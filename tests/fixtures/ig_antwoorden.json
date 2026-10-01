@@ -1,0 +1,411 @@
+{
+  "positions_v2": {
+    "positions": []
+  },
+  "markets": {
+    "instrument": {
+      "epic": "CS.D.CFEGOLD.CEA.IP",
+      "expiry": "-",
+      "name": "Spot Gold ($1)",
+      "forceOpenAllowed": true,
+      "stopsLimitsAllowed": true,
+      "lotSize": 1.0,
+      "unit": "CONTRACTS",
+      "type": "CURRENCIES",
+      "controlledRiskAllowed": true,
+      "streamingPricesAvailable": true,
+      "marketId": "GC",
+      "currencies": [
+        {
+          "code": "USD",
+          "symbol": "$",
+          "baseExchangeRate": 1.134785,
+          "exchangeRate": 0.66,
+          "isDefault": false
+        }
+      ],
+      "sprintMarketsMinimumExpiryTime": null,
+      "sprintMarketsMaximumExpiryTime": null,
+      "marginDepositBands": [
+        {
+          "min": 0,
+          "max": 2300,
+          "margin": 5,
+          "currency": "USD"
+        },
+        {
+          "min": 2300,
+          "max": 4600,
+          "margin": 5,
+          "currency": "USD"
+        },
+        {
+          "min": 4600,
+          "max": 6900,
+          "margin": 5,
+          "currency": "USD"
+        },
+        {
+          "min": 6900,
+          "max": null,
+          "margin": 7.5,
+          "currency": "USD"
+        }
+      ],
+      "marginFactor": 5,
+      "marginFactorUnit": "PERCENTAGE",
+      "slippageFactor": {
+        "unit": "pct",
+        "value": 50.0
+      },
+      "limitedRiskPremium": {
+        "value": 1,
+        "unit": "POINTS"
+      },
+      "openingHours": null,
+      "expiryDetails": null,
+      "rolloverDetails": null,
+      "newsCode": "GOL",
+      "chartCode": null,
+      "country": null,
+      "valueOfOnePip": "1.00",
+      "onePipMeans": "1",
+      "contractSize": "1",
+      "specialInfo": [
+        "DEFAULT KNOCK OUT LEVEL DISTANCE",
+        "MIN KNOCK OUT LEVEL DISTANCE",
+        "MAX KNOCK OUT LEVEL DISTANCE"
+      ]
+    },
+    "dealingRules": {
+      "minStepDistance": {
+        "unit": "POINTS",
+        "value": 1.0
+      },
+      "minDealSize": {
+        "unit": "POINTS",
+        "value": 0.1
+      },
+      "minControlledRiskStopDistance": {
+        "unit": "POINTS",
+        "value": 2.0
+      },
+      "minNormalStopOrLimitDistance": {
+        "unit": "POINTS",
+        "value": 1.0
+      },
+      "maxStopOrLimitDistance": {
+        "unit": "PERCENTAGE",
+        "value": 75.0
+      },
+      "controlledRiskSpacing": {
+        "unit": "POINTS",
+        "value": 4.0
+      },
+      "marketOrderPreference": "AVAILABLE_DEFAULT_OFF",
+      "trailingStopsPreference": "AVAILABLE"
+    },
+    "snapshot": {
+      "marketStatus": "TRADEABLE",
+      "netChange": 23.34,
+      "percentageChange": 0.57,
+      "updateTime": "09:00:35",
+      "delayTime": 0,
+      "bid": 4139.11,
+      "offer": 4139.71,
+      "high": 4149.33,
+      "low": 4113.06,
+      "binaryOdds": null,
+      "decimalPlacesFactor": 2,
+      "scalingFactor": 1,
+      "controlledRiskExtraSpread": null
+    }
+  },
+  "transactions_v2": {
+    "transactions": [
+      {
+        "date": "2026-09-29",
+        "dateUtc": "2026-09-29T05:23:10",
+        "openDateUtc": "2026-09-29T02:19:41",
+        "instrumentName": "Spot Gold ($1) converted at 0.8731281439999999",
+        "period": "-",
+        "profitAndLoss": "E2.48",
+        "transactionType": "Transactie",
+        "reference": "JZ3RYUBE",
+        "openLevel": "4134.69",
+        "closeLevel": "4132.83",
+        "size": "-1.53",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-29",
+        "dateUtc": "2026-09-29T02:19:37",
+        "openDateUtc": "2026-09-29T01:48:41",
+        "instrumentName": "Spot Gold ($1) converted at 0.872467472",
+        "period": "-",
+        "profitAndLoss": "E1.35",
+        "transactionType": "Transactie",
+        "reference": "JZZHPDBE",
+        "openLevel": "4136.56",
+        "closeLevel": "4135.55",
+        "size": "-1.53",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-29",
+        "dateUtc": "2026-09-29T01:48:31",
+        "openDateUtc": "2026-09-29T01:30:01",
+        "instrumentName": "Spot Gold ($1) converted at 0.886687704",
+        "period": "-",
+        "profitAndLoss": "E-10.42",
+        "transactionType": "Transactie",
+        "reference": "JZYFRZBE",
+        "openLevel": "4129.78",
+        "closeLevel": "4137.31",
+        "size": "-1.56",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-29",
+        "dateUtc": "2026-09-28T22:23:34",
+        "openDateUtc": "2026-09-28T20:43:38",
+        "instrumentName": "Spot Gold ($1) converted at 0.872187728",
+        "period": "-",
+        "profitAndLoss": "E15.06",
+        "transactionType": "Transactie",
+        "reference": "JZB3JMBE",
+        "openLevel": "4114.2",
+        "closeLevel": "4126.11",
+        "size": "+1.45",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T20:43:36",
+        "openDateUtc": "2026-09-28T20:15:04",
+        "instrumentName": "Spot Gold ($1) converted at 0.8864382239999999",
+        "period": "-",
+        "profitAndLoss": "E-10.20",
+        "transactionType": "Transactie",
+        "reference": "JZA7YABE",
+        "openLevel": "4122.06",
+        "closeLevel": "4114.01",
+        "size": "+1.43",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T17:06:50",
+        "openDateUtc": "2026-09-28T16:26:35",
+        "instrumentName": "Spot Gold ($1) converted at 0.8724868159999999",
+        "period": "-",
+        "profitAndLoss": "E15.16",
+        "transactionType": "Transactie",
+        "reference": "JYTKVTBE",
+        "openLevel": "4141.08",
+        "closeLevel": "4126.6",
+        "size": "-1.20",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T16:26:34",
+        "openDateUtc": "2026-09-28T16:21:25",
+        "instrumentName": "Spot Gold ($1) converted at 0.885803688",
+        "period": "-",
+        "profitAndLoss": "E-10.77",
+        "transactionType": "Transactie",
+        "reference": "JYSEBUBE",
+        "openLevel": "4131",
+        "closeLevel": "4141.13",
+        "size": "-1.20",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T16:21:24",
+        "openDateUtc": "2026-09-28T15:04:57",
+        "instrumentName": "Spot Gold ($1) converted at 0.88616556",
+        "period": "-",
+        "profitAndLoss": "E-10.14",
+        "transactionType": "Transactie",
+        "reference": "JYE5BPBE",
+        "openLevel": "4122.28",
+        "closeLevel": "4132.97",
+        "size": "-1.07",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T15:04:55",
+        "openDateUtc": "2026-09-28T14:44:14",
+        "instrumentName": "Spot Gold ($1) converted at 0.873047296",
+        "period": "-",
+        "profitAndLoss": "E0.78",
+        "transactionType": "Transactie",
+        "reference": "JYBGF5BE",
+        "openLevel": "4123.39",
+        "closeLevel": "4122.62",
+        "size": "-1.16",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T14:44:04",
+        "openDateUtc": "2026-09-28T14:15:04",
+        "instrumentName": "Spot Gold ($1) converted at 0.873419792",
+        "period": "-",
+        "profitAndLoss": "E15.32",
+        "transactionType": "Transactie",
+        "reference": "JX7KTFBE",
+        "openLevel": "4138.71",
+        "closeLevel": "4123.32",
+        "size": "-1.14",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T13:30:58",
+        "openDateUtc": "2026-09-28T12:57:32",
+        "instrumentName": "Spot Gold ($1) converted at 0.87287072",
+        "period": "-",
+        "profitAndLoss": "E19.14",
+        "transactionType": "Transactie",
+        "reference": "JXXY22BE",
+        "openLevel": "4153.79",
+        "closeLevel": "4140.17",
+        "size": "-1.61",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T12:57:23",
+        "openDateUtc": "2026-09-28T12:28:50",
+        "instrumentName": "Spot Gold ($1) converted at 0.87259048",
+        "period": "-",
+        "profitAndLoss": "E1.23",
+        "transactionType": "Transactie",
+        "reference": "JXVNVCBE",
+        "openLevel": "4155.21",
+        "closeLevel": "4154.44",
+        "size": "-1.83",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T12:28:44",
+        "openDateUtc": "2026-09-28T12:07:13",
+        "instrumentName": "Spot Gold ($1) converted at 0.872110848",
+        "period": "-",
+        "profitAndLoss": "E14.42",
+        "transactionType": "Transactie",
+        "reference": "JXTEWQBE",
+        "openLevel": "4165.18",
+        "closeLevel": "4154.58",
+        "size": "-1.56",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T12:07:07",
+        "openDateUtc": "2026-09-28T12:05:32",
+        "instrumentName": "Spot Gold ($1) converted at 0.885729096",
+        "period": "-",
+        "profitAndLoss": "E-9.93",
+        "transactionType": "Transactie",
+        "reference": "JXTENNBE",
+        "openLevel": "4160.25",
+        "closeLevel": "4167.44",
+        "size": "-1.56",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T12:05:27",
+        "openDateUtc": "2026-09-28T12:04:11",
+        "instrumentName": "Spot Gold ($1) converted at 0.886021416",
+        "period": "-",
+        "profitAndLoss": "E-11.99",
+        "transactionType": "Transactie",
+        "reference": "JXTEHVBE",
+        "openLevel": "4155.3",
+        "closeLevel": "4160.69",
+        "size": "-2.51",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T12:04:08",
+        "openDateUtc": "2026-09-28T11:16:40",
+        "instrumentName": "Spot Gold ($1) converted at 0.872229392",
+        "period": "-",
+        "profitAndLoss": "E1.03",
+        "transactionType": "Transactie",
+        "reference": "JXBE68BE",
+        "openLevel": "4153.72",
+        "closeLevel": "4152.95",
+        "size": "-1.54",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T11:16:36",
+        "openDateUtc": "2026-09-28T09:51:51",
+        "instrumentName": "Spot Gold ($1) converted at 0.8723102399999999",
+        "period": "-",
+        "profitAndLoss": "E0.97",
+        "transactionType": "Transactie",
+        "reference": "JWDNCEBE",
+        "openLevel": "4155.5",
+        "closeLevel": "4154.73",
+        "size": "-1.45",
+        "currency": "E",
+        "cashTransaction": false
+      },
+      {
+        "date": "2026-09-28",
+        "dateUtc": "2026-09-28T09:51:42",
+        "openDateUtc": "2026-09-28T09:23:30",
+        "instrumentName": "Spot Gold ($1) converted at 0.885962952",
+        "period": "-",
+        "profitAndLoss": "E-10.24",
+        "transactionType": "Transactie",
+        "reference": "JWA3TZBE",
+        "openLevel": "4148.19",
+        "closeLevel": "4156.16",
+        "size": "-1.45",
+        "currency": "E",
+        "cashTransaction": false
+      }
+    ],
+    "metadata": {
+      "size": 43,
+      "pageData": {
+        "pageSize": 20,
+        "pageNumber": 1,
+        "totalPages": 3
+      }
+    }
+  },
+  "clientsentiment": {
+    "marketId": "GC",
+    "longPositionPercentage": 77.0,
+    "shortPositionPercentage": 23.0
+  }
+}
