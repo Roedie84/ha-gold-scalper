@@ -1,0 +1,10 @@
+# Dit voorbeeld is vervangen.
+#
+# Het verwees naar gegokte entiteit-id's (zoals sensor.gold_scalper_price) die
+# Home Assistant niet aanmaakt. Laat de integratie het dashboard schrijven met
+# de id's die werkelijk bestaan:
+#
+#   action: gold_scalper.write_dashboard
+#
+# Dat maakt /config/gold_scalper_dashboard.yaml. Plak de inhoud daarvan in de
+# ruwe configuratie-editor van een dashboard.

@@ -1,0 +1,429 @@
+prepare_shutdown:
+  name: Afwikkelen voor herstart
+  description: 'Stopt met nieuwe posities openen en wikkelt de lopende af. Roep dit
+    aan vóórdat je Home Assistant herstart of bijwerkt. Controleer daarna binary_sensor.gold_scalper_veilig_herstarten.
+
+    '
+close_all:
+  name: Alles sluiten
+  description: 'Sluit alle open posities direct tegen marktprijs. Noodknop.
+
+    '
+resume:
+  name: Hervatten na noodstop
+  description: 'Heft een noodstop op en stemt opnieuw af met de broker. Doe dit pas
+    nadat je hebt vastgesteld wat de noodstop veroorzaakte.
+
+    '
+generate_report:
+  name: Keuringsrapport maken
+  description: 'Schrijft een zelfstandig HTML-rapport met resultaat, kosten en analyse
+    naar je configuratiemap.
+
+    '
+  fields:
+    path:
+      name: Bestandsnaam
+      description: Bestandsnaam binnen de configuratiemap.
+      example: gold_scalper_rapport.html
+      selector:
+        text: null
+backtest:
+  name: Backtest draaien
+  description: 'Laat de strategie over de opgebouwde historie lopen met dezelfde code
+    als de live handel. Vraagt geen datapunten op bij de broker. Let op: een backtest
+    die je gebruikt om instellingen te kiezen, meet daarna niets meer.'
+  fields:
+    spread:
+      name: Spread
+      description: USD per ounce. Leeg = de spread die de broker nu geeft.
+      selector:
+        number:
+          min: 0.0
+          max: 5.0
+          step: 0.05
+          mode: box
+    slippage:
+      name: Slippage
+      description: Aanname per zijde in USD per ounce.
+      selector:
+        number:
+          min: 0.0
+          max: 1.0
+          step: 0.005
+          mode: box
+    units:
+      name: Ordergrootte
+      description: Ounces per trade. Leeg = je huidige instelling.
+      selector:
+        number:
+          min: 0.01
+          max: 100
+          step: 0.01
+          mode: box
+    invert:
+      name: Signaal omdraaien
+      description: 'Draait elk signaal om: een koopsignaal wordt een verkoop. De trefkans
+        ligt ver onder wat willekeurig instappen zou opleveren bij dezelfde exits,
+        en een signaal dat structureel slechter is dan toeval bevat informatie met
+        het verkeerde teken. Er valt niets aan af te stellen - het werkt of het werkt
+        niet.'
+      selector:
+        boolean: null
+reset_day:
+  name: Dagtellers terugzetten
+  description: 'Begint de handelsdag opnieuw: dagverlies, hervattingen en verliesreeks
+    op nul, en een lopende noodstop wordt opgeheven. Het geleden verlies blijft in
+    de database staan en telt mee in je resultaten; alleen de noodrem begint opnieuw.
+    Bedoeld voor het geval je de limiet bereikte door een instelling die je inmiddels
+    hebt gecorrigeerd.'
+import_history:
+  name: Historie inlezen
+  description: 'Haalt bars bij de broker op en bewaart ze in het archief. Bewust handmatig:
+    elk datapunt telt tegen het weekquotum, en een importlus die zichzelf start kan
+    dat in een uur opmaken. Het archief groeit daarnaast vanzelf met elke bar die
+    de bot tijdens het draaien afsluit.'
+  fields:
+    bars:
+      name: Aantal bars
+      description: Hoeveel bars in één keer (100 tot 5000).
+      selector:
+        number:
+          min: 100
+          max: 5000
+          step: 100
+          mode: box
+validate_backtest:
+  name: Backtest valideren tegen live
+  description: Draait de backtest over precies de periode waarin de bot werkelijk
+    handelde en legt de uitkomsten naast elkaar. Alle hypothesen die je op historische
+    data toetst rusten op de aanname dat de backtest de werkelijkheid nabootst; deze
+    dienst controleert die aanname.
+new_run:
+  name: Nieuwe bewijsfase beginnen
+  description: 'Sluit de huidige run af en begint een nieuwe, zonder iets aan de strategie
+    te veranderen. Bedoeld voor wanneer blijkt dat de meting fout was: dan zijn de
+    oude cijfers onbruikbaar terwijl de strategie ongewijzigd is. Eerdere runs blijven
+    bewaard en staan onderaan het keuringsrapport.'
+  fields:
+    note:
+      name: Reden
+      description: Waarom je opnieuw begint. Wordt bij de run bewaard.
+      selector:
+        text: null
+recheck_exits:
+  name: Uitstapprijzen opnieuw opzoeken
+  description: 'Zet alle afgerekende trades terug op ''geschat'' zodat hun uitstapprijs
+    opnieuw bij de broker wordt opgehaald. Nodig na een versie die de verkeerde transactie
+    kon koppelen: twee posities met bijna dezelfde instapprijs maar tegengestelde
+    richting waren niet te scheiden.'
+indicator_lab:
+  name: Indicatorlab
+  description: 'Toetst ruim twintig indicatoren op het barsarchief: wat had elk opgeleverd
+    als je erop had gehandeld? De eerste 70% van de bars bepaalt drempels en richting,
+    de laatste 30% bevestigt zonder aanpassing. De vereiste t-waarde stijgt met het
+    aantal indicatoren, omdat veel proberen anders altijd een toevalstreffer oplevert.'
+  fields:
+    kosten:
+      name: Kosten per ounce
+      description: Heen en terug, per ounce. Standaard 0,75 uit de gemeten live-kosten.
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.05
+          mode: box
+reconcile:
+  name: Afstemmen met de broker
+  description: Legt de gesloten trades van de laatste dagen naast het transactieoverzicht
+    van de broker en meldt elke afwijking in uitstapprijs of bedrag. Gebeurt ook elke
+    handelsdag vanzelf, na 06:00 UTC.
+  fields:
+    dagen:
+      name: Dagen terug
+      description: Hoeveel dagen afstemmen (standaard 3).
+      selector:
+        number:
+          min: 1
+          max: 14
+          step: 1
+          mode: box
+capture_responses:
+  name: Brokerantwoorden vastleggen
+  description: Slaat de werkelijke antwoorden van de broker op, zonder rekeningnummers,
+    zodat de tests tegen echte gegevens toetsen in plaats van tegen aannames.
+write_dashboard:
+  name: Dashboard schrijven
+  description: Schrijft /config/gold_scalper_dashboard.yaml met een Lovelace-dashboard
+    dat de werkelijke entiteit-id's gebruikt, uit het entiteitenregister. Plak de
+    inhoud in de ruwe configuratie-editor van een dashboard.
+
+lab_snapshot:
+  name: 'Lab: dataset vastleggen'
+  description: 'Maakt een onveranderlijke dataset uit het barsarchief (alleen lezen). Onderzoek; raakt de handel niet.'
+  fields:
+    symbol:
+      name: symbol
+      description: 'Symbool in het archief.'
+      example: GOLD
+      selector:
+        text: null
+    timeframe:
+      name: timeframe
+      description: 'Tijdvak: 1m, 5m, 15m, 30m of 1h.'
+      example: 15m
+      selector:
+        text: null
+    start:
+      name: start
+      description: 'Optioneel begin (ISO-tijd, UTC).'
+      example: 2026-09-01T00:00:00Z
+      selector:
+        text: null
+    end:
+      name: end
+      description: 'Optioneel einde (ISO-tijd, UTC).'
+      selector:
+        text: null
+    precision:
+      name: precision
+      description: 'Optioneel aantal decimalen van het instrument.'
+      example: 2
+      selector:
+        number:
+          min: 0
+          max: 6
+          mode: box
+    request_id:
+      name: request_id
+      description: 'Optioneel. Zelfde id en zelfde invoer geeft hetzelfde antwoord; er gebeurt niets dubbel.'
+      example: snap-20261001-01
+      selector:
+        text: null
+lab_create_walk_forward:
+  name: 'Lab: walk-forward als concept'
+  description: 'Legt een walk-forwardexperiment vast als concept, met de bestaande Lab-validatie. Registreren en starten zijn aparte stappen.'
+  fields:
+    name:
+      name: name
+      description: 'Naam.'
+      example: drempel 0,45
+      selector:
+        text: null
+    description:
+      name: description
+      description: 'Optionele toelichting.'
+      selector:
+        text: null
+    hypothesis:
+      name: hypothesis
+      description: 'Hypothese.'
+      selector:
+        text: null
+    expected_effect:
+      name: expected_effect
+      description: 'Verwacht effect.'
+      selector:
+        text: null
+    hypothesis_family_id:
+      name: hypothesis_family_id
+      description: 'Hypothesefamilie.'
+      example: bruto-oos
+      selector:
+        text: null
+    dataset_id:
+      name: dataset_id
+      description: 'Datasetnummer.'
+      example: 1
+      selector:
+        text: null
+    mode:
+      name: mode
+      description: 'CANDIDATE_SELECTION_WALK_FORWARD of SEQUENTIAL_OOS.'
+      selector:
+        text: null
+    window_type:
+      name: window_type
+      description: 'ROLLING of EXPANDING.'
+      selector:
+        text: null
+    first_train_start:
+      name: first_train_start
+      description: 'Optioneel begin van het eerste trainvenster (ISO, UTC).'
+      selector:
+        text: null
+    train_days:
+      name: train_days
+      description: 'Trainvenster in dagen.'
+      example: 10
+      selector:
+        text: null
+    validation_days:
+      name: validation_days
+      description: 'Validatievenster in dagen (standaard 0).'
+      selector:
+        text: null
+    test_days:
+      name: test_days
+      description: 'Testvenster in dagen.'
+      example: 5
+      selector:
+        text: null
+    step_days:
+      name: step_days
+      description: 'Stap in dagen (standaard test + validatie).'
+      selector:
+        text: null
+    window_count:
+      name: window_count
+      description: 'Aantal vensters.'
+      example: 4
+      selector:
+        text: null
+    max_hold_seconds:
+      name: max_hold_seconds
+      description: 'Maximale houdtijd (standaard 900).'
+      selector:
+        text: null
+    primary_metric:
+      name: primary_metric
+      description: 'Primaire metriek (standaard net_pnl).'
+      selector:
+        text: null
+    selection_direction:
+      name: selection_direction
+      description: 'MAXIMIZE of MINIMIZE.'
+      selector:
+        text: null
+    validation_condition:
+      name: validation_condition
+      description: 'Verplicht als validation_days > 0: {metric, operator, threshold}.'
+      selector:
+        object: null
+    candidates:
+      name: candidates
+      description: 'Lijst van {label, config}; config met strategy, exits, execution. Onbekende sleutels worden geweigerd.'
+      selector:
+        object: null
+    request_id:
+      name: request_id
+      description: 'Optioneel. Zelfde id en zelfde invoer geeft hetzelfde antwoord; er gebeurt niets dubbel.'
+      example: snap-20261001-01
+      selector:
+        text: null
+lab_register:
+  name: 'Lab: registreren'
+  description: 'Zet een concept op registered. Daarna ligt het plan vast.'
+  fields:
+    experiment_id:
+      name: experiment_id
+      description: 'Experimentnummer.'
+      example: 4
+      selector:
+        number:
+          min: 1
+          mode: box
+    request_id:
+      name: request_id
+      description: 'Optioneel. Zelfde id en zelfde invoer geeft hetzelfde antwoord; er gebeurt niets dubbel.'
+      example: snap-20261001-01
+      selector:
+        text: null
+lab_start:
+  name: 'Lab: starten'
+  description: 'Start een geregistreerd walk-forwardexperiment. Wacht niet op het einde; voortgang volgt als event en melding.'
+  fields:
+    experiment_id:
+      name: experiment_id
+      description: 'Experimentnummer.'
+      example: 4
+      selector:
+        number:
+          min: 1
+          mode: box
+    request_id:
+      name: request_id
+      description: 'Optioneel. Zelfde id en zelfde invoer geeft hetzelfde antwoord; er gebeurt niets dubbel.'
+      example: snap-20261001-01
+      selector:
+        text: null
+lab_cancel:
+  name: 'Lab: annuleren'
+  description: 'Annuleert een concept, geregistreerd of lopend experiment.'
+  fields:
+    experiment_id:
+      name: experiment_id
+      description: 'Experimentnummer.'
+      example: 4
+      selector:
+        number:
+          min: 1
+          mode: box
+lab_assess:
+  name: 'Lab: beoordelen'
+  description: 'Beoordeelt een voltooid experiment. Opent TEST (gelogd). Onderzoeksclassificatie, geen advies of toestemming voor live handel.'
+  fields:
+    experiment_id:
+      name: experiment_id
+      description: 'Experimentnummer.'
+      example: 4
+      selector:
+        number:
+          min: 1
+          mode: box
+    request_id:
+      name: request_id
+      description: 'Optioneel. Zelfde id en zelfde invoer geeft hetzelfde antwoord; er gebeurt niets dubbel.'
+      example: snap-20261001-01
+      selector:
+        text: null
+lab_compare:
+  name: 'Lab: vergelijken'
+  description: 'Vergelijkt twee beoordeelde experimenten. Standaard uit de beoordelingen, zonder TEST te openen. Geen winnaar.'
+  fields:
+    reference_experiment_id:
+      name: reference_experiment_id
+      description: 'Referentie-experiment.'
+      example: 1
+      selector:
+        number:
+          min: 1
+          mode: box
+    challenger_experiment_id:
+      name: challenger_experiment_id
+      description: 'Uitdager.'
+      example: 2
+      selector:
+        number:
+          min: 1
+          mode: box
+    mode:
+      name: mode
+      description: 'ASSESSMENT_COMPARISON (standaard) of DEEP_RESULT_COMPARISON.'
+      selector:
+        text: null
+    reference_assessment_id:
+      name: reference_assessment_id
+      description: 'Optioneel.'
+      selector:
+        number:
+          min: 1
+          mode: box
+    challenger_assessment_id:
+      name: challenger_assessment_id
+      description: 'Optioneel.'
+      selector:
+        number:
+          min: 1
+          mode: box
+    confirm_test_reuse:
+      name: confirm_test_reuse
+      description: 'Alleen bij DEEP_RESULT_COMPARISON: bevestig dat TEST opnieuw wordt geopend en als hergebruik telt.'
+      selector:
+        boolean: null
+    request_id:
+      name: request_id
+      description: 'Optioneel. Zelfde id en zelfde invoer geeft hetzelfde antwoord; er gebeurt niets dubbel.'
+      example: snap-20261001-01
+      selector:
+        text: null
