@@ -59,7 +59,10 @@ IDEMPOTENT_ACTIONS = frozenset({"snapshot", "create_walk_forward", "register", "
 #: Wat op een bestandspad lijkt, wordt geweigerd - ook als het een tekstveld is.
 PAD = re.compile(r"(^\s*/|\\|\.\./|\.db\b|/config\b)")
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_.:-]{8,64}$")
-NAAM = re.compile(r"^[A-Za-z0-9 _.:/()+-]{1,80}$")
+#: Namen en labels: letters (ook met accenten), cijfers, spaties en
+#: _ . , : / ( ) + - &. Geen aanhalingstekens of regeleinden.
+NAAM = re.compile(r"^[\w ,.:/()+&-]{1,80}$")
+NAAM_UITLEG = "hooguit 80 tekens: letters, cijfers, spaties en _ . , : / ( ) + - &"
 SYMBOOL = re.compile(r"^[A-Z0-9._]{1,32}$")
 #: Tijdvakken die het archief bijhoudt.
 TIMEFRAMES = ("1m", "5m", "15m", "30m", "1h")
@@ -274,7 +277,7 @@ class LabActions:
         _alleen(p, ACTION_FIELDS["create_walk_forward"], "create_walk_forward")
         naam = _tekst(p, "name", maximum=80)
         if not NAAM.match(naam):
-            raise LabActionError("invalid_parameter", "name: hooguit 80 gewone tekens")
+            raise LabActionError("invalid_parameter", f"name: {NAAM_UITLEG}")
         familie = _tekst(p, "hypothesis_family_id", maximum=80)
         ds_id = _int(p, "dataset_id", minimum=1)
         ds = db.dataset(ds_id)
@@ -294,7 +297,7 @@ class LabActions:
             if not isinstance(k, dict) or set(k) - {"label", "config"} or "label" not in k:
                 raise LabActionError("invalid_parameter", "kandidaat: {label, config}")
             if not isinstance(k["label"], str) or not NAAM.match(k["label"]) or k["label"] in labels:
-                raise LabActionError("invalid_parameter", "kandidaat: unieke, gewone label")
+                raise LabActionError("invalid_parameter", f"kandidaatlabel moet uniek zijn, {NAAM_UITLEG}")
             labels.add(k["label"])
             try:
                 build_configs(k.get("config") or {})

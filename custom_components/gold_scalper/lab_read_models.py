@@ -26,7 +26,7 @@ from .experiment_lab import INVARIANT
 from .experiment_lab.storage import LAB_SCHEMA_VERSION
 
 #: Versie van de vorm van deze modellen. Omhoog bij elke sleutelwijziging.
-READ_MODEL_VERSION = 1
+READ_MODEL_VERSION = 2       # 2 (1.3): componentdetails in AssessmentDetail
 
 DISCLAIMER = (
     "Onderzoeksclassificatie op historische backtest- of paperdata. Geen advies, "
@@ -140,6 +140,19 @@ def _json(waarde, standaard):
         return json.loads(waarde)
     except (TypeError, ValueError):
         return standaard
+
+
+def _gewoon(waarde, diepte: int = 0):
+    """Alleen getallen, tekst, ja/nee en lijsten of dicts daarvan; begrensd."""
+    if diepte > 4:
+        return None
+    if waarde is None or isinstance(waarde, (bool, int, float, str)):
+        return waarde[:300] if isinstance(waarde, str) else waarde
+    if isinstance(waarde, (list, tuple)):
+        return [_gewoon(v, diepte + 1) for v in list(waarde)[:50]]
+    if isinstance(waarde, dict):
+        return {str(k): _gewoon(v, diepte + 1) for k, v in list(waarde.items())[:50]}
+    return None
 
 
 def _check(naam: str, model: dict) -> dict:
@@ -416,6 +429,9 @@ def assessment_detail(db, assessment_id: int) -> dict:
             "unit": c.get("unit"), "sample_size": c.get("sample_size"),
             "required_condition": c.get("required_condition"), "blocking": bool(c.get("blocking")),
             "explanation": c.get("explanation"),
+            # Gemiddelden, spreiding, intervallen (1.3). Alleen gewone waarden;
+            # de beoordeling heeft TEST al geopend en gelogd.
+            "details": _gewoon(_json(c.get("details_json"), {})),
             "source_window_ids": _json(c.get("source_window_ids_json"), []),
         })
         drempels[code] = c.get("required_condition")

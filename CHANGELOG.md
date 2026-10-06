@@ -1,5 +1,15 @@
 # Changelog — Gold Scalper
 
+## 1.3.0
+
+* **Namen en labels** in het Lab mogen komma's, accenten en `&` bevatten. De
+  foutmelding noemt nu welke tekens zijn toegestaan.
+* **Voortgang bij walk-forward**: `bars_total` en `bars_processed` worden
+  gevuld, opgeteld over alle eenheden; na afloop zijn ze gelijk.
+* **Leesmodel versie 2**: `AssessmentDetail` geeft per component de details
+  (gemiddelde, spreiding, standaardfout, interval). Bij `GROSS_EVIDENCE`
+  daarmee ook gemiddeld bruto, netto en kosten per trade.
+
 ## 1.2.0
 
 * **`import_history` gaat terug in de tijd.** Nieuw veld `days`: zoveel dagen

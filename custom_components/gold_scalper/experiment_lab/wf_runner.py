@@ -112,7 +112,9 @@ class WalkForwardRunner(ExperimentRunner):
             per_venster = (len(kandidaten) + (1 if regel.validation_policy == TRAIN_THEN_VALIDATION
                                               else 0) + 1) if selectie else 1
             totaal = per_venster * len(plan["windows"])
-            teller = {"eenheid": 0, "vensters": 0}
+            # bars: opgeteld over alle eenheden; per eenheid zou de teller
+            # teruglopen, en voortgang gaat nooit achteruit (1.3).
+            teller = {"eenheid": 0, "vensters": 0, "bars_klaar": 0, "eenheid_totaal": 0}
             t_start = time.monotonic()
             handle.timings = []                                     # type: ignore[attr-defined]
 
@@ -128,11 +130,14 @@ class WalkForwardRunner(ExperimentRunner):
 
                 def voortgang(bericht):
                     deel = bericht["done"] / bericht["total"] if bericht.get("total") else 0
+                    teller["eenheid_totaal"] = max(teller["eenheid_totaal"], int(bericht.get("total") or 0))
                     db.update_wf_progress(
                         eid, pct=(nr + min(1.0, deel)) / totaal * 100,
                         windows_total=len(plan["windows"]), windows_completed=teller["vensters"],
                         current_window=venster["window_index"], candidates_total=len(kandidaten),
-                        current_candidate=kandidaat["candidate_label"], segment=soort)
+                        current_candidate=kandidaat["candidate_label"], segment=soort,
+                        bars_processed=teller["bars_klaar"] + int(bericht.get("done") or 0),
+                        bars_total=teller["bars_klaar"] + int(bericht.get("total") or 0))
 
                 t0 = time.monotonic()
                 proces = subprocess.Popen(
@@ -156,6 +161,18 @@ class WalkForwardRunner(ExperimentRunner):
                                        "bars": resultaat["segment"]["bars_in_slice"],
                                        "payload_bytes": len(json.dumps(resultaat))})
                 teller["eenheid"] += 1
+                # Dezelfde maat als de voortgangsberichten: wat de worker als
+                # totaal meldde, zodat verwerkt aan het eind gelijk is aan totaal.
+                teller["bars_klaar"] += teller["eenheid_totaal"]
+                teller["eenheid_totaal"] = 0
+                # Het laatste bericht van de worker komt vóór de laatste bar;
+                # na een voltooide eenheid is alles verwerkt.
+                db.update_wf_progress(
+                    eid, pct=teller["eenheid"] / totaal * 100,
+                    windows_total=len(plan["windows"]), windows_completed=teller["vensters"],
+                    current_window=venster["window_index"], candidates_total=len(kandidaten),
+                    current_candidate=kandidaat["candidate_label"], segment=soort,
+                    bars_processed=teller["bars_klaar"], bars_total=teller["bars_klaar"])
                 return rid
 
             for venster in plan["windows"]:

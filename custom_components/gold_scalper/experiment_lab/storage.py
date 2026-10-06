@@ -2308,15 +2308,18 @@ class LabDatabase:
     def update_wf_progress(self, experiment_id: int, *, pct: float, windows_total: int,
                            windows_completed: int, current_window: int | None,
                            candidates_total: int, current_candidate: str | None,
-                           segment: str | None) -> None:
+                           segment: str | None, bars_processed: int = 0,
+                           bars_total: int = 0) -> None:
         self.conn.execute(
             "UPDATE experiment_runs SET progress_pct = MAX(progress_pct, ?), "
             "windows_total = MAX(windows_total, ?), windows_completed = MAX(windows_completed, ?), "
             "current_window = ?, candidates_total = MAX(candidates_total, ?), "
-            "current_candidate = ?, current_segment = ?, last_progress_at = ? "
+            "current_candidate = ?, current_segment = ?, last_progress_at = ?, "
+            "bars_total = MAX(bars_total, ?), bars_processed = MAX(bars_processed, ?) "
             "WHERE experiment_id = ?",
             (min(99.9, round(pct, 1)), windows_total, windows_completed, current_window,
-             candidates_total, current_candidate, segment, _nu(), experiment_id))
+             candidates_total, current_candidate, segment, _nu(),
+             max(bars_total, bars_processed), bars_processed, experiment_id))
 
     def wf_overview(self, experiment_id: int) -> dict:
         """Wat zonder TEST-toegang zichtbaar mag zijn: aantallen, statussen,
