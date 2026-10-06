@@ -1,0 +1,54 @@
+# Maakt automatisch tag en release aan zodra manifest.json een nieuwe versie
+# heeft. Zo hoeft er na een push naar main niets meer met de hand op GitHub;
+# HACS ziet de release en meldt de update in Home Assistant.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - custom_components/gold_scalper/manifest.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Versie uit manifest lezen
+        id: versie
+        run: |
+          VERSIE=$(python3 -c "import json;print(json.load(open('custom_components/gold_scalper/manifest.json'))['version'])")
+          echo "versie=$VERSIE" >> "$GITHUB_OUTPUT"
+          if git rev-parse "v$VERSIE" >/dev/null 2>&1; then
+            echo "bestaat=ja" >> "$GITHUB_OUTPUT"
+          else
+            echo "bestaat=nee" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Releasetekst uit CHANGELOG.md
+        if: steps.versie.outputs.bestaat == 'nee'
+        run: |
+          python3 - "${{ steps.versie.outputs.versie }}" > notes.md <<'PY'
+          import re, sys
+          versie = sys.argv[1]
+          tekst = open("CHANGELOG.md", encoding="utf-8").read()
+          m = re.search(rf"^## {re.escape(versie)}\s*\n(.*?)(?=^## |\Z)", tekst, re.S | re.M)
+          print(m.group(1).strip() if m else f"Versie {versie}.")
+          PY
+
+      - name: Tag en release aanmaken
+        if: steps.versie.outputs.bestaat == 'nee'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.versie.outputs.versie }}" \
+            --target "$GITHUB_SHA" \
+            --title "${{ steps.versie.outputs.versie }}" \
+            --notes-file notes.md
