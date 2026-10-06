@@ -2047,9 +2047,13 @@ class LabDatabase:
             "FROM experiments e LEFT JOIN segment_plans p ON p.experiment_id = e.id "
             "WHERE e.hypothesis_family_id = ? ORDER BY e.id", (familie,),
         ).fetchall()
+        # Walk-forwardexperimenten tellen hieronder per kandidaat. Hier
+        # overslaan, anders telt hun experimenthash als extra configuratie
+        # (tot 1.1: één kandidaat gaf "2 geëvalueerde configuraties").
+        wf_ids = {r[0] for r in self.conn.execute("SELECT experiment_id FROM wf_plans")}
         geevalueerd = {
             (r["config_hash"], r["dataset_id"], r["plan_hash"], r["versies"])
-            for r in exps if r["status"] == "completed"
+            for r in exps if r["status"] == "completed" and r["id"] not in wf_ids
         }
         # Walk-forward: een geëvalueerde configuratie is configuratiehash,
         # dataset, plan (kandidatenset en vensterindeling), versies en rol.
@@ -2625,7 +2629,8 @@ class LabDatabase:
                                 "overlapping_prior_count": h["overlapping"],
                                 "overlap_seconds": h["overlap_seconds"], "overlap_bars": h["overlap_bars"]})
                 test = {"result_id": r["id"],
-                        "trades": [{"net": t["net_pnl_instrument"], "trading_day": t["trading_day"],
+                        "trades": [{"net": t["net_pnl_instrument"], "gross": t["gross_pnl_instrument"],
+                                    "trading_day": t["trading_day"],
                                     "regime": t["regime"], "session": t["session"],
                                     "close_reason": t["close_reason"]} for t in trades],
                         "metrics": {k: {"value": m["value"], "calculation_status": m["calculation_status"]}

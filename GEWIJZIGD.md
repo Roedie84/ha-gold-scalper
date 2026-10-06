@@ -1,34 +1,29 @@
-# ha-gold-scalper 1.0.0
+# Van 1.0.0 naar 1.1.0
 
-Volledige repository, klaar voor `Roedie84/ha-gold-scalper`. Inhoudelijk
-Goldscalper 5.7.0; zie `CHANGELOG.md`.
+Eén zip met alleen de gewijzigde bestanden sinds 1.0.0. Suite: **1650 tests
+groen**, 1 overgeslagen (de test die een echte Home Assistant vraagt).
 
-## Naar GitHub
+## Uitpakken
 
-Sleep de **inhoud** van deze map in de lege repository en commit. Daarna een
-release maken: tag `v1.0.0`, titel `1.0.0`. HACS gebruikt de tags.
+Inhoud naar de repository slepen, committen, release `v1.1.0` maken, in HACS
+bijwerken, Home Assistant herstarten.
 
-## Overstappen in Home Assistant
+## Wat je merkt
 
-1. HACS → oude repository `Roedie84/Goldscalper` verwijderen (niet de
-   integratie zelf).
-2. HACS → ⋮ → *Aangepaste repositories* → `https://github.com/Roedie84/ha-gold-scalper`,
-   categorie *Integratie* → downloaden.
-3. Home Assistant herstarten.
+* Eenmalig een **nieuwe run** (de groottemethode zit nu in de vingerafdruk).
+  Run 99 blijft bewaard; vanaf nu bevat een run nooit meer twee
+  groottemethoden.
+* Nieuwe beoordelingen hebben `GROSS_EVIDENCE` (bruto per trade tegen nul) en
+  de juiste Bonferroni-drempel bij één kandidaat.
+* Bestaande beoordelingen veranderen niet.
 
-Het domein blijft `gold_scalper`: entiteiten, tradedatabase, barsarchief,
-Lab-database en opties blijven werken. De lopende run gaat door (de versie zit
-niet in de vingerafdruk). Draaide je nog 5.6.2, dan migreert de Lab-database
-bij deze herstart naar schema 9.
+## Bestanden
 
-Controle: het Lab-paneel toont *Gold Scalper-versie 1.0.0* en *Lab-schema 9
-(verwacht 9)*.
-
-## Niet meegenomen
-
-De EMS-bestanden die per ongeluk in de oude repository stonden (`752c044`).
-Die horen in de EMS-repository.
-
-## Tests
-
-1640 geslaagd, 1 overgeslagen (de test die een echte Home Assistant vraagt).
+* `custom_components/gold_scalper/coordinator.py`
+* `custom_components/gold_scalper/experiment_lab/assessment.py`
+* `custom_components/gold_scalper/experiment_lab/storage.py`
+* `custom_components/gold_scalper/experiment_lab/research_design.py`
+* `custom_components/gold_scalper/const.py`, `manifest.json` (1.1.0)
+* `tests/test_release_110.py` (nieuw), `tests/test_lab_comparison.py`,
+  `tests/test_lab_services_57.py`
+* `CHANGELOG.md`, `GEWIJZIGD.md`

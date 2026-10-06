@@ -420,14 +420,16 @@ def test_dataset_detail_keeps_quality_as_stored(lab):
         assert f["label"] == R.QUALITY_LABELS.get(f["code"], f["code"])
 
 
-def test_assessment_detail_has_the_disclaimer_and_fourteen_components(lab):
+def test_assessment_detail_has_the_disclaimer_and_all_components(lab):
     db = _db(lab)
     try:
         a = R.assessment_detail(db, db.conn.execute("SELECT MIN(id) FROM assessments").fetchone()[0])
     finally:
         db.close()
     assert a["disclaimer"] == R.DISCLAIMER
-    assert len(a["components"]) == 14
+    # 14 componenten in regelversie 1; GROSS_EVIDENCE erbij in versie 2.
+    assert len(a["components"]) == 15
+    assert "GROSS_EVIDENCE" in {c["code"] for c in a["components"]}
 
 
 def test_family_summary_matches_storage(lab):
@@ -588,7 +590,8 @@ def test_research_design_orders_gross_before_net_and_labels_the_inverse():
     assert RD.GROSS.order < RD.NET.order and RD.NET.costs == "all_registered_costs"
     assert RD.INVERSE_SANITY_CHECK.role == "SANITY_CHECK"
     assert RD.INVERSE_SANITY_CHECK.independent_evidence is False
-    assert RD.as_dict()["changes_assessment_rules"] is False
+    assert RD.as_dict()["assessment_component"] == "GROSS_EVIDENCE"
+    assert RD.as_dict()["changes_strategy_parameters"] is False
 
 
 # ------------------------------------------------------------ IG-quotum --

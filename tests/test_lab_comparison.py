@@ -125,7 +125,7 @@ def test_all_compatible_windows_and_components_are_included(drie):
         v = lab.comparison(lab.create_comparison(ref, ch))
         assert len([i for i in v["items"] if i["section"] == "window"]) == 3
         codes = {i["item_key"] for i in v["items"] if i["section"] == "component"}
-        assert len(codes) == 14 and "TEST_INDEPENDENCE" in codes
+        assert len(codes) == 15 and "GROSS_EVIDENCE" in codes   # regelversie 2
         klassen = {i["item_key"] for i in v["items"] if i["section"] == "classification"}
         assert klassen == {"raw_classification", "classification_ceiling", "final_classification"}
     finally:

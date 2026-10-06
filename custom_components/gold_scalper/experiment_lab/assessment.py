@@ -23,7 +23,11 @@ import statistics
 from ..analysis.indicator_lab import drempel_t
 
 ASSESSMENT_SCHEMA_VERSION = 1
-ASSESSMENT_RULES_VERSION = 1
+#: 2 (1.1): component GROSS_EVIDENCE - het bruto OOS-resultaat per trade
+#: tegen nul, vóór de nettotoets (onderzoeksopzet H_GROSS_OOS_PER_TRADE).
+#: De classificatie blijft op netto; bruto is bewijs over het signaal, niet
+#: over wat er na kosten overblijft.
+ASSESSMENT_RULES_VERSION = 2
 
 PASS, WARNING, FAIL = "PASS", "WARNING", "FAIL"
 INSUFFICIENT_DATA, NOT_APPLICABLE, UNKNOWN_INPUT = "INSUFFICIENT_DATA", "NOT_APPLICABLE", "UNKNOWN_INPUT"
@@ -396,10 +400,48 @@ def c_test_independence(inp):
 # classificatie
 # --------------------------------------------------------------------------- #
 
+def _oos_grosses(inp):
+    return [t["gross"] for w in _test_vensters(inp) for t in w["test"]["trades"]
+            if t.get("gross") is not None]
+
+
+def c_gross(inp, drempel):
+    """H_GROSS_OOS_PER_TRADE: gemiddeld bruto per trade tegen nul, tweezijdig.
+
+    Zelfde drempel als de nettotoets. Niet blokkerend en geen invloed op de
+    classificatie: het beantwoordt of het signaal vóór kosten iets doet.
+    """
+    bruto = _oos_grosses(inp)
+    n = len(bruto)
+    if n < 2:
+        return component("GROSS_EVIDENCE", INSUFFICIENT_DATA, None, "t", n,
+                         "minstens twee OOS-trades met bruto resultaat", False,
+                         "te weinig trades voor een spreiding")
+    gem, sd = statistics.mean(bruto), statistics.stdev(bruto)
+    se = sd / math.sqrt(n) if sd > 0 else None
+    t = gem / se if se else None
+    if t is None:
+        status, uitleg = UNKNOWN_INPUT, "geen spreiding: t niet te berekenen"
+    elif t >= drempel:
+        status, uitleg = PASS, f"bruto t = {t:.2f} >= {drempel}: positief signaal vóór kosten"
+    elif t <= -drempel:
+        status, uitleg = FAIL, f"bruto t = {t:.2f} <= -{drempel}: negatief signaal vóór kosten"
+    else:
+        status, uitleg = WARNING, f"bruto |t| = {abs(t):.2f} < {drempel}: geen signaal vóór kosten aangetoond"
+    netto = _oos_nets(inp)
+    return component("GROSS_EVIDENCE", status, t, "t", n,
+                     f"|t| >= {drempel} (gecorrigeerd), tweezijdig", False, uitleg,
+                     {"hypothesis": "H_GROSS_OOS_PER_TRADE", "mean_gross": gem, "stdev": sd,
+                      "standard_error": se, "threshold": drempel,
+                      "mean_net": statistics.mean(netto) if netto else None,
+                      "mean_cost": (gem - statistics.mean(netto)) if netto else None})
+
+
 def assess(inp: dict) -> dict:
     """Componenten, ruwe classificatie, plafonds, eindclassificatie en spoor."""
     mt = c_multiple_testing(inp)
     comps = [c_compatibility(inp), c_data_sufficiency(inp), mt,
+             c_gross(inp, mt["measured_value"]),
              c_statistics(inp, mt["measured_value"]), c_window_consistency(inp),
              c_concentration(inp), c_degradation(inp), c_cost_sensitivity(inp),
              c_parameter_sensitivity(inp), c_dataset_quality(inp), c_warmup(inp),

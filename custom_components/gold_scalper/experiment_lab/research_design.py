@@ -2,8 +2,9 @@
 
 **EXPERIMENT_LAB_CAN_NEVER_ENABLE_LIVE_TRADING**
 
-Alleen een beschrijving. Deze module rekent niets uit, wijzigt geen
-beoordelingsregels en past geen strategieparameter aan. Zij legt vast welke
+Alleen een beschrijving. Deze module rekent niets uit en past geen
+strategieparameter aan. De brutotoets is sinds 1.1 component GROSS_EVIDENCE
+van de beoordeling (regelversie 2). Zij legt vast welke
 vragen in welke volgorde gesteld worden, zodat die keuze niet achteraf door de
 uitkomst wordt bepaald.
 
@@ -70,6 +71,9 @@ def as_dict() -> dict:
     return {
         "research_design_version": RESEARCH_DESIGN_VERSION,
         "hypotheses": [h.__dict__.copy() for h in DESIGN],
-        "changes_assessment_rules": False,
+        # Sinds 1.1 meet de beoordeling H_GROSS als component GROSS_EVIDENCE
+        # (regelversie 2). De classificatie blijft op netto.
+        "assessment_component": "GROSS_EVIDENCE",
+        "assessment_rules_version": 2,
         "changes_strategy_parameters": False,
     }

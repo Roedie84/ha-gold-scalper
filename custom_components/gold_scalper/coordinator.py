@@ -988,6 +988,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         "trading_hours": "trading_start_hour",
         "units": "units",
         "assumed_spread": "assumed_spread",
+        "sizing": "risk_based_sizing",
     }
 
     async def _notify(self, stats: dict) -> None:
@@ -1134,6 +1135,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # uitkomst waardeloos maken - juist het verschil tussen die twee
             # is wat je wilt meten.
             "mode": self.mode.value,
+            # De groottemethode hoort erbij (1.1): vast of uit risico bepaald
+            # verandert het resultaat per trade in dollars. Run 99 mengde beide.
+            # Het maximum blijft erbuiten: dat is een risicolimiet.
+            "sizing": {
+                "risk_based": bool(self.sizing.risk_based),
+                "risk_per_trade_pct": (
+                    float(self.sizing.risk_per_trade_pct) if self.sizing.risk_based else None
+                ),
+                "scale_with_confidence": bool(self.sizing.scale_with_confidence),
+            },
         }
 
     @staticmethod

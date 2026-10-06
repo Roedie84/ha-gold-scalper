@@ -1,5 +1,22 @@
 # Changelog — Gold Scalper
 
+## 1.1.0
+
+* **Brutotoets in de beoordeling** (regelversie 2). Nieuwe component
+  `GROSS_EVIDENCE`: gemiddeld bruto OOS-resultaat per trade tegen nul,
+  tweezijdig, met dezelfde gecorrigeerde drempel als de nettotoets. Toont ook
+  gemiddeld bruto, netto en kosten per trade. Niet blokkerend; de classificatie
+  blijft op netto. Beoordelingen uit regelversie 1 blijven ongewijzigd; een
+  vergelijking tussen versie 1 en 2 krijgt de waarschuwing
+  `ASSESSMENT_RULES_DIFFER`.
+* **Telling geëvalueerde configuraties gecorrigeerd.** Een walk-forward met één
+  kandidaat telde als twee (de experimenthash én de kandidaat). Daardoor was de
+  drempel te streng (t = 2,25 in plaats van 1,96).
+* **Groottemethode in de vingerafdruk.** Vast of uit risico bepaald (en het
+  risicopercentage) start bij wijziging een nieuwe run. Bij deze update begint
+  daarom eenmalig een nieuwe run; de vorige blijft bewaard. Het maximum blijft
+  erbuiten (een limiet).
+
 ## 1.0.0
 
 Eerste release in `Roedie84/ha-gold-scalper`. Inhoudelijk gelijk aan
