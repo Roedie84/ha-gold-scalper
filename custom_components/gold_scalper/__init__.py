@@ -171,9 +171,9 @@ def _register_services(hass: HomeAssistant) -> None:
         """
         def omhullen(functie):
             @functools.wraps(functie)
-            async def uitvoeren(call: ServiceCall) -> None:
+            async def uitvoeren(call: ServiceCall):
                 try:
-                    await functie(call)
+                    return await functie(call)
                 except HomeAssistantError:
                     raise
                 except Exception as err:  # noqa: BLE001
@@ -268,54 +268,112 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_RESUME, _zeg_wat_er_misging("resume")(resume))
     hass.services.async_register(DOMAIN, SERVICE_GENERATE_REPORT, _zeg_wat_er_misging("generate_report")(generate_report))
     _register_lab_services(hass)
-    async def import_history(call: ServiceCall) -> None:
+    async def import_history(call: ServiceCall) -> ServiceResponse:
         """Vul het archief met historie van de broker.
 
-        In één stap zoveel bars als de broker in één keer geeft. Bewust
-        handmatig en niet automatisch: elk datapunt telt tegen het weekquotum,
-        en een importlus die zichzelf start kan dat in een uur opmaken.
+        Twee manieren:
+
+        * ``days`` (1.2): zoveel dagen terug vanaf de oudste bar in het
+          archief, per blok opgehaald, begrensd door ``max_points``. Zo groeit
+          het archief naar het verleden; elke keer dat je dit aanroept, gaat
+          het verder terug.
+        * ``bars``: de laatste bars in één stap (hooguit 1000 bij IG). Vult
+          alleen recente gaten.
+
+        Bewust handmatig: elk datapunt telt tegen het weekquotum.
         """
+        dagen = call.data.get("days")
+        budget = int(call.data.get("max_points", 5000))
         gevraagd = int(call.data.get("bars", 1000))
+        antwoord: dict = {}
 
         for coordinator in _coordinators():
             if coordinator.archive is None:
                 raise HomeAssistantError("Het archief is niet geopend.")
-
+            voor = await hass.async_add_executor_job(
+                coordinator.archive.stats, coordinator.symbol, coordinator.timeframe,
+            )
+            info: dict = {}
             try:
-                candles = await coordinator.venue.candles(
-                    coordinator.symbol, coordinator.timeframe, gevraagd
-                )
+                if dagen is not None:
+                    if not hasattr(coordinator.venue, "history"):
+                        raise HomeAssistantError(
+                            "Deze databron kan geen historie per periode leveren; "
+                            "gebruik 'bars'.")
+                    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+
+                    eind = (_dt.fromisoformat(voor.first) if voor.first
+                            else _dt.now(_tz.utc))
+                    begin = eind - _td(days=int(dagen))
+                    candles, info = await coordinator.venue.history(
+                        coordinator.symbol, coordinator.timeframe, begin, eind, budget,
+                    )
+                else:
+                    candles = await coordinator.venue.candles(
+                        coordinator.symbol, coordinator.timeframe, gevraagd
+                    )
+                    info = {"points": len(candles), "stopped": "complete"}
+            except HomeAssistantError:
+                raise
             except Exception as err:  # noqa: BLE001
                 raise HomeAssistantError(
                     f"Historie ophalen mislukte: {err}. Bij IG telt elk "
                     "datapunt tegen het weekquotum; is dat op, probeer het "
-                    "volgende week opnieuw of vraag minder bars."
+                    "volgende week opnieuw of vraag minder."
                 ) from err
 
-            nieuw = await hass.async_add_executor_job(
-                coordinator.archive.store, coordinator.symbol,
-                coordinator.timeframe, candles, "import",
-            )
+            nieuw = 0
+            if candles is not None and len(candles):
+                nieuw = await hass.async_add_executor_job(
+                    coordinator.archive.store, coordinator.symbol,
+                    coordinator.timeframe, candles, "import",
+                )
             stats = await hass.async_add_executor_job(
                 coordinator.archive.stats, coordinator.symbol,
                 coordinator.timeframe,
             )
+            reden = {
+                "complete": "volledige periode opgehaald",
+                "budget": "gestopt bij het puntenbudget; roep opnieuw aan om verder terug te gaan",
+                "allowance": "gestopt: het IG-quotum is bijna op",
+                "error": "gestopt na een fout van IG; wat binnen was, is bewaard",
+            }.get(info.get("stopped"), info.get("stopped"))
             # Informatief, geen waarschuwing: een geslaagde import hoort niet
-            # als rood item in het logboek te staan. Het onderscheid gaat
-            # verloren als elke geslaagde handeling eruitziet als een probleem.
+            # als rood item in het logboek te staan.
             _LOGGER.info(
                 "Historie ingelezen: %d bars opgehaald, %d nieuw. Archief nu "
                 "%d bars over %.1f dagen, %d gaten, dekking %.0f%%.",
-                len(candles), nieuw, stats.bars, stats.span_days,
-                stats.gaps, stats.coverage * 100,
+                0 if candles is None else len(candles), nieuw, stats.bars,
+                stats.span_days, stats.gaps, stats.coverage * 100,
             )
+            antwoord = {
+                "message": (
+                    f"{0 if candles is None else len(candles)} bars opgehaald, {nieuw} nieuw. "
+                    f"Archief: {stats.bars} bars, van {stats.first} tot {stats.last}. "
+                    f"{reden}."),
+                "fetched": 0 if candles is None else len(candles),
+                "new": nieuw,
+                "points_used": info.get("points"),
+                "chunks": info.get("chunks"),
+                "stopped": info.get("stopped"),
+                "reached": info.get("reached"),
+                "ig_error": info.get("error"),
+                "ig_allowance": info.get("allowance"),
+                "archive": {"bars": stats.bars, "first": stats.first, "last": stats.last,
+                            "span_days": round(stats.span_days, 1), "gaps": stats.gaps,
+                            "coverage": round(stats.coverage, 3)},
+            }
             await coordinator.async_request_refresh()
+        return antwoord
 
     hass.services.async_register(
         DOMAIN, SERVICE_IMPORT_HISTORY, _zeg_wat_er_misging("import_history")(import_history),
         schema=vol.Schema({
-            vol.Optional("bars"): vol.All(vol.Coerce(int), vol.Range(100, 5000)),
+            vol.Exclusive("bars", "manier"): vol.All(vol.Coerce(int), vol.Range(100, 5000)),
+            vol.Exclusive("days", "manier"): vol.All(vol.Coerce(int), vol.Range(1, 180)),
+            vol.Optional("max_points"): vol.All(vol.Coerce(int), vol.Range(100, 10000)),
         }),
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
     async def validate_backtest(call: ServiceCall) -> None:

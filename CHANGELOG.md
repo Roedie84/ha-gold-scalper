@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 1.2.0
+
+* **`import_history` gaat terug in de tijd.** Nieuw veld `days`: zoveel dagen
+  vóór de oudste bar in het archief, opgehaald in blokken van een week via een
+  datumbereik bij IG. Tot nu toe vroeg de dienst alleen de laatste bars op
+  (bij IG hooguit 1000), en die stonden al in het archief.
+* **Puntenbudget** `max_points` (standaard 5000). Stopt vóór het blok dat het
+  budget zou overschrijden, en ook als IG meldt dat het quotum bijna op is.
+  Een fout halverwege bewaart wat al binnen was.
+* **Leesbare reactie**: opgehaald, nieuw, gebruikte punten, waar gestopt en
+  waarom, resterend quotum (alleen als IG het meegeeft), en de stand van het
+  archief.
+
 ## 1.1.0
 
 * **Brutotoets in de beoordeling** (regelversie 2). Nieuwe component

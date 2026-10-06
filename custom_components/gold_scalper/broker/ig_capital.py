@@ -67,6 +67,10 @@ QUOTE_TIMEOUT = ClientTimeout(total=6, connect=3)
 #: de order is uitgevoerd. Liever wachten en een duidelijk antwoord krijgen.
 ORDER_TIMEOUT = ClientTimeout(total=25, connect=5)
 
+#: Historie per blok van zoveel dagen: bij 15 minuten ongeveer 650 bars, ruim
+#: onder wat IG in één antwoord geeft.
+HISTORY_CHUNK_DAYS = 7
+
 #: Wachttijden tussen de pogingen om een orderbevestiging op te halen, in
 #: seconden. Samen ruim zes seconden. Wat daarna nog ontbreekt, is onbekend en
 #: wordt door de veiligheidslaag teruggezocht - nooit opnieuw verstuurd.
@@ -721,6 +725,91 @@ class IgStyleVenue(ExecutionVenue):
             high=[r[2] for r in rows], low=[r[3] for r in rows],
             close=[r[4] for r in rows], volume=[r[5] for r in rows],
         )
+
+    def _rows(self, payload: dict) -> list:
+        rows = []
+        for price in payload.get("prices", []):
+            try:
+                moment = self._parse_time(price.get("snapshotTimeUTC") or price["snapshotTime"])
+                o = self._mid(price["openPrice"])
+                h = self._mid(price["highPrice"])
+                l = self._mid(price["lowPrice"])
+                c = self._mid(price["closePrice"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if None in (o, h, l, c):
+                continue
+            rows.append([int(moment.timestamp()), o, h, l, c,
+                         float(price.get("lastTradedVolume") or 0)])
+        return rows
+
+    async def history(
+        self, symbol: str, timeframe: str, start: datetime, end: datetime,
+        max_points: int, chunk_days: int = HISTORY_CHUNK_DAYS,
+    ) -> tuple[Candles | None, dict]:
+        """Historie over een periode, in blokken, binnen een puntenbudget (1.2).
+
+        ``candles`` geeft alleen de laatste 1000 bars; daarmee kom je nooit
+        verder terug dan het archief al reikt. Dit vraagt per blok een
+        datumbereik op, van oud naar nieuw, en stopt:
+
+        * als het volgende blok het budget ``max_points`` zou overschrijden
+          (schatting: de grootte van het grootste blok tot nu toe);
+        * als IG meldt dat er minder punten resteren dan dat;
+        * bij een fout van IG - wat al binnen is, blijft bewaard.
+
+        Elke teruggegeven bar telt bij IG als één punt.
+        """
+        if timeframe not in self.resolutions:
+            raise VenueError(f"Tijdsframe '{timeframe}' niet beschikbaar")
+        epic = symbol or self.epic
+        rows: list = []
+        info = {"points": 0, "chunks": 0, "stopped": "complete", "allowance": None,
+                "error": None, "first_requested": start.isoformat(),
+                "last_requested": end.isoformat(), "reached": None}
+        schatting = 0
+        blok_start = start
+        while blok_start < end:
+            blok_eind = min(blok_start + timedelta(days=chunk_days), end)
+            if info["points"] + schatting > max_points:
+                info["stopped"] = "budget"
+                break
+            rest = (info["allowance"] or {}).get("remainingAllowance")
+            if rest is not None and rest < max(schatting, 1):
+                info["stopped"] = "allowance"
+                break
+            try:
+                payload = await self._request(
+                    "GET", f"/prices/{epic}", version="3",
+                    params={"resolution": self.resolutions[timeframe],
+                            "from": blok_start.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "to": blok_eind.strftime("%Y-%m-%dT%H:%M:%S"),
+                            "pageSize": 0},
+                )
+            except VenueError as err:
+                info["stopped"], info["error"] = "error", str(err)[:200]
+                break
+            blok = self._rows(payload)
+            info["points"] += len(blok)
+            info["chunks"] += 1
+            schatting = max(schatting, len(blok))
+            rows.extend(blok)
+            toelage = (payload.get("metadata") or {}).get("allowance")
+            if isinstance(toelage, dict):
+                info["allowance"] = {k: toelage[k] for k in
+                                     ("remainingAllowance", "totalAllowance", "allowanceExpiry")
+                                     if k in toelage}
+            info["reached"] = blok_eind.isoformat()
+            blok_start = blok_eind
+        if not rows:
+            return None, info
+        uniek = {r[0]: r for r in rows}
+        rows = [uniek[k] for k in sorted(uniek)]
+        return Candles(
+            timestamp=[r[0] for r in rows], open=[r[1] for r in rows],
+            high=[r[2] for r in rows], low=[r[3] for r in rows],
+            close=[r[4] for r in rows], volume=[r[5] for r in rows],
+        ), info
 
     @staticmethod
     def _mid(level) -> float | None:

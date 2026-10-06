@@ -79,14 +79,33 @@ reset_day:
     hebt gecorrigeerd.'
 import_history:
   name: Historie inlezen
-  description: 'Haalt bars bij de broker op en bewaart ze in het archief. Bewust handmatig:
-    elk datapunt telt tegen het weekquotum, en een importlus die zichzelf start kan
-    dat in een uur opmaken. Het archief groeit daarnaast vanzelf met elke bar die
-    de bot tijdens het draaien afsluit.'
+  description: 'Haalt bars bij de broker op en bewaart ze in het archief. Met days gaat het
+    archief terug in de tijd, vanaf de oudste bar, in blokken van een week en begrensd
+    door max_points. Elke keer dat je het aanroept, gaat het verder terug. Bewust handmatig:
+    elk datapunt telt tegen het weekquotum van IG.'
   fields:
+    days:
+      name: Dagen terug
+      description: Zoveel dagen voor de oudste bar in het archief (1 tot 180). Niet samen met bars.
+      example: 30
+      selector:
+        number:
+          min: 1
+          max: 180
+          mode: box
+    max_points:
+      name: Puntenbudget
+      description: Hooguit zoveel datapunten in deze aanroep (standaard 5000). IG geeft er 10.000 per week.
+      example: 5000
+      selector:
+        number:
+          min: 100
+          max: 10000
+          step: 100
+          mode: box
     bars:
-      name: Aantal bars
-      description: Hoeveel bars in één keer (100 tot 5000).
+      name: Aantal recente bars
+      description: Alleen de laatste bars in één stap (IG geeft er hooguit 1000). Vult recente gaten; gaat niet terug in de tijd. Niet samen met days.
       selector:
         number:
           min: 100
