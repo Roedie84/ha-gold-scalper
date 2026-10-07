@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 1.6.0
+
+* **t-statistiek over clusters.** Trades die binnen 10 minuten na het sluiten
+  van de vorige openen, tellen als één cluster (`CLUSTER_MINUTEN`). Op
+  7 oktober opende de bot vier trades in vier minuten, telkens ~10 s na het
+  sluiten; dat zijn geen vier onafhankelijke waarnemingen, en per trade
+  tellen maakte de toets te zeker. `t_statistic` (en dus het oordeel) gaat nu
+  over clusters; de oude waarde staat in `t_statistic_per_trade`, met
+  `clusters` en `t_basis` erbij. De sensor *t-statistiek* toont ze als
+  attributen.
+* **Versienummer.** `INTEGRATION_VERSION` liep sinds 1.4.0 achter op het
+  manifest (de diagnose meldde 1.4.0 terwijl 1.5.0 draaide).
+
 ## 1.5.0
 
 * **Veilig herstarten uit één bron.** De binaire sensor *Veilig herstarten*

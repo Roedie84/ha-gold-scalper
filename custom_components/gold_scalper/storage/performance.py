@@ -36,6 +36,56 @@ from ..timeutil import trading_day_of
 MIN_TRADES_FOR_SIGNIFICANCE = 100
 #: Drempel waarboven we het resultaat niet meer aan toeval toeschrijven.
 T_STAT_THRESHOLD = 2.0
+#: Een trade die binnen zoveel minuten na het sluiten van de vorige opent,
+#: hoort bij hetzelfde cluster (1.6.0). Op 7 oktober: vier trades in vier
+#: minuten, herinstap telkens ~10 s na sluiten - dezelfde marktsituatie,
+#: geen vier onafhankelijke waarnemingen.
+CLUSTER_MINUTEN = 10.0
+
+
+def _tijd(tekst) -> datetime | None:
+    if not tekst:
+        return None
+    try:
+        moment = datetime.fromisoformat(str(tekst))
+    except (TypeError, ValueError):
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def cluster_resultaten(trades: Sequence[Trade]) -> list[float]:
+    """Netto resultaat per cluster van op elkaar volgende trades (1.6.0).
+
+    Trades worden op openingstijd gesorteerd; een trade die binnen
+    CLUSTER_MINUTEN na het sluiten van de vorige opent, telt bij diens
+    cluster. Zonder tijden telt elke trade als eigen cluster.
+    """
+    gesorteerd = sorted(trades, key=lambda t: str(t.open_time or ""))
+    uit: list[float] = []
+    vorige_sluit: datetime | None = None
+    for t in gesorteerd:
+        open_t = _tijd(t.open_time)
+        if (
+            uit
+            and open_t is not None
+            and vorige_sluit is not None
+            and (open_t - vorige_sluit).total_seconds() <= CLUSTER_MINUTEN * 60
+        ):
+            uit[-1] += t.net_pnl or 0.0
+        else:
+            uit.append(t.net_pnl or 0.0)
+        sluit = _tijd(t.close_time)
+        if sluit is not None:
+            vorige_sluit = sluit if vorige_sluit is None else max(vorige_sluit, sluit)
+    return uit
+
+
+def _t(values: Sequence[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    gem = sum(values) / len(values)
+    sd = statistics.stdev(values)
+    return _safe(gem, sd / math.sqrt(len(values))) if sd > 0 else 0.0
 
 
 def _safe(numerator: float, denominator: float, default: float = 0.0) -> float:
@@ -91,7 +141,12 @@ def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict
         sd = 0.0
 
     # t-statistiek voor "is het gemiddelde resultaat te onderscheiden van nul".
-    t_stat = _safe(mean_net, sd / math.sqrt(len(nets))) if sd > 0 else 0.0
+    # 1.6.0: over clusters, niet over losse trades. Trades die vlak na elkaar
+    # in dezelfde marktsituatie vallen zijn niet onafhankelijk; per trade
+    # tellen maakt de toets te zeker. De oude waarde blijft zichtbaar.
+    t_per_trade = _safe(mean_net, sd / math.sqrt(len(nets))) if sd > 0 else 0.0
+    clusters = cluster_resultaten(closed)
+    t_stat = _t(clusters)
 
     # Gemiddelde beweging die per trade gevangen wordt, in USD per ounce.
     volumes = [t.volume * 100.0 for t in closed]
@@ -156,6 +211,12 @@ def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict
         "edge_surplus_per_oz": round(avg_excursion - breakeven_edge, 4),
 
         "t_statistic": round(t_stat, 3),
+        "t_statistic_per_trade": round(t_per_trade, 3),
+        "clusters": len(clusters),
+        "t_basis": (
+            f"{len(clusters)} clusters uit {len(closed)} trades "
+            f"(herinstap binnen {CLUSTER_MINUTEN:.0f} min = zelfde cluster)"
+        ),
         "std_dev": round(sd, 4),
         "avg_duration_seconds": round(_safe(sum(durations), len(durations)), 1),
         "close_reasons": reasons,

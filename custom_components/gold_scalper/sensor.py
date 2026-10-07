@@ -144,7 +144,11 @@ SENSORS: tuple[ScalperSensor, ...] = (
         attrs_fn=lambda d: {
             "meaning": (
                 "Onder 2,0 is het resultaat niet te onderscheiden van toeval."
-            )
+            ),
+            # 1.6.0: over clusters van op elkaar volgende trades.
+            "basis": _stats(d).get("t_basis"),
+            "clusters": _stats(d).get("clusters"),
+            "per_trade": _stats(d).get("t_statistic_per_trade"),
         },
     ),
     ScalperSensor(
