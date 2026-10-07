@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .lifecycle import veilig_herstarten
 from .const import DOMAIN
 from .coordinator import GoldScalperCoordinator
 from .entity import GoldScalperEntity
@@ -43,8 +44,7 @@ class SafeToRestart(GoldScalperEntity, BinarySensorEntity):
         data = self.coordinator.data
         if not data:
             return None
-        no_positions = not (data.get("open_positions") or [])
-        return no_positions or self.coordinator.lifecycle.safe_to_restart
+        return veilig_herstarten(data.get("open_positions"), self.coordinator.lifecycle)
 
     @property
     def extra_state_attributes(self) -> dict:

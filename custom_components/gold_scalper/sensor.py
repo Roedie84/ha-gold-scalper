@@ -266,11 +266,31 @@ SENSORS: tuple[ScalperSensor, ...] = (
     ScalperSensor(
         key="latency", name="Latency p99", icon="mdi:timer-outline",
         native_unit_of_measurement="ms", state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda d: ((d.get("latency") or {}).get("total") or {}).get("p99"),
-        attrs_fn=lambda d: d.get("latency") or {},
+        value_fn=lambda d: _staart_latency(d)[0],
+        attrs_fn=lambda d: {
+            **(d.get("latency") or {}),
+            "basis": _staart_latency(d)[1],
+            "metingen": ((d.get("latency") or {}).get("total") or {}).get("samples"),
+        },
     ),
 )
 
+
+
+def _staart_latency(d: dict) -> tuple[float | None, str]:
+    """De staart van de totale latency, met wat hij is (1.5.0).
+
+    p99 vraagt 100 metingen (storage/latency.py); daaronder stond de sensor
+    op unknown, met 24 metingen in de attributen. Nu p90 vanaf 20 metingen,
+    met de basis erbij - en onder de 20 eerlijk geen waarde.
+    """
+    totaal = (d.get("latency") or {}).get("total") or {}
+    n = totaal.get("samples") or 0
+    if totaal.get("p99") is not None:
+        return totaal["p99"], f"p99 (n={n})"
+    if totaal.get("p90") is not None:
+        return totaal["p90"], f"p90, p99 pas vanaf 100 metingen (n={n})"
+    return None, f"te weinig metingen (n={n}, p90 vanaf 20)"
 
 
 def _uit_spec(spec: dict) -> ScalperSensor:

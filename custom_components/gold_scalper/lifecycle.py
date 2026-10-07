@@ -332,3 +332,15 @@ class LifecycleController:
             "last_transition": self.last_transition.isoformat(timespec="seconds"),
             "recent_history": self.history[-10:],
         }
+
+
+def veilig_herstarten(open_positions, lifecycle) -> bool:
+    """Eén bron voor "veilig herstarten" (1.5.0).
+
+    Zonder open posities is herstarten altijd veilig; mét posities alleen als
+    de levenscyclus is afgewikkeld. Tot 1.4 rekende de binaire sensor zo, maar
+    het attribuut safe_to_restart keek alleen naar de levenscyclus - op
+    7 oktober stond de sensor op aan en het attribuut op false (running,
+    0 open).
+    """
+    return not (open_positions or []) or lifecycle.safe_to_restart

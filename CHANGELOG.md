@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 1.5.0
+
+* **Veilig herstarten uit één bron.** De binaire sensor *Veilig herstarten*
+  en het attribuut `safe_to_restart` van *Toestand* spraken elkaar tegen
+  (aan tegenover false bij running, 0 open). Beide komen nu uit
+  `lifecycle.veilig_herstarten()`: zonder open posities altijd veilig, mét
+  posities pas na afwikkelen. De oude betekenis staat in
+  `levenscyclus_afgewikkeld`.
+* **Latency bij weinig metingen.** *Latency p99* bleef unknown tot 100
+  metingen. Nu p90 vanaf 20 metingen, met `basis` (bijv. "p90, p99 pas vanaf
+  100 metingen (n=24)") en `metingen` in de attributen. Onder de 20 metingen
+  blijft hij bewust leeg.
+
 ## 1.4.0
 
 * **Afstemming herkent slippage.** Klopt een trade met de broker op

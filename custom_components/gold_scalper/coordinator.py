@@ -74,7 +74,7 @@ from .const import (
 )
 from .learning.analysis import evaluate_threshold, measure_execution, regime_performance
 from .learning.postmortem import analyse_losses
-from .lifecycle import DrainPolicy, LifecycleController
+from .lifecycle import DrainPolicy, LifecycleController, veilig_herstarten
 from .notify import Notifier, NotifierConfig
 from .status import build_status
 from .modes import LiveGate, ModeLockedError, TradingMode, require_live_unlocked
@@ -1742,7 +1742,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "stats": stats,
             "gate": self.gate,
             "risk": self.risk.as_dict(),
-            "lifecycle": self.lifecycle.as_dict(),
+            "lifecycle": {
+                **self.lifecycle.as_dict(),
+                # 1.5.0: dezelfde bron als de binaire sensor Veilig herstarten
+                "safe_to_restart": veilig_herstarten(open_positions, self.lifecycle),
+                "levenscyclus_afgewikkeld": self.lifecycle.safe_to_restart,
+            },
             "latency": self.latency.stats(),
             "ig_requests": (
                 self.venue.request_stats() if hasattr(self.venue, "request_stats") else None
