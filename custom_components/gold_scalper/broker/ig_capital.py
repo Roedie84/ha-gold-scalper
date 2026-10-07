@@ -98,6 +98,34 @@ def _utc(waarde) -> datetime | None:
     return m if m.tzinfo else m.replace(tzinfo=timezone.utc)
 
 
+def broker_loopt_achter(transacties: list, moment: datetime) -> bool:
+    """Staat de nieuwste transactie van de broker van voor ``moment``?
+
+    Het transactieoverzicht van de broker loopt uren achter. Zolang de
+    nieuwste regel ouder is dan het sluitmoment van een trade, kan die trade
+    er nog niet in staan, en is niet vinden geen fout. ``dateUtc`` komt
+    zonder tijdzone terug en is UTC.
+    """
+    nieuwste = None
+    for tx in transacties:
+        tekst = tx.get("dateUtc")
+        if not tekst:
+            continue
+        try:
+            t = datetime.fromisoformat(str(tekst))
+        except ValueError:
+            continue
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        if nieuwste is None or t > nieuwste:
+            nieuwste = t
+    if nieuwste is None:
+        return True
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return nieuwste < moment
+
+
 def match_transaction(
     transacties: list, ticket, open_price: float | None,
     side: str | None, units: float | None,
@@ -1240,7 +1268,9 @@ class IgStyleVenue(ExecutionVenue):
         # Eén regel met de werkelijke sleutels maakt dat gokken onnodig.
         if transacties and not self._velden_gelogd:
             self._velden_gelogd = True
-            _LOGGER.warning(
+            # 1.6.1: debug. De veldnamen zijn sinds 1.4.0 bekend en kloppen;
+            # als waarschuwing stond deze regel na elke herstart in het log.
+            _LOGGER.debug(
                 "Transactieoverzicht van de broker: %d transacties. Velden van "
                 "de eerste: %s. Eerste transactie: %s",
                 len(transacties), sorted(transacties[0].keys()),
@@ -1298,11 +1328,20 @@ class IgStyleVenue(ExecutionVenue):
             # probeert het elke paar minuten opnieuw. Elke mislukte poging
             # melden gaf zo'n veertig identieke regels per trade - ruis die de
             # meldingen die er wél toe doen onleesbaar maakt.
+            # 1.6.1: alleen waarschuwen als de broker het sluitmoment al
+            # voorbij is. Loopt zijn overzicht nog achter (nieuwste transactie
+            # van voor het sluiten), dan is niet vinden normaal: de correctie
+            # pakt het later op. Op 7 oktober gaf dat vijf waarschuwingen voor
+            # trades van het laatste uur, die gewoon nog niet in het overzicht
+            # stonden.
+            achter = broker_loopt_achter(transacties, midden)
             log = (
-                _LOGGER.debug if ticket in self._niet_gevonden_gemeld
+                _LOGGER.debug
+                if achter or ticket in self._niet_gevonden_gemeld
                 else _LOGGER.warning
             )
-            self._niet_gevonden_gemeld.add(ticket)
+            if not achter:
+                self._niet_gevonden_gemeld.add(ticket)
             log(
                 "Geen transactie gevonden voor instapprijs %.2f (ticket %s). "
                 "%d transacties bekeken, nieuwste %s, oudste %s. "

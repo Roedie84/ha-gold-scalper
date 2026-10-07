@@ -1,5 +1,16 @@
 # Changelog — Gold Scalper
 
+## 1.6.1
+
+* **Minder ruis in het log.** "Geen transactie gevonden" is alleen nog een
+  waarschuwing als de broker het sluitmoment van de trade al voorbij is.
+  Loopt zijn transactieoverzicht nog achter (nieuwste regel van voor het
+  sluiten), dan is niet vinden normaal en staat de regel op debug; de
+  correctie zoekt later opnieuw. Op 7 oktober gaf dat vijf waarschuwingen
+  voor trades van het laatste uur.
+* De eenmalige regel met de veldnamen van het transactieoverzicht staat op
+  debug; die velden zijn sinds 1.4.0 bekend.
+
 ## 1.6.0
 
 * **t-statistiek over clusters.** Trades die binnen 10 minuten na het sluiten

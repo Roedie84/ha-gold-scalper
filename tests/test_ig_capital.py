@@ -909,7 +909,10 @@ def test_a_missing_transaction_is_reported_once_per_ticket(caplog):
     import logging
 
     transacties = ({"transactions": [
-        {"openLevel": "4333.97", "closeLevel": "4340.00", "size": "-1.0"},
+        # 1.6.1: de broker is bij (nieuwste regel na het sluitmoment); anders
+        # is niet vinden achterstand en blijft het bij debug.
+        {"openLevel": "4333.97", "closeLevel": "4340.00", "size": "-1.0",
+         "dateUtc": "2099-01-01T00:00:00"},
     ]}, 200)
     venue = ig({"/history/transactions": transacties})
     with caplog.at_level(logging.DEBUG):
