@@ -73,6 +73,34 @@ def test_unexpected_target_rate_is_flagged():
     assert any("ATR" in n for n in facts.notes)
 
 
+def test_target_rate_uses_reconciled_reason():
+    """1.7.1: na een afstemming staat in close_reason alleen nog
+    'broker_gesloten_gecorrigeerd'. De doel- en stoptreffers komen dan uit de
+    afgeleide reden, zoals bij de sensoren Doel geraakt en Stop geraakt."""
+    trades = []
+    for i in range(40):
+        t = _trade(i, 1.0, reason="stop_loss")
+        if i < 10:
+            t.close_reason = "broker_gesloten_gecorrigeerd"
+            t.original_close_reason = "stop_loss"
+            t.reconciled_close_reason = "take_profit" if i < 4 else "stop_loss"
+        trades.append(t)
+    facts = measure_execution(trades)
+    assert facts.target_hit_rate == 0.1
+    assert facts.stop_hit_rate == 0.9
+
+
+def test_unreconciled_broker_close_counts_as_unknown():
+    trades = [_trade(i, 1.0, reason="take_profit") for i in range(30)]
+    for t in trades[:3]:
+        t.close_reason = "broker_gesloten_gecorrigeerd"
+        t.original_close_reason = None
+        t.reconciled_close_reason = None
+    facts = measure_execution(trades)
+    assert facts.target_hit_rate == 0.9
+    assert facts.stop_hit_rate == 0.0
+
+
 # ---------------- optimalisatie ----------------
 
 def test_no_proposal_without_enough_trades():

@@ -139,7 +139,13 @@ def measure_execution(
         if len(values) >= 5
     }
 
-    reasons = [t.close_reason for t in closed if t.close_reason]
+    # De effectieve sluitreden (1.7.1): na een afstemming staat in
+    # ``close_reason`` alleen nog ``broker_gesloten_gecorrigeerd``. Wat de
+    # positie werkelijk sloot staat in de afgeleide of oorspronkelijke reden,
+    # dezelfde bron als de sensoren Doel geraakt en Stop geraakt.
+    from .exit_stats import effective_reason
+
+    reasons = [effective_reason(t) for t in closed]
     if reasons:
         total = len(reasons)
         facts.stop_hit_rate = round(reasons.count("stop_loss") / total, 3)

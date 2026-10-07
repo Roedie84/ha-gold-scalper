@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 1.7.1
+
+* **Doel- en stoptreffers in *Geleerd* op de effectieve sluitreden.** De
+  uitvoeringsmeting (`measure_execution`) telde uit `close_reason`; na een
+  afstemming staat daar alleen nog `broker_gesloten_gecorrigeerd`. Op 7
+  oktober gold dat voor 24 van de 56 trades, waardoor *Geleerd* doel 14% en
+  stop 43% meldde (met de notitie "ATR mogelijk overschat"), terwijl *Doel
+  geraakt* en *Stop geraakt* op bewijs 19,6% en 80,4% gaven. Nu dezelfde bron
+  als die sensoren (`exit_stats.effective_reason`): afgeleide reden, anders de
+  oorspronkelijke; een niet-afgestemde brokersluiting telt als onbekend.
+  Raakt geen handelslogica.
+* Opgemerkt, niet gewijzigd: vier tests in `test_unconfirmed_orders.py`
+  hangen van de klok af en falen tijdens de dagpauze van de markt (rond
+  21-22 UTC). Met een vaste tijd overdag slaagt de hele suite.
+
 ## 1.7.0
 
 * **Een haperende koersopvraging maakt niet meer alles onbeschikbaar.** Op
