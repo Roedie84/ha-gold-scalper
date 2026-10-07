@@ -1,18 +1,20 @@
 datumtijd,type,kpi,waarde,n,opmerking
-2026-10-07 23:30,TUSSEN,gs_trades,56,56,25 winst / 31 verlies
-2026-10-07 23:30,TUSSEN,gs_clusters,7,56,herinstap <10 min = zelfde cluster
-2026-10-07 23:30,TUSSEN,gs_t_netto_clusters,-2.05,7,te weinig clusters voor conclusie
-2026-10-07 23:30,TUSSEN,gs_t_bruto_clusters,-0.24,7,zelf berekend uit per_cluster
-2026-10-07 23:30,TUSSEN,gs_netto_usd,-120.53,56,"bruto -18.65, kosten 101.88"
-2026-10-07 23:30,TUSSEN,gs_kosten_per_trade_usd,1.82,56,100% gemeten
-2026-10-07 23:30,TUSSEN,gs_profit_factor,0.651,56,
-2026-10-07 23:30,TUSSEN,gs_winst_pct,44.64,56,
-2026-10-07 23:30,TUSSEN,gs_slippage_ratio,3.0,56,gemeten 0.06 tegen aanname 0.02
-2026-10-07 23:30,TUSSEN,gs_latency_p90_ms,207.1,56,mediaan 179.5; max 785.8 (exits->signal)
-2026-10-07 23:30,TUSSEN,gs_doel_geraakt_pct_bewijs,19.6,56,sensor doel_geraakt (11/56)
-2026-10-07 23:30,TUSSEN,gs_doel_geraakt_pct_geleerd,14.3,56,geleerd.execution telt ruwe close_reason (8/56) - meetfout
-2026-10-07 23:30,TUSSEN,gs_regime_range_t,-2.91,16,netto -97.82
-2026-10-07 23:30,TUSSEN,gs_regime_trend_t,-0.29,40,netto -22.70
-2026-10-07 23:30,TUSSEN,gs_clusters_nodig_bruto_edge,17,7,"t=2 bij edge = kosten/cluster 14.6 USD, sd 29.6"
-2026-10-07 23:30,TUSSEN,gs_afstemming,nog_niet,1,24 trades wel afgestemd via transacties
-2026-10-07 23:30,TUSSEN,gs_versie,1.7.0,1,geinstalleerd = beschikbaar
+2026-10-07 23:15,TUSSEN,gs_trades,56,56,25 winst / 31 verlies
+2026-10-07 23:15,TUSSEN,gs_clusters,7,56,herinstap <10 min = zelfde cluster
+2026-10-07 23:15,TUSSEN,gs_t_netto_clusters,-2.05,7,te weinig clusters voor conclusie
+2026-10-07 23:15,TUSSEN,gs_t_bruto_clusters,-0.24,7,zelf berekend uit per_cluster
+2026-10-07 23:15,TUSSEN,gs_netto_usd,-120.53,56,"bruto -18.65, kosten 101.88"
+2026-10-07 23:15,TUSSEN,gs_kosten_per_trade_usd,1.82,56,100% gemeten
+2026-10-07 23:15,TUSSEN,gs_profit_factor,0.651,56,
+2026-10-07 23:15,TUSSEN,gs_winst_pct,44.64,56,
+2026-10-07 23:15,TUSSEN,gs_slippage_ratio,3.0,56,gemeten 0.06 tegen aanname 0.02
+2026-10-07 23:15,TUSSEN,gs_latency_p90_ms,207.1,56,mediaan 179.5; max 785.8 (exits->signal)
+2026-10-07 23:15,TUSSEN,gs_doel_geraakt_pct_bewijs,19.6,56,sensor doel_geraakt (11/56)
+2026-10-07 23:15,TUSSEN,gs_doel_geraakt_pct_geleerd,14.3,56,geleerd.execution telt ruwe close_reason (8/56) - meetfout
+2026-10-07 23:15,TUSSEN,gs_regime_range_t,-2.91,16,netto -97.82
+2026-10-07 23:15,TUSSEN,gs_regime_trend_t,-0.29,40,netto -22.70
+2026-10-07 23:15,TUSSEN,gs_clusters_nodig_bruto_edge,17,7,"t=2 bij edge = kosten/cluster 14.6 USD, sd 29.6"
+2026-10-07 23:15,TUSSEN,gs_afstemming,nog_niet,1,24 trades wel afgestemd via transacties
+2026-10-07 23:15,TUSSEN,gs_versie,1.7.0,1,geinstalleerd = beschikbaar
+2026-10-07 23:40,TUSSEN,gs_versie,1.7.1,1,"gereleased, nog niet geinstalleerd"
+2026-10-07 23:40,TUSSEN,gs_tests_klokafhankelijk,4,21,"test_unconfirmed_orders faalt in dagpauze, ook op main"

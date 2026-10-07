@@ -2,7 +2,7 @@
 
 Onderzoeksproject op IG-demo: edge van ruis onderscheiden. Alleen gemeten getallen; KPI's in KPI.csv.
 
-## 07-10 23:30 · tussenronde (eerste ronde, baseline)
+## 07-10 23:15 · tussenronde (eerste ronde, baseline)
 - Gemeten: 56 trades in 7 clusters (06-10 06:30 - 07-10 19:03 UTC). Netto −120,53 USD = bruto −18,65 − kosten 101,88 (1,82 USD/trade, 100% gemeten). PF 0,651, winst 44,6%.
 - t netto over clusters −2,05; t bruto (zelf berekend) −0,24 → bruto niet van nul te onderscheiden, netto verlies komt uit de kosten (kosten/bruto-verhouding 5,5).
 - Eerlijk over n: 7 clusters. Om een bruto-edge ter grootte van de kosten (14,6 USD/cluster bij sd 29,6) met t=2 te zien zijn ~17 clusters nodig; voor een netto-oordeel meer. Geen conclusie over de strategie.
@@ -13,4 +13,12 @@ Onderzoeksproject op IG-demo: edge van ruis onderscheiden. Alleen gemeten getall
 - Afstemming met broker: "nog_niet" (wel 24 trades gecorrigeerd via transacties).
 - Geen release (tussenronde; 1.7.0 vandaag al uitgebracht en geïnstalleerd).
 
-laatste ronde: 07-10 23:30, gemeten t/m 07-10 23:15
+laatste ronde: 07-10 23:15, gemeten t/m 07-10 23:15
+
+## 07-10 23:40 · tussenronde (handmatig gestart)
+- Correctie: de vorige ronde was om 23:15, niet 23:30 (tijdstempels aangepast).
+- Gebouwd: **v1.7.1** = L-GS-001 (geleerd telt doel/stop op de effectieve sluitreden; 2 nieuwe tests). Gereleased in een tussenronde omdat "geleerd" nu foute data gaf (doel 14% i.p.v. 19,6% en een onterechte ATR-notitie). Workflow groen; HACS ververst.
+- Testsuite: 1707 groen, 5 overgeslagen, met de klok vast op 10:00 UTC. Zonder vaste klok falen 4 tests in `test_unconfirmed_orders.py` tijdens de dagpauze (ook op main zonder wijziging) → L-GS-002.
+- Geen nieuwe trades sinds 19:03 UTC (markt in dagpauze).
+
+laatste ronde: 07-10 23:40, gemeten t/m 07-10 23:40
