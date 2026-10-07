@@ -53,15 +53,20 @@ def _tijd(tekst) -> datetime | None:
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
-def cluster_resultaten(trades: Sequence[Trade]) -> list[float]:
-    """Netto resultaat per cluster van op elkaar volgende trades (1.6.0).
+#: Hoeveel clusters de sensor per stuk toont (1.7.0). Houdt de attributen
+#: ruim onder de 16 KB die de recorder accepteert.
+CLUSTER_LIJST_MAX = 50
+
+
+def _clusters(trades: Sequence[Trade]) -> list[list[Trade]]:
+    """Trades gegroepeerd in clusters van op elkaar volgende trades.
 
     Trades worden op openingstijd gesorteerd; een trade die binnen
     CLUSTER_MINUTEN na het sluiten van de vorige opent, telt bij diens
     cluster. Zonder tijden telt elke trade als eigen cluster.
     """
     gesorteerd = sorted(trades, key=lambda t: str(t.open_time or ""))
-    uit: list[float] = []
+    uit: list[list[Trade]] = []
     vorige_sluit: datetime | None = None
     for t in gesorteerd:
         open_t = _tijd(t.open_time)
@@ -71,13 +76,90 @@ def cluster_resultaten(trades: Sequence[Trade]) -> list[float]:
             and vorige_sluit is not None
             and (open_t - vorige_sluit).total_seconds() <= CLUSTER_MINUTEN * 60
         ):
-            uit[-1] += t.net_pnl or 0.0
+            uit[-1].append(t)
         else:
-            uit.append(t.net_pnl or 0.0)
+            uit.append([t])
         sluit = _tijd(t.close_time)
         if sluit is not None:
             vorige_sluit = sluit if vorige_sluit is None else max(vorige_sluit, sluit)
     return uit
+
+
+def cluster_resultaten(trades: Sequence[Trade]) -> list[float]:
+    """Netto resultaat per cluster van op elkaar volgende trades (1.6.0)."""
+    return [sum(t.net_pnl or 0.0 for t in c) for c in _clusters(trades)]
+
+
+def _iso(moment: datetime | None) -> str | None:
+    return moment.isoformat(timespec="seconds") if moment else None
+
+
+def cluster_details(trades: Sequence[Trade]) -> list[dict]:
+    """Per cluster: trades, begin, eind, duur en resultaat (1.7.0).
+
+    Laat zien of één trendepisode het resultaat draagt. Bedragen in
+    instrumentvaluta (USD), zoals ``net_pnl``; ``netto_eur`` alleen als de
+    broker voor álle trades in het cluster in euro afrekende.
+    """
+    uit: list[dict] = []
+    for nr, c in enumerate(_clusters(trades), start=1):
+        opens = [x for x in (_tijd(t.open_time) for t in c) if x is not None]
+        sluits = [x for x in (_tijd(t.close_time) for t in c) if x is not None]
+        start = min(opens) if opens else None
+        eind = max(sluits) if sluits else None
+        bruto = [t.gross_pnl for t in c if t.gross_pnl is not None]
+        eur = [
+            t.net_pnl_account for t in c
+            if t.net_pnl_account is not None
+            and str(t.account_currency or "").upper() == "EUR"
+        ]
+        uit.append({
+            "nr": nr,
+            "trades": len(c),
+            "start": _iso(start),
+            "eind": _iso(eind),
+            "duur_min": (
+                round((eind - start).total_seconds() / 60.0, 1)
+                if start and eind else None
+            ),
+            "netto_usd": round(sum(t.net_pnl or 0.0 for t in c), 2),
+            "bruto_usd": round(sum(bruto), 2) if bruto else None,
+            "netto_eur": round(sum(eur), 2) if len(eur) == len(c) else None,
+        })
+    return uit
+
+
+def cluster_samenvatting(details: Sequence[dict]) -> dict:
+    """Weegt het grootste cluster zwaar (1.7.0)?
+
+    * ``grootste_cluster_aandeel_trades_procent``: het cluster met de meeste
+      trades, als deel van alle trades.
+    * ``grootste_cluster_aandeel_netto_procent``: het cluster met het grootste
+      resultaat (absoluut), als deel van de som van alle absolute
+      clusterresultaten. Het netto totaal zelf kan rond nul liggen; dan zegt
+      een aandeel daarvan niets.
+    * ``netto_zonder_grootste_cluster_usd``: het totaal zonder dat cluster.
+    """
+    if not details:
+        return {}
+    totaal_trades = sum(d["trades"] for d in details) or 1
+    meeste = max(details, key=lambda d: d["trades"])
+    zwaarste = max(details, key=lambda d: abs(d["netto_usd"]))
+    abs_som = sum(abs(d["netto_usd"]) for d in details)
+    netto = sum(d["netto_usd"] for d in details)
+    return {
+        "grootste_cluster_aandeel_trades_procent": round(
+            meeste["trades"] / totaal_trades * 100.0, 1
+        ),
+        "grootste_cluster_trades_nr": meeste["nr"],
+        "grootste_cluster_aandeel_netto_procent": (
+            round(abs(zwaarste["netto_usd"]) / abs_som * 100.0, 1)
+            if abs_som > 0 else None
+        ),
+        "grootste_cluster_netto_nr": zwaarste["nr"],
+        "grootste_cluster_netto_usd": zwaarste["netto_usd"],
+        "netto_zonder_grootste_cluster_usd": round(netto - zwaarste["netto_usd"], 2),
+    }
 
 
 def _t(values: Sequence[float]) -> float:
@@ -147,6 +229,7 @@ def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict
     t_per_trade = _safe(mean_net, sd / math.sqrt(len(nets))) if sd > 0 else 0.0
     clusters = cluster_resultaten(closed)
     t_stat = _t(clusters)
+    details = cluster_details(closed)
 
     # Gemiddelde beweging die per trade gevangen wordt, in USD per ounce.
     volumes = [t.volume * 100.0 for t in closed]
@@ -217,6 +300,9 @@ def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict
             f"{len(clusters)} clusters uit {len(closed)} trades "
             f"(herinstap binnen {CLUSTER_MINUTEN:.0f} min = zelfde cluster)"
         ),
+        # 1.7.0: per cluster, de laatste CLUSTER_LIJST_MAX.
+        "per_cluster": details[-CLUSTER_LIJST_MAX:],
+        "cluster_samenvatting": cluster_samenvatting(details),
         "std_dev": round(sd, 4),
         "avg_duration_seconds": round(_safe(sum(durations), len(durations)), 1),
         "close_reasons": reasons,

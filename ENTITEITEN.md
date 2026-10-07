@@ -79,7 +79,7 @@ Vervang `<...>` door `gold_scalper_xau_usd` of wat er bij jouw symbool staat.
 | Entiteit | Doel |
 |---|---|
 | `binary_sensor.<...>_noodstop` | limiet geraakt |
-| `binary_sensor.<...>_dataprobleem` | OHLCV-kolommen uit de pas |
+| `binary_sensor.<...>_dataprobleem` | OHLCV-kolommen uit de pas, of koers verouderd (laatste opvraging mislukt; `koers_leeftijd_seconden`) |
 | `binary_sensor.<...>_modus_genegeerd` | gekozen modus wordt overruled |
 | `binary_sensor.<...>_veilig_herstarten` | mag HA nu herstart worden |
 | `binary_sensor.<...>_live_vrijgegeven` | staat de poort open |

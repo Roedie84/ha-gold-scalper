@@ -96,15 +96,27 @@ class RiskHalted(GoldScalperEntity, BinarySensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_halted"
 
     @property
+    def available(self) -> bool:
+        # 1.7.0: de noodstop blijft zichtbaar, ook als de koersopvraging
+        # faalt. Hij leest de risicobewaking rechtstreeks, niet de cyclus.
+        return True
+
+    def _risk(self) -> dict:
+        try:
+            return self.coordinator.risk.as_dict()
+        except Exception:  # noqa: BLE001 - dan de laatste cyclus
+            return (self.coordinator.data or {}).get("risk") or {}
+
+    @property
     def is_on(self) -> bool | None:
-        data = self.coordinator.data
-        if not data:
+        risk = self._risk()
+        if not risk:
             return None
-        return (data.get("risk") or {}).get("state") == "halted"
+        return risk.get("state") == "halted"
 
     @property
     def extra_state_attributes(self) -> dict:
-        risk = (self.coordinator.data or {}).get("risk") or {}
+        risk = self._risk()
         return {
             "reason": risk.get("halt_reason"),
             "recent_triggers": risk.get("recent_triggers", []),
@@ -178,6 +190,9 @@ class DataIntegrity(GoldScalperEntity, BinarySensorEntity):
         data = self.coordinator.data
         if not data:
             return None
+        # 1.7.0: een vastgehouden (verouderde) koers is een dataprobleem.
+        if data.get("koers_verouderd"):
+            return True
         if not data.get("candles_consistent", True):
             return True
         # Te weinig historie is óók een dataprobleem: de indicatoren geven dan
@@ -191,6 +206,10 @@ class DataIntegrity(GoldScalperEntity, BinarySensorEntity):
             "candles": data.get("candles"),
             "indicator_bars": self.coordinator.state.bars,
             "columns_consistent": data.get("candles_consistent"),
+            "koers_verouderd": bool(data.get("koers_verouderd")),
+            "koers_leeftijd_seconden": data.get("koers_leeftijd_seconden"),
+            "koers_mislukt_op_rij": data.get("koers_mislukt_op_rij", 0),
+            "koers_fout": data.get("koers_fout"),
             "hint": (
                 "Bij een probleem wordt de historie automatisch opnieuw opgehaald "
                 "bij de volgende cyclus."

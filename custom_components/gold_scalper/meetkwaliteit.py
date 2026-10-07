@@ -122,6 +122,8 @@ SPECS: tuple[dict, ...] = (
     ),
     dict(
         key="reconciliation", name="Afstemming met broker",
+        # 1.7.0: zichtbaar houden bij een storing.
+        blijft_beschikbaar=True,
         icon="mdi:scale-balance",
         device_class="enum",
         options=["in_orde", "afwijkingen", "nog_niet"],

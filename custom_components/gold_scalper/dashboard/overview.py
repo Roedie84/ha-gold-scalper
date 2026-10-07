@@ -33,6 +33,7 @@ _STATUS_COLOURS = {
     "positie_open": TOKENS["assay"],
     "wachtend": TOKENS["assay"],
     "afwikkelen": TOKENS["cost"],
+    "koers_verouderd": TOKENS["cost"],
 }
 
 _STATUS_LABELS = {
@@ -45,6 +46,7 @@ _STATUS_LABELS = {
     "positie_open": "Positie open",
     "wachtend": "Actief",
     "afwikkelen": "Afwikkelen",
+    "koers_verouderd": "Koers verouderd",
 }
 
 _CSS = """

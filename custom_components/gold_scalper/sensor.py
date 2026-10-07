@@ -25,6 +25,8 @@ from .status import build_status
 class ScalperSensor(SensorEntityDescription):
     value_fn: Callable[[dict], object]
     attrs_fn: Callable[[dict], dict] | None = None
+    #: 1.7.0: blijft beschikbaar (laatste waarde) als een cyclus faalt.
+    blijft_beschikbaar: bool = False
 
 
 def _stats(d: dict) -> dict:
@@ -53,7 +55,13 @@ SENSORS: tuple[ScalperSensor, ...] = (
         key="price", name="Koers", icon="mdi:gold",
         state_class=SensorStateClass.MEASUREMENT, suggested_display_precision=2,
         value_fn=lambda d: d.get("price"),
-        attrs_fn=lambda d: {"bid": d["quote"].bid, "ask": d["quote"].ask},
+        attrs_fn=lambda d: {
+            "bid": d["quote"].bid, "ask": d["quote"].ask,
+            # 1.7.0: aan als de laatste opvraging mislukte en dit de
+            # vastgehouden koers is.
+            "koers_verouderd": bool(d.get("koers_verouderd")),
+            "koers_leeftijd_seconden": d.get("koers_leeftijd_seconden"),
+        },
     ),
     ScalperSensor(
         key="spread", name="Spread", icon="mdi:arrow-expand-horizontal",
@@ -149,6 +157,9 @@ SENSORS: tuple[ScalperSensor, ...] = (
             "basis": _stats(d).get("t_basis"),
             "clusters": _stats(d).get("clusters"),
             "per_trade": _stats(d).get("t_statistic_per_trade"),
+            # 1.7.0: per cluster (laatste 50) en hoe zwaar het grootste weegt.
+            **(_stats(d).get("cluster_samenvatting") or {}),
+            "per_cluster": _stats(d).get("per_cluster"),
         },
     ),
     ScalperSensor(
@@ -332,6 +343,12 @@ class ScalperSensorEntity(GoldScalperEntity, SensorEntity):
         super().__init__(coordinator, entry)
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+
+    @property
+    def available(self) -> bool:
+        if self.entity_description.blijft_beschikbaar:
+            return self.coordinator.data is not None
+        return super().available
 
     @property
     def native_value(self):

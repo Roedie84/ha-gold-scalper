@@ -70,7 +70,7 @@ from .const import (
     DATABASE_FILENAME, DEFAULT_ENVIRONMENT, DEFAULT_MAX_UNITS, DEFAULT_MODE,
     DEFAULT_STARTING_BALANCE, DEFAULT_SYMBOL, DEFAULT_TIMEFRAME, DEFAULT_UNITS,
     DEFAULT_UPDATE_SECONDS, DOMAIN, MIN_UPDATE_SECONDS, MIN_WARMUP_CANDLES,
-    WARMUP_CANDLES,
+    WARMUP_CANDLES, KOERS_HOUD_MAX_MISLUKT, KOERS_HOUD_MAX_SECONDEN,
 )
 from .learning.analysis import evaluate_threshold, measure_execution, regime_performance
 from .learning.postmortem import analyse_losses
@@ -461,6 +461,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: bij herhaling tot niets. Gaat nu mee in de bewaarde toestand.
         self._partial_taken: set[str] = set()
         self._last_quote: VenueQuote | None = None
+        #: 1.7.0: mislukte koersopvragingen op rij, het moment van de laatste
+        #: geslaagde, en wat die cyclus teruggaf. Zo blijft bij een losse
+        #: time-out het laatste beeld staan in plaats van alles onbeschikbaar.
+        self._koers_mislukt: int = 0
+        self._laatste_verse_koers_om: datetime | None = None
+        self._laatste_data: dict | None = None
         self._last_signal = None
         #: Aantal gesloten trades bij de laatste poortberekening. De poort
         #: herberekenen is duur (meerdere queries), dus dat gebeurt alleen als
@@ -1419,11 +1425,25 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 quote = self._last_quote
                 _LOGGER.debug("Markt gesloten; laatst bekende koers aangehouden")
             else:
+                # 1.7.0: een losse mislukte opvraging houdt het laatste beeld
+                # vast. Er wordt in deze cyclus niets beslist: geen instap,
+                # geen stop verplaatsen, geen sluiting op een oude koers. De
+                # stops en doelen staan bij de broker en werken gewoon door.
+                vastgehouden = self._houd_laatste_data(err)
+                if vastgehouden is not None:
+                    return vastgehouden
                 raise UpdateFailed(f"Geen koers beschikbaar: {err}") from err
         self._last_quote = quote
         budget.mark("quote")
 
         now = datetime.now(timezone.utc)
+        if self._koers_mislukt:
+            _LOGGER.info(
+                "Koers weer beschikbaar na %d mislukte opvraging(en).",
+                self._koers_mislukt,
+            )
+            self._koers_mislukt = 0
+        self._laatste_verse_koers_om = now
         tick_age = (now - quote.time).total_seconds()
 
         # -- bars bijwerken --------------------------------------------------- #
@@ -1725,9 +1745,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if self._candles is not None else set()
         )
 
-        return {
+        data = {
             "quote": quote,
             "price": quote.mid,
+            # 1.7.0: verse koers; bij een vastgehouden cyclus staan hier de
+            # leeftijd en het aantal mislukte opvragingen.
+            "koers_verouderd": False,
+            "koers_leeftijd_seconden": None,
+            "koers_mislukt_op_rij": 0,
+            "koers_fout": None,
             "candles": len(self._candles) if self._candles else 0,
             "market_open": quote.tradeable,
             "quote_age_seconds": round(tick_age, 1),
@@ -1800,6 +1826,76 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "mode_override_reason": self.mode_override_reason,
             "enabled": self._enabled,
         }
+        self._laatste_data = data
+        return data
+
+    def _houd_laatste_data(self, err: Exception) -> dict | None:
+        """Laatste gegevens aanhouden na een mislukte koersopvraging (1.7.0).
+
+        Live op 7 oktober: de koersopvraging bij IG liep zes keer in
+        anderhalf uur tegen de time-out van 6 s aan, steeds één cyclus. Elke
+        keer werd álles onbeschikbaar, ook de noodstop - precies de indicator
+        die je bij een storing wilt blijven zien.
+
+        Geeft een kopie van de laatste gegevens terug met ``koers_verouderd``
+        aan, of None als de drempel voorbij is (dan de oude storing). De
+        cyclus beslist niets: geen signaal, geen instap, geen exitbeheer op
+        een oude koers. Stops en doelen staan bij de broker en werken door.
+        """
+        self._koers_mislukt += 1
+        vorige = self._laatste_data
+        if vorige is None or self._laatste_verse_koers_om is None:
+            return None
+        now = datetime.now(timezone.utc)
+        leeftijd = (now - self._laatste_verse_koers_om).total_seconds()
+        if (
+            self._koers_mislukt > KOERS_HOUD_MAX_MISLUKT
+            or leeftijd > KOERS_HOUD_MAX_SECONDEN
+        ):
+            _LOGGER.warning(
+                "Koersopvraging %d keer op rij mislukt (laatste verse koers "
+                "%.0f s oud); entiteiten worden onbeschikbaar tot de koers "
+                "terug is.", self._koers_mislukt, leeftijd,
+            )
+            return None
+
+        _LOGGER.warning(
+            "Koersopvraging mislukt (%d van max. %d op rij): %s. Laatste "
+            "gegevens aangehouden (koers %.0f s oud); geen nieuwe posities "
+            "en geen exitbeheer tot er een verse koers is.",
+            self._koers_mislukt, KOERS_HOUD_MAX_MISLUKT, err, leeftijd,
+        )
+        data = dict(vorige)
+        quote = vorige.get("quote")
+        if quote is not None and getattr(quote, "time", None) is not None:
+            data["quote_age_seconds"] = round((now - quote.time).total_seconds(), 1)
+        data.update({
+            "koers_verouderd": True,
+            "koers_leeftijd_seconden": round(leeftijd, 1),
+            "koers_mislukt_op_rij": self._koers_mislukt,
+            "koers_fout": str(err)[:200],
+            # Er is in deze cyclus niets geëvalueerd.
+            "signal": None,
+            "reject_reason": "koers verouderd: geen verse koers van de broker",
+            # Noodstop en levenscyclus actueel houden: die veranderen ook
+            # zonder koers (handmatig hervatten, afwikkelen).
+            "risk": self.risk.as_dict(),
+            "lifecycle": {
+                **self.lifecycle.as_dict(),
+                "safe_to_restart": veilig_herstarten(
+                    vorige.get("open_positions"), self.lifecycle
+                ),
+                "levenscyclus_afgewikkeld": self.lifecycle.safe_to_restart,
+            },
+            "reconciliation": self.reconciliation,
+            "enabled": self._enabled,
+        })
+        return data
+
+    @property
+    def koers_verouderd(self) -> bool:
+        """Waar zolang de laatste koersopvraging mislukte (1.7.0)."""
+        return self._koers_mislukt > 0
 
     def _append_candle(self, fresh: Candles, index: int) -> None:
         """Voeg één candle toe en kap de reeks af.
@@ -2085,6 +2181,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 _LOGGER.error("Exitactie %s mislukte: %s", action.kind, err)
 
     async def _open_position(self, signal, quote: VenueQuote, now: datetime) -> None:
+        # 1.7.0: nooit instappen op een vastgehouden koers. De lus slaat zo'n
+        # cyclus al over; dit is de tweede grendel.
+        if self.koers_verouderd:
+            _LOGGER.warning("Instap overgeslagen: koers verouderd.")
+            return
         side = "buy" if signal.direction == 1 else "sell"
         try:
             # Grootte bepalen vóór de order. Bij risicogestuurde schaling

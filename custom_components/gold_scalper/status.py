@@ -44,6 +44,13 @@ def build_status(d: dict) -> tuple[str, str]:
         )
     if lifecycle == "draining":
         return "afwikkelen", "Bezig met afwikkelen voor een herstart."
+    if d.get("koers_verouderd"):
+        return "koers_verouderd", (
+            f"Geen verse koers van de broker ({d.get('koers_mislukt_op_rij')}x "
+            f"mislukt, {d.get('koers_leeftijd_seconden')} s oud). Laatste "
+            "gegevens aangehouden; geen nieuwe posities tot de koers terug is. "
+            "Stops en doelen bij de broker werken door."
+        )
     note = d.get("schedule_note")
     if note:
         return "rooster_wijkt_af", note

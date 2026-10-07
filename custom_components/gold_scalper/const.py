@@ -124,6 +124,15 @@ DEFAULT_MODE: Final = "paper"
 DEFAULT_UPDATE_SECONDS: Final = 20
 MIN_UPDATE_SECONDS: Final = 10
 
+#: Een mislukte koersopvraging (time-out na 6 s, haperende DNS of verbinding)
+#: maakt niet meteen alles onbeschikbaar (1.7.0). Tot zoveel opvragingen op
+#: rij, en zolang de laatste verse koers niet ouder is dan KOERS_HOUD_MAX_SECONDEN,
+#: blijven de laatste gegevens staan met *Dataprobleem* aan. Daarna de oude
+#: storing (UpdateFailed). Op 7 oktober zes losse time-outs in anderhalf uur,
+#: telkens één cyclus.
+KOERS_HOUD_MAX_MISLUKT: Final = 3
+KOERS_HOUD_MAX_SECONDEN: Final = 180
+
 DEFAULT_UNITS: Final = 1.0        # ounces
 #: Ounces per lot bij XAU/USD. Stond eerder in twee modules apart gedefinieerd;
 #: twee kopieën van hetzelfde getal kunnen uit elkaar lopen, en dan reken je in
@@ -194,7 +203,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "1.6.1"
+INTEGRATION_VERSION: Final = "1.7.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

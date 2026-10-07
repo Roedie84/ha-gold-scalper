@@ -1,5 +1,36 @@
 # Changelog — Gold Scalper
 
+## 1.7.0
+
+* **Een haperende koersopvraging maakt niet meer alles onbeschikbaar.** Op
+  7 oktober liep de koersopvraging bij IG zes keer in anderhalf uur tegen de
+  time-out van 6 s aan; elke keer werden álle entiteiten kort
+  onbeschikbaar, ook de noodstop. Nu blijft het laatste beeld staan tot
+  drie mislukte opvragingen op rij (`KOERS_HOUD_MAX_MISLUKT`) en zolang de
+  laatste verse koers hooguit 180 s oud is (`KOERS_HOUD_MAX_SECONDEN`).
+  *Dataprobleem* gaat dan aan, met `koers_verouderd`,
+  `koers_leeftijd_seconden`, `koers_mislukt_op_rij` en `koers_fout` in de
+  attributen (de eerste twee ook bij *Koers*), *Status* meldt
+  `koers_verouderd`, en het log krijgt een waarschuwing. Pas daarna de oude
+  storing.
+* **Niet handelen op een oude koers.** Een vastgehouden cyclus beslist niets:
+  geen signaal, geen instap, geen stop verplaatsen of sluiten. Stops en
+  doelen staan bij de broker en werken gewoon door; het eigen exitbeheer
+  wacht hooguit drie cycli. `_open_position` weigert bovendien zelf bij een
+  verouderde koers.
+* **Noodstop en Afstemming blijven zichtbaar**, ook na de drempel. De
+  noodstop leest de risicobewaking rechtstreeks; de afstemming toont het
+  laatste resultaat.
+* **Statistiek per cluster.** De sensor *t-statistiek* toont per cluster
+  (laatste 50) `per_cluster`: `nr`, `trades`, `start`, `eind`, `duur_min`,
+  `netto_usd`, `bruto_usd` en `netto_eur` (alleen als de broker alle trades
+  in het cluster in euro afrekende). Daarbij hoe zwaar het grootste cluster
+  weegt: `grootste_cluster_aandeel_trades_procent`,
+  `grootste_cluster_aandeel_netto_procent` (absoluut resultaat als deel van
+  de som van alle absolute clusterresultaten), `grootste_cluster_netto_usd`
+  en `netto_zonder_grootste_cluster_usd`. Zo is te zien of één
+  trendepisode het resultaat draagt.
+
 ## 1.6.1
 
 * **Minder ruis in het log.** "Geen transactie gevonden" is alleen nog een
