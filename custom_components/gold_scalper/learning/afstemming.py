@@ -23,6 +23,18 @@ de cent. Een uitstapprijs wordt alleen overgenomen bij hooguit een cent
 verschil (5.7), met de oude waarde in ``exit_price_provenance``; een groter
 verschil wijst op een verkeerde koppeling en blijft een zichtbare afwijking.
 
+**Sterke koppeling (1.4).** Klopt de instapprijs op de cent, de omvang en
+het openingsmoment van de broker (``openDateUtc``) binnen tien minuten, dan is
+het zeker dezelfde trade. Een groter verschil in uitstapprijs is dan geen
+verkeerde koppeling maar slippage: de broker vulde anders dan de koers die de
+lus zag. Dan wordt zijn prijs overgenomen, met de oude waarde in
+``exit_price_provenance``, en geldt het niet als afwijking. Bij een zwakke
+koppeling blijft een groter verschil wel een afwijking.
+
+**Kosten (1.4).** Met de afrekening van de broker erbij worden de kosten van
+de trade gemeten (zie ``kosten.py``) en gaat ``cost_source`` naar
+``measured``.
+
 **Wat niet telt.** Trades die nog niet in het overzicht staan. Dat overzicht
 loopt uren achter, dus een ontbrekende trade van vandaag is geen afwijking maar
 geduld. Pas na twee dagen heet hij ontbrekend.
@@ -37,6 +49,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Sequence
 
 from ..storage.database import Trade
+from .kosten import meet_kosten
 
 #: Een uitstapprijs mag hooguit zoveel verschillen.
 PRIJS_TOLERANTIE = 0.01
@@ -71,6 +84,10 @@ class Afstemming:
     gevonden: int = 0
     kloppend: int = 0
     nog_niet_verwerkt: int = 0
+    #: Uitstapprijzen die bij een sterke koppeling naar de broker gingen.
+    slippage_overgenomen: int = 0
+    #: Trades waarvan de kosten in deze ronde zijn gemeten.
+    kosten_gemeten: int = 0
     afwijkingen: list = field(default_factory=list)
     #: Trades waarvan bedrag, koers of omvang naar de broker is bijgewerkt:
     #: ``{"trade_id", "ticket", "velden": {...}}``. De coordinator legt ze vast.
@@ -110,6 +127,8 @@ class Afstemming:
             "nog_niet_verwerkt": self.nog_niet_verwerkt,
             "afwijkingen": [a.as_dict() for a in self.afwijkingen],
             "bijgewerkt": len(self.overnames),
+            "slippage_overgenomen": self.slippage_overgenomen,
+            "kosten_gemeten": self.kosten_gemeten,
             "in_orde": self.in_orde,
             "samenvatting": self.samenvatting(),
         }
@@ -145,7 +164,7 @@ def stem_af(
         units = (trade.volume or 0) * contract_size
         match = match_transaction(
             transacties, trade.broker_ticket, trade.open_price,
-            trade.side, units or None,
+            trade.side, units or None, trade.open_time,
         )
 
         if match is None:
@@ -166,10 +185,28 @@ def stem_af(
 
         broker_uit = match.get("exit_price")
         uit_velden: dict = {}
+        slippage = False
         if broker_uit is not None and trade.close_price is not None:
             verschil = round(broker_uit - trade.close_price, 6)
-            if abs(verschil) > PRIJS_TOLERANTIE + 1e-9:
-                # Groter dan een cent: nooit stil gelijkgesteld.
+            if abs(verschil) > PRIJS_TOLERANTIE + 1e-9 and _sterk(trade, match, units):
+                # Zeker dezelfde trade: het verschil is slippage. De broker is
+                # de afrekening.
+                slippage = True
+                uitslag.slippage_overgenomen += 1
+                uit_velden = {
+                    "close_price": broker_uit,
+                    "exit_price_provenance": json.dumps({
+                        "original_local": trade.close_price, "broker": broker_uit,
+                        "difference": verschil,
+                        "status": "ADOPTED_BROKER_SETTLEMENT_SLIPPAGE",
+                        "matched_on": match.get("matched_on"),
+                        "broker_reference": match.get("reference"),
+                        "source": "broker_transactions", "at": now.isoformat(),
+                    }, sort_keys=True),
+                }
+            elif abs(verschil) > PRIJS_TOLERANTIE + 1e-9:
+                # Groter dan een cent bij een zwakke koppeling: nooit stil
+                # gelijkgesteld.
                 fouten.append(
                     f"uitstap {trade.close_price} tegen {broker_uit} bij de broker"
                 )
@@ -193,7 +230,9 @@ def stem_af(
                 and trade.net_pnl is not None):
             # Met de koers van de broker: exact controleren en overnemen.
             bedrag_velden, fout = _overname(trade, match, contract_size)
-            if fout:
+            # Na overgenomen slippage verschilt het oude bedrag vanzelf: dat
+            # verschil is verklaard en geen afwijking.
+            if fout and not slippage:
                 fouten.append(fout)
             velden.update(bedrag_velden)
         elif broker_bedrag is not None and koers and trade.net_pnl is not None:
@@ -206,6 +245,25 @@ def stem_af(
                 fouten.append(
                     f"bedrag {eigen:+.2f} tegen {broker_bedrag:+.2f} bij de broker"
                 )
+        if slippage and "net_pnl" not in velden and trade.open_price is not None:
+            richting = 1.0 if trade.side == "buy" else -1.0
+            netto = round((broker_uit - trade.open_price) * richting * units, 4)
+            velden["net_pnl"] = netto
+
+        if trade.cost_source != "measured" and broker_uit is not None and prijs_klopt:
+            kosten = meet_kosten(trade, broker_uit, contract_size)
+            if kosten is not None:
+                netto = velden.get("net_pnl", trade.net_pnl)
+                velden.update({
+                    "total_cost": kosten["total_cost"],
+                    "spread_cost": kosten["spread_cost"],
+                    "slippage_cost": kosten["slippage_cost"],
+                    "cost_source": "measured",
+                })
+                if netto is not None:
+                    velden["gross_pnl"] = round(netto + kosten["total_cost"], 4)
+                uitslag.kosten_gemeten += 1
+
         if velden:
             uitslag.overnames.append({
                 "trade_id": trade.id, "ticket": str(trade.broker_ticket), "velden": velden,
@@ -220,6 +278,21 @@ def stem_af(
             uitslag.kloppend += 1
 
     return uitslag
+
+
+def _sterk(trade: Trade, match: dict, units: float) -> bool:
+    """Zeker dezelfde trade: instap op de cent, omvang en openingsmoment."""
+    if match.get("matched_on") != "instapprijs+opentijd":
+        return False
+    instap = match.get("open_price")
+    if instap is None or trade.open_price is None:
+        return False
+    if abs(instap - trade.open_price) > PRIJS_TOLERANTIE + 1e-9:
+        return False
+    omvang = _omvang(match)
+    if omvang is not None and units and abs(omvang - units) > OMVANG_TOLERANTIE:
+        return False
+    return True
 
 
 def _overname(trade: Trade, match: dict, contract_size: float) -> tuple[dict, str | None]:

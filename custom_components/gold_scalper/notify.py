@@ -30,6 +30,16 @@ _LOGGER = logging.getLogger(__name__)
 #: Minimale tijd tussen twee identieke waarschuwingen.
 REPEAT_AFTER = timedelta(hours=4)
 
+#: Bestaat de notify-dienst nog niet - bij het opstarten laadt mobile_app vaak
+#: later dan deze integratie - dan zoveel seconden wachten en opnieuw kijken.
+OPNIEUW_NA_S = 30
+
+#: Zo vaak opnieuw kijken voordat een melding wordt opgegeven: tien minuten.
+MAX_POGINGEN = 20
+
+#: Hooguit zoveel meldingen vasthouden tot de dienst er is.
+MAX_WACHTEND = 10
+
 
 @dataclass(slots=True)
 class NotifierConfig:
@@ -57,6 +67,10 @@ class Notifier:
         self.hass = hass
         self.config = config
         self._sent = _Sent()
+        #: Meldingen die wachten tot de notify-dienst bestaat.
+        self._wachtend: list[dict] = []
+        self._pogingen = 0
+        self._herhaling = None
 
     @property
     def enabled(self) -> bool:
@@ -87,6 +101,57 @@ class Notifier:
         if extra:
             data["data"] = extra
 
+        if not self._dienst_bestaat():
+            # Bij het opstarten: mobile_app is er vaak nog niet. Vasthouden en
+            # opnieuw proberen, in plaats van de opstartmelding te verliezen.
+            self._wachtend = (self._wachtend + [data])[-MAX_WACHTEND:]
+            self._plan_herhaling()
+            return
+
+        await self._roep_aan(data)
+
+    def _dienst_bestaat(self) -> bool:
+        has = getattr(self.hass.services, "has_service", None)
+        if has is None:
+            return True
+        try:
+            return bool(has("notify", self.config.service))
+        except Exception:  # noqa: BLE001
+            return True
+
+    def _plan_herhaling(self) -> None:
+        if self._herhaling is not None:
+            return
+        try:
+            from homeassistant.helpers.event import async_call_later
+        except ImportError:  # pragma: no cover
+            return
+        self._herhaling = async_call_later(
+            self.hass, OPNIEUW_NA_S, self._probeer_wachtend
+        )
+
+    async def _probeer_wachtend(self, _now=None) -> None:
+        """Wachtende meldingen versturen zodra de dienst er is."""
+        self._herhaling = None
+        if not self._wachtend:
+            return
+        if self._dienst_bestaat():
+            wachtend, self._wachtend, self._pogingen = self._wachtend, [], 0
+            for data in wachtend:
+                await self._roep_aan(data)
+            return
+        self._pogingen += 1
+        if self._pogingen >= MAX_POGINGEN:
+            _LOGGER.warning(
+                "notify.%s bestaat na %d minuten nog niet; %d melding(en) "
+                "niet verstuurd.", self.config.service,
+                MAX_POGINGEN * OPNIEUW_NA_S // 60, len(self._wachtend),
+            )
+            self._wachtend, self._pogingen = [], 0
+            return
+        self._plan_herhaling()
+
+    async def _roep_aan(self, data: dict) -> None:
         try:
             await self.hass.services.async_call(
                 "notify", self.config.service, data, blocking=False

@@ -1463,9 +1463,19 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # Daarnaast elk uur: het overzicht van de broker loopt uren achter,
             # en zonder tussentijdse afstemming bleven de bedragen van vandaag
             # tot morgen benaderingen.
+            #
+            # Staat er nog iets open - een afwijking of een trade die de broker
+            # nog niet verwerkte - dan elk kwartier (1.4). Anders bleef een
+            # afwijking die zichzelf al had opgelost tot een uur zichtbaar, en
+            # werden late transacties pas op het volgende hele uur afgerekend.
+            vorige = self.reconciliation or {}
+            open_eind = bool(
+                vorige.get("afwijkingen") or vorige.get("nog_niet_verwerkt")
+            )
+            interval = 900 if open_eind else 3600
             uur_voorbij = (
                 self._afgestemd_om is None
-                or (now - self._afgestemd_om).total_seconds() >= 3600
+                or (now - self._afgestemd_om).total_seconds() >= interval
             )
             if (self._afgestemd_op != dag and now.hour >= 6) or uur_voorbij:
                 self._afgestemd_op = dag
@@ -2178,8 +2188,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             for trade in bijgewerkt:
                 await self.hass.async_add_executor_job(self.db.update_trade, trade)
             _LOGGER.info(
-                "Afstemming: %d trade(s) bijgewerkt naar het bedrag van de broker.",
-                len(bijgewerkt),
+                "Afstemming: %d trade(s) bijgewerkt naar de broker (%d met "
+                "slippage op de uitstap, %d met gemeten kosten).",
+                len(bijgewerkt), uitslag.slippage_overgenomen,
+                uitslag.kosten_gemeten,
             )
         self.reconciliation = {**uitslag.as_dict(), "moment": nu.isoformat()}
         if uitslag.afwijkingen:
@@ -2529,6 +2541,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     str(trade.broker_ticket), trade.open_price, trade.side,
                     _as_datetime(trade.close_time, None),
                     trade.volume * CONTRACT_SIZE,
+                    trade.open_time,
                 )
             except VenueError:
                 return
@@ -2793,7 +2806,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     # rond het huidige tijdstip is juist.
                     werkelijk = await zoek(
                         str(trade.broker_ticket), trade.open_price, trade.side,
-                        None, trade.volume * CONTRACT_SIZE,
+                        None, trade.volume * CONTRACT_SIZE, trade.open_time,
                     )
                 except VenueError as err:
                     _LOGGER.debug(

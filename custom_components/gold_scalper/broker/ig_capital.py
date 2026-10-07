@@ -80,9 +80,28 @@ CONFIRM_DELAYS = (0.0, 0.3, 0.7, 1.0, 1.5, 2.5)
 TIMEOUT = ClientTimeout(total=15, connect=5)
 
 
+#: Zoveel seconden mag het openingsmoment van de broker afwijken van het eigen
+#: instapmoment. Bevestigen duurt hooguit seconden; tien minuten is ruim.
+OPENTIJD_TOLERANTIE_S = 600
+
+
+def _utc(waarde) -> datetime | None:
+    if waarde is None:
+        return None
+    if isinstance(waarde, datetime):
+        m = waarde
+    else:
+        try:
+            m = datetime.fromisoformat(str(waarde))
+        except (TypeError, ValueError):
+            return None
+    return m if m.tzinfo else m.replace(tzinfo=timezone.utc)
+
+
 def match_transaction(
     transacties: list, ticket, open_price: float | None,
     side: str | None, units: float | None,
+    open_time=None,
 ) -> dict | None:
     """Zoek in een transactieoverzicht de transactie die bij een trade hoort.
 
@@ -125,6 +144,19 @@ def match_transaction(
             if richting_broker != side:
                 continue
 
+        # Het openingsmoment als tweede sleutel (1.4). Het veld ``reference``
+        # is bij IG niet het dealId van de positie - dat koppelt nooit - maar
+        # ``openDateUtc`` is het moment waarop de positie opende, en dat ligt
+        # binnen seconden van de eigen instap. Twee trades met dezelfde
+        # instapprijs uren na elkaar zijn zo niet meer te verwisselen.
+        eigen_open = _utc(open_time)
+        broker_open = _utc(tx.get("openDateUtc"))
+        tijd_afstand = None
+        if eigen_open is not None and broker_open is not None:
+            tijd_afstand = abs((broker_open - eigen_open).total_seconds())
+            if tijd_afstand > OPENTIJD_TOLERANTIE_S:
+                continue
+
         if open_price is not None and openings is not None:
             afstand = abs(openings - open_price)
             if afstand >= 0.05:
@@ -149,8 +181,9 @@ def match_transaction(
             # Prijs en omvang samen wegen. De prijs zwaarder, want die is
             # nauwkeuriger; de omvang als scheidsrechter bij een gelijke
             # prijs.
+            hoe = "instapprijs+opentijd" if tijd_afstand is not None else "instapprijs"
             kandidaten.append(
-                (afstand + omvang_afstand * 0.1, "instapprijs", niveau, tx)
+                (afstand + omvang_afstand * 0.1, hoe, niveau, tx)
             )
             continue
 
@@ -192,6 +225,8 @@ def match_transaction(
             # dateUtc eerst: die bevat het tijdstip. Het veld ``date``
             # heeft alleen de dag, en dat is als sluitmoment onbruikbaar.
             "closed_at": tx.get("dateUtc") or tx.get("date"),
+            "opened_at": tx.get("openDateUtc"),
+            "reference": tx.get("reference"),
         }
 
     # Niets gevonden: laat zien wat er gezocht werd en wat er lag.
@@ -1135,7 +1170,7 @@ class IgStyleVenue(ExecutionVenue):
     async def closed_deal(
         self, ticket: str, open_price: float | None = None,
         side: str | None = None, around: datetime | None = None,
-        units: float | None = None,
+        units: float | None = None, open_time=None,
     ) -> dict | None:
         """Zoek de werkelijke uitstapprijs van een gesloten positie.
 
@@ -1240,7 +1275,7 @@ class IgStyleVenue(ExecutionVenue):
         # De RICHTING sluit dat uit: de ene grootte is negatief, de andere
         # positief. Samen met de prijs is dat eenduidig.
         gevonden = match_transaction(
-            transacties, ticket, open_price, side, units,
+            transacties, ticket, open_price, side, units, open_time,
         )
         if gevonden:
             return gevonden

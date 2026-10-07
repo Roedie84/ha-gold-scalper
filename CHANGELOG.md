@@ -1,5 +1,27 @@
 # Changelog — Gold Scalper
 
+## 1.4.0
+
+* **Afstemming herkent slippage.** Klopt een trade met de broker op
+  instapprijs, richting, omvang én openingsmoment (`openDateUtc`, binnen tien
+  minuten), dan is een verschil in uitstapprijs geen verkeerde koppeling maar
+  slippage. De prijs van de broker wordt overgenomen, met de oude waarde in
+  `exit_price_provenance` (`ADOPTED_BROKER_SETTLEMENT_SLIPPAGE`), en het telt
+  niet meer als afwijking. Bij een zwakke koppeling blijft het een afwijking.
+* **Koppelen op openingsmoment.** Het veld `reference` van IG is niet het
+  dealId van de positie (dat koppelde nooit); het openingsmoment wel. Twee
+  trades met dezelfde instapprijs uren na elkaar worden zo niet meer verwisseld.
+  De referentie van IG wordt bij een overname vastgelegd.
+* **Afstemming elk kwartier zolang er iets openstaat** (afwijking of trade die
+  de broker nog niet verwerkte), anders elk uur.
+* **Gemeten kosten.** Met de afrekening van de broker worden de kosten per
+  trade gemeten: instap tegen het midden, uitstap tegen het order­niveau
+  (stop/doel) of het midden (eigen sluitorder), gesplitst in spread en
+  slippage. `cost_source` gaat dan naar `measured`.
+* **Opstartmelding gaat niet meer verloren.** Bestaat de notify-dienst nog
+  niet (mobile_app laadt vaak later), dan wacht de melding en wordt elke 30 s
+  opnieuw geprobeerd, tot tien minuten.
+
 ## 1.3.0
 
 * **Namen en labels** in het Lab mogen komma's, accenten en `&` bevatten. De
