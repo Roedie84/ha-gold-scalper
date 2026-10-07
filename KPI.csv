@@ -18,3 +18,6 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-07 23:15,TUSSEN,gs_versie,1.7.0,1,geinstalleerd = beschikbaar
 2026-10-07 23:40,TUSSEN,gs_versie,1.7.1,1,"gereleased, nog niet geinstalleerd"
 2026-10-07 23:40,TUSSEN,gs_tests_klokafhankelijk,4,21,"test_unconfirmed_orders faalt in dagpauze, ook op main"
+2026-10-07 23:45,TUSSEN,gs_latency_p99_ms,252.7,56,sensor latency_p99
+2026-10-07 23:45,TUSSEN,gs_max_drawdown_pct,1.89,56,sensor max_drawdown
+2026-10-07 23:45,TUSSEN,gs_versie_geinstalleerd,1.7.0,1,1.7.1 beschikbaar

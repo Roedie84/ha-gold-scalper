@@ -22,3 +22,12 @@ laatste ronde: 07-10 23:15, gemeten t/m 07-10 23:15
 - Geen nieuwe trades sinds 19:03 UTC (markt in dagpauze).
 
 laatste ronde: 07-10 23:40, gemeten t/m 07-10 23:40
+
+## 07-10 23:45 · tussenronde
+- Geen nieuwe trades (56; status markt_gesloten, dagpauze). Open posities 0. Equity 7169,85; max drawdown 1,89%.
+- Nieuw vastgelegd: latency p99 252,7 ms (n=56) naast p90 207 ms.
+- v1.7.1 (L-GS-001) nog niet geïnstalleerd (HA draait 1.7.0) → verificatie wacht op installatie.
+- Hypotheses ongewijzigd (H-GS-1 pas toetsen na fix en ≥100 trades; bruto-edge-toets pas bij ~17 clusters, nu 7).
+- Geen release.
+
+laatste ronde: 07-10 23:45, gemeten t/m 07-10 23:44
