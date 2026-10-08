@@ -131,3 +131,16 @@ laatste ronde: 08-10 15:40, gemeten t/m 08-10 15:44
 - Geen release (tussenronde, niets acuut). Geen knoppen, geen instellingen.
 
 laatste ronde: 08-10 19:40, gemeten t/m 08-10 19:44
+
+## 08-10 23:40 · tussenronde
+- Geïnstalleerd: 1.7.9 (1.7.7 saldosprong, 1.7.8 geen noodstop na eigen sluiting/race met IG, 1.7.9 sluiting pas boeken na bevestiging IG; chatsessie). Herstart 22:02 (reconciling → running). Markt sinds 23:00 dicht (dagpauze).
+- Sinds 19:44: **22 trades in 1 cluster** (15: 21:15-22:50, netto −21,17, bruto +2,38, kosten 23,55 = 1,07/trade). Totaal 123 trades / 15 clusters: netto −217,23 = bruto −28,23 − kosten 189,00; PF 0,613; winst 34,2%; t −2,95 (clusters, nagerekend); max DD 2,76%.
+- **Noodstop 21:20** ("positie open bij de broker maar niet in de database") → 12 signalen geweigerd; hervat 21:22, "alles sluiten" 21:58 (1 sluitreden "handmatig"). Dit is de race die 1.7.8/1.7.9 oplossen → na 1.7.9 tellen: 0× deze noodstop.
+- **L-GS-005 (tijdstops):** regime `tijdstop` nu 55 trades / 5 clusters: netto −16,96 (−0,31/trade, t −0,55, PF 0,85), bruto +54,07 (+0,98/trade, t bruto 1,79) tegen 19:40 +4,39 netto. Geen conclusie (5 clusters; bij gem. −3,4 en sd 13,9 USD/cluster zou pas na ~67 clusters iets significant worden). Beslismoment blijft ≥10 clusters gepaard.
+- **H-GS-7 sterker:** cluster 15 weer 22 trades in 95 min; in het tijdstopregime bruto 0,98/trade tegen kosten 1,29/trade → het bruto voordeel wordt volledig door het hogere tempo opgegeten.
+- **L-GS-004:** sluitreden onbekend 3/123 (was 1/101); afstemming in_orde (107/107 kloppend, 15 nog niet bij IG verwerkt). Kosten 120 gemeten / 3 berekend. Toets in de dagafsluiting: onbekend moet na afstemming dalen.
+- **H-GS-6 (latency):** p99 1067 ms (n=2000), p50 247, max 7,6 s (candles→exits max 6,2 s) — staart rond de noodstop/herstart. Nachttoets blijft staan.
+- Opgemerkt: 22:59:59 waarschuwing "broker meldt gesloten, rooster open" — 1 s vóór de dagpauze van 23:00 (klokrand; `closures` uur 22: 1/350). Eenmalig, geen voorstel.
+- Geen release (tussenronde, niets acuut). Geen knoppen, geen instellingen.
+
+laatste ronde: 08-10 23:40, gemeten t/m 08-10 23:44
