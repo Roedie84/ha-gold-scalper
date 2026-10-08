@@ -130,6 +130,9 @@ CREATE TABLE IF NOT EXISTS trades (
     -- Uitvoeringsversie waaronder de trade is geopend. Maakt later exact
     -- vast te stellen welke trades onder welk gedrag vielen.
     execution_semantics     INTEGER,
+    -- Uitstapregime bij het openen (1.7.6): 'zonder_tijdstop' of 'tijdstop'.
+    -- Alleen voor de statistiek; verandert geen beslissing.
+    exit_regime             TEXT,
     -- Resultaat in accountvaluta, met de omrekening erbij. Bij een correctie
     -- het bedrag van de broker zelf; anders omgerekend met de koers van dat
     -- moment. Nooit achteraf met één koers gereconstrueerd.
@@ -262,6 +265,9 @@ class Trade:
     cost_source: str | None = None
     #: Uitvoeringsversie bij het openen.
     execution_semantics: int | None = None
+    #: 1.7.6: uitstapregime bij het openen (zie const.EXIT_REGIME_*). Alleen
+    #: statistiek.
+    exit_regime: str | None = None
     #: Resultaat in accountvaluta en de omrekening waarmee het tot stand kwam.
     net_pnl_account: float | None = None
     account_currency: str | None = None
@@ -397,6 +403,10 @@ class TradeDatabase:
             self._conn.execute(
                 "ALTER TABLE trades ADD COLUMN execution_semantics INTEGER"
             )
+        if "exit_regime" not in trade_columns:
+            self._conn.execute("ALTER TABLE trades ADD COLUMN exit_regime TEXT")
+            _LOGGER.info("Database bijgewerkt: kolom 'exit_regime' toegevoegd")
+        self._backfill_exit_regime()
         self._migrate_close_reasons()
         self._conn.commit()
 
@@ -413,6 +423,46 @@ class TradeDatabase:
             "CREATE INDEX IF NOT EXISTS idx_runs_fingerprint ON runs(fingerprint)"
         )
         self._conn.commit()
+
+    def _backfill_exit_regime(self) -> int:
+        """Vul het uitstapregime van trades van vóór 1.7.6 in (idempotent).
+
+        Alleen lege velden. Een brokertrade die vóór de installatie van 1.7.4
+        opende, liep zonder werkende tijdstop; alles daarna, en elke
+        papertrade (die had altijd een openingstijd), met. Op tijd vergeleken
+        en niet als tekst: papertrades staan op seconden, brokertrades met
+        microseconden. Zonder leesbare openingstijd blijft het veld leeg.
+        """
+        from ..const import (
+            EXIT_REGIME_GRENS_UTC, EXIT_REGIME_TIJDSTOP, EXIT_REGIME_ZONDER_TIJDSTOP,
+        )
+        grens = datetime.fromisoformat(EXIT_REGIME_GRENS_UTC)
+        rijen = self._conn.execute(
+            "SELECT id, mode, open_time FROM trades WHERE exit_regime IS NULL"
+        ).fetchall()
+        updates: list[tuple[str, int]] = []
+        for rij in rijen:
+            try:
+                moment = datetime.fromisoformat(str(rij["open_time"]))
+            except (TypeError, ValueError):
+                continue
+            if moment.tzinfo is None:
+                moment = moment.replace(tzinfo=timezone.utc)
+            regime = (
+                EXIT_REGIME_ZONDER_TIJDSTOP
+                if rij["mode"] != MODE_PAPER and moment < grens
+                else EXIT_REGIME_TIJDSTOP
+            )
+            updates.append((regime, rij["id"]))
+        if updates:
+            self._conn.executemany(
+                "UPDATE trades SET exit_regime=? WHERE id=? AND exit_regime IS NULL",
+                updates,
+            )
+            _LOGGER.info(
+                "Uitstapregime ingevuld voor %d bestaande trade(s)", len(updates)
+            )
+        return len(updates)
 
     def close(self) -> None:
         if self._conn:

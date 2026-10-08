@@ -221,6 +221,9 @@ SENSORS: tuple[ScalperSensor, ...] = (
             "blocking_reasons": _stats(d).get("blocking_reasons", []),
             "checks": (d.get("gate") or {}).get("checks", {}),
             "gate_unlocked": (d.get("gate") or {}).get("unlocked"),
+            # 1.7.6: alleen ter informatie; het oordeel zelf gaat over de
+            # hele run.
+            "per_exitregime": _stats(d).get("per_exitregime"),
         },
     ),
     ScalperSensor(
@@ -286,6 +289,10 @@ SENSORS: tuple[ScalperSensor, ...] = (
             **(d.get("latency") or {}),
             "basis": _staart_latency(d)[1],
             "metingen": ((d.get("latency") or {}).get("total") or {}).get("samples"),
+            # 1.7.6: de steekproef overleeft een herstart; onder de 1000
+            # metingen is de p99 indicatief.
+            "n": ((d.get("latency") or {}).get("total") or {}).get("samples") or 0,
+            "p99_indicatief": _p99_indicatief(d),
         },
     ),
 )
@@ -302,10 +309,24 @@ def _staart_latency(d: dict) -> tuple[float | None, str]:
     totaal = (d.get("latency") or {}).get("total") or {}
     n = totaal.get("samples") or 0
     if totaal.get("p99") is not None:
+        # 1.7.6: gelijk aan storage.latency.P99_BETROUWBAAR_VANAF (een test
+        # bewaakt dat). Hier als getal, zodat de functie op zichzelf staat.
+        if n < 1000:
+            return totaal["p99"], (
+                f"p99 indicatief (n={n}, betrouwbaar vanaf 1000 metingen)"
+            )
         return totaal["p99"], f"p99 (n={n})"
     if totaal.get("p90") is not None:
         return totaal["p90"], f"p90, p99 pas vanaf 100 metingen (n={n})"
     return None, f"te weinig metingen (n={n}, p90 vanaf 20)"
+
+
+def _p99_indicatief(d: dict) -> bool | None:
+    """Is de getoonde p99 indicatief (1.7.6)? None als er geen p99 is."""
+    totaal = (d.get("latency") or {}).get("total") or {}
+    if totaal.get("p99") is None:
+        return None
+    return (totaal.get("samples") or 0) < 1000
 
 
 def _uit_spec(spec: dict) -> ScalperSensor:

@@ -23,7 +23,7 @@ en het feit dat een echte broker jouw orderflow ziet.
 
 from __future__ import annotations
 
-from ..const import EXECUTION_SEMANTICS_VERSION
+from ..const import EXECUTION_SEMANTICS_VERSION, EXIT_REGIME_HUIDIG
 
 import logging
 import random
@@ -276,6 +276,7 @@ class PaperBroker:
             mae=0.0,
             mfe=0.0,
             execution_semantics=EXECUTION_SEMANTICS_VERSION,
+            exit_regime=EXIT_REGIME_HUIDIG,
         )
         self.db.insert_trade(trade)
         self._open.append(trade)

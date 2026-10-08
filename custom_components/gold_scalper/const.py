@@ -203,7 +203,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "1.7.5"
+INTEGRATION_VERSION: Final = "1.7.6"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
@@ -216,3 +216,21 @@ INTEGRATION_VERSION: Final = "1.7.5"
 #: 3  5.4.0: één handelsdag, kosten uit het ledger, sluitredenen op bewijs,
 #:    geen nieuwe positie zonder bruikbare wisselkoers.
 EXECUTION_SEMANTICS_VERSION: Final = 3
+
+
+#: Uitstapregime van een trade (1.7.6). Alleen voor de statistiek: het zit
+#: niet in de vingerafdruk en verandert geen enkele beslissing.
+#:
+#: Tot 1.7.4 kwamen IG-posities binnen zonder openingstijd, waardoor tijdstop
+#: en maximale duur bij de broker nooit vuurden. Sinds 1.7.4 wel. Binnen
+#: dezelfde run zijn dat twee uitstapgedragingen; per trade vastleggen onder
+#: welk regime hij opende, maakt ze apart te beoordelen.
+EXIT_REGIME_ZONDER_TIJDSTOP: Final = "zonder_tijdstop"
+EXIT_REGIME_TIJDSTOP: Final = "tijdstop"
+#: Het regime waaronder nu geopende trades vallen.
+EXIT_REGIME_HUIDIG: Final = EXIT_REGIME_TIJDSTOP
+#: Moment waarop 1.7.4 (samen met 1.7.5) is geïnstalleerd: de herstart van
+#: Home Assistant op 8 oktober 2026 om 12:16 lokale tijd. Brokertrades die
+#: daarvóór openden, liepen zonder werkende tijdstop. Papertrades hadden
+#: altijd een openingstijd; voor hen werkte de tijdstop al.
+EXIT_REGIME_GRENS_UTC: Final = "2026-10-08T10:16:00+00:00"

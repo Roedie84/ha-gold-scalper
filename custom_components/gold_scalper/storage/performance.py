@@ -174,6 +174,38 @@ def _safe(numerator: float, denominator: float, default: float = 0.0) -> float:
     return numerator / denominator if denominator else default
 
 
+def per_exitregime(trades: Sequence[Trade]) -> dict:
+    """Kerncijfers per uitstapregime (1.7.6). Alleen ter informatie.
+
+    Sinds 1.7.4 vuren de tijdstops op IG; daarvóór niet. Binnen één run zijn
+    dat twee uitstapgedragingen. Per regime: aantal trades, aantal clusters,
+    netto per trade, t-statistiek over clusters (zoals de hoofdtoets) en
+    profit factor. Clusters worden binnen het regime gevormd. Verandert het
+    oordeel niet. Trades zonder vastgesteld regime staan onder ``onbekend``.
+    """
+    groepen: dict[str, list[Trade]] = {}
+    for t in trades:
+        if t.net_pnl is None:
+            continue
+        groepen.setdefault(getattr(t, "exit_regime", None) or "onbekend", []).append(t)
+    uit: dict[str, dict] = {}
+    for regime in sorted(groepen):
+        groep = groepen[regime]
+        nets = [t.net_pnl for t in groep]
+        winst = sum(p for p in nets if p > 0)
+        verlies = abs(sum(p for p in nets if p < 0))
+        clusters = cluster_resultaten(groep)
+        uit[regime] = {
+            "trades": len(groep),
+            "clusters": len(clusters),
+            "netto_usd": round(sum(nets), 2),
+            "netto_per_trade_usd": round(sum(nets) / len(nets), 4),
+            "t_statistiek": round(_t(clusters), 3),
+            "profit_factor": round(winst / verlies, 3) if verlies > 0 else None,
+        }
+    return uit
+
+
 def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict:
     """Bereken alle prestatiemetrieken over een reeks gesloten trades."""
     closed = [t for t in trades if t.net_pnl is not None]
@@ -479,6 +511,8 @@ def compute_for_run(
     stats["started_at"] = run["started_at"]
     stats["signals"] = db.signal_stats(run_id)
     stats["cost_projection"] = cost_projection(trades)
+    # 1.7.6: na het oordeel, en er niet in gebruikt.
+    stats["per_exitregime"] = per_exitregime(trades)
 
     from ..learning.postmortem import analyse_losses
     # Bewust een andere sleutel dan "losses": dat veld bevat het *aantal*

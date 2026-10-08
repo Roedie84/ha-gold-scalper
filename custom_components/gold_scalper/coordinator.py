@@ -49,6 +49,7 @@ from .broker.risk import RiskLimits, RiskManager, TradingState
 from .const import (
     STRATEGY_WINDOW_BARS,
     EXECUTION_SEMANTICS_VERSION,
+    EXIT_REGIME_HUIDIG,
     INTEGRATION_VERSION,
     ARCHIVE_FILENAME,
     CONF_ACCOUNT_ID, CONF_API_KEY, CONF_ASSUMED_SPREAD, CONF_BUILD_FROM_QUOTES,
@@ -86,7 +87,9 @@ from .settings import candle_source, resolve
 from .timeutil import parse_utc, trading_day
 from .storage.database import MODE_LIVE, MODE_PAPER, Trade, TradeDatabase
 from .storage.state import ResultsStore, RuntimeState, StateStore
-from .storage.latency import LatencyBudget, LatencyTracker, install_buffered_signals
+from .storage.latency import (
+    LATENCY_VENSTER, LatencyBudget, LatencyTracker, install_buffered_signals,
+)
 from .strategy.scalping import STRATEGY_VERSION, ScalpConfig, evaluate
 from .learning.robustness import evaluate_robustness
 from .learning.sessions import build_news_impact, build_sessions
@@ -424,7 +427,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         self.lifecycle = LifecycleController(DrainPolicy.WAIT_THEN_CLOSE)
         self.exits = ExitManager(ExitConfig())
-        self.latency = LatencyTracker()
+        # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
+        # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
+        # bepaalde één uitschieter de p99.
+        self.latency = LatencyTracker(window=LATENCY_VENSTER)
         self.state = StreamState()
         self.gate = LiveGate().evaluate({}, {}, []).as_dict()
 
@@ -1346,6 +1352,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "backtest": self.backtest or {},
             "validation": self.validation or {},
             "lab": self.lab or {},
+            # 1.7.6: de latencysteekproef, zodat p99 niet na elke herstart
+            # weer op een handvol metingen rust.
+            "latency": self.latency.export(),
         }
 
     async def _bewaar_resultaten(self, direct: bool = False) -> None:
@@ -1371,6 +1380,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if not data:
             return
         self.closures.restore(data.get("closures"))
+        self.latency.restore(data.get("latency"))
         for veld in ("backtest", "validation", "lab"):
             waarde = data.get(veld)
             if isinstance(waarde, dict) and waarde and not getattr(self, veld):
@@ -3706,6 +3716,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             signal_score=trade.signal_score, regime=trade.regime,
             broker_ticket=f"{ticket}-deel",
             execution_semantics=trade.execution_semantics,
+            exit_regime=trade.exit_regime,
             mfe=(self._excursions.get(str(ticket), {}).get("mfe", 0.0)) * units,
             mae=(self._excursions.get(str(ticket), {}).get("mae", 0.0)) * units,
             gross_pnl=round((quote.mid - trade.open_mid) * direction * units, 4),
@@ -3755,6 +3766,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             signal_score=signal.score,
             signal_confidence=signal.confidence,
             execution_semantics=EXECUTION_SEMANTICS_VERSION,
+            # 1.7.6: alleen statistiek, zit niet in de vingerafdruk.
+            exit_regime=EXIT_REGIME_HUIDIG,
             regime=(signal.components or {}).get("regime"),
             # Indicatorwaarden op het instapmoment vastleggen.
             #

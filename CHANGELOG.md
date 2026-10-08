@@ -1,5 +1,36 @@
 # Changelog — Gold Scalper
 
+## 1.7.6
+
+* **Alleen statistiek en rapportage.** Strategie, in- en uitstap,
+  risicolimieten en risicoberekeningen (dagstartsaldo, equityondergrens),
+  parameters, standaardwaarden, positiegrootte en vingerafdruk zijn niet
+  aangeraakt. Geen nieuwe run, en er gaat nooit een order uit door iets
+  hieronder.
+* **Uitstapregime per trade.** Sinds 1.7.4 vuren tijdstop en maximale duur
+  ook op IG; binnen dezelfde run zijn er dus twee uitstapgedragingen. Elke
+  trade krijgt nu bij het openen een `exit_regime` (`tijdstop`), in een nieuwe
+  kolom die bij het opstarten wordt toegevoegd. Bestaande trades worden
+  eenmalig aangevuld: een brokertrade die opende vóór de installatie van
+  1.7.4/1.7.5 (herstart 8 oktober 2026, 12:16 lokale tijd = 10:16 UTC) krijgt
+  `zonder_tijdstop`, alle andere `tijdstop` - ook papertrades, want die hadden
+  altijd een openingstijd. Een al ingevuld regime wordt nooit overschreven;
+  zonder leesbare openingstijd blijft het leeg. Let op: een trade die vóór de
+  grens opende en erna sloot, telt als `zonder_tijdstop`.
+* **Cijfers per regime op het oordeel.** De sensor *Oordeel* heeft een nieuw
+  attribuut `per_exitregime`: per regime het aantal trades en clusters, netto
+  totaal en per trade, de t-statistiek over clusters (clusters binnen het
+  regime gevormd) en de profit factor. Het oordeel zelf wordt nog steeds over
+  de hele run bepaald en kijkt niet naar het regime.
+* **Latency-p99 over een herstart heen.** De steekproef begon na elke
+  herstart opnieuw, zodat één uitschieter de p99 bepaalde (587 ms bij
+  n=326). De laatste 2000 metingen per schakel worden nu bewaard in de opslag
+  van de uitkomsten (elke 15 minuten en bij afsluiten) en bij opstarten
+  teruggezet, één keer, vóór wat er al gemeten is. De sensor *Latency p99*
+  heeft de attributen `n` en `p99_indicatief`; onder de 1000 metingen zegt
+  `basis` "p99 indicatief". Wat er gemeten wordt en hoe de percentielen
+  berekend worden, is ongewijzigd.
+
 ## 1.7.5
 
 * **Een herstart verandert niets meer.** Alleen herstartbestendigheid:

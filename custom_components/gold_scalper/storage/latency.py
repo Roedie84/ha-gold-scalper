@@ -31,6 +31,16 @@ from typing import Any, Callable
 
 _LOGGER = logging.getLogger(__name__)
 
+#: Omvang van de steekproef per schakel (1.7.6). Wordt over een herstart heen
+#: bewaard; daarvóór begon hij na elke herstart opnieuw.
+LATENCY_VENSTER = 2000
+#: Vanaf zoveel metingen geldt de p99 als betrouwbaar; daaronder bepalen een
+#: paar uitschieters hem en heet hij indicatief (1.7.6).
+P99_BETROUWBAAR_VANAF = 1000
+#: Maximaal aantal schakels dat wordt teruggezet; begrenst wat een
+#: beschadigd bestand kan aanrichten.
+_MAX_SCHAKELS = 32
+
 
 @dataclass(slots=True)
 class LatencyBudget:
@@ -91,6 +101,9 @@ class LatencyTracker:
         self._samples: dict[str, deque[float]] = {}
         self._window = window
         self._lock = threading.Lock()
+        #: Een bewaarde steekproef wordt hooguit één keer teruggezet; een
+        #: tweede keer zou dezelfde metingen dubbel tellen.
+        self._hersteld = False
 
     def record(self, budget: LatencyBudget) -> None:
         with self._lock:
@@ -125,6 +138,44 @@ class LatencyTracker:
                     entry["p99"] = pct(0.99)
                 out[stage] = entry
             return out
+
+    def export(self) -> dict[str, list[float]]:
+        """De steekproef per schakel, om te bewaren (1.7.6)."""
+        with self._lock:
+            return {stage: list(values) for stage, values in self._samples.items()}
+
+    def restore(self, data: Any) -> int:
+        """Zet een bewaarde steekproef terug (1.7.6). Geeft het aantal metingen.
+
+        Bewaarde metingen komen vóór wat er in deze sessie al gemeten is, en
+        het venster blijft begrensd. Onleesbare waarden worden overgeslagen;
+        meten verandert hierdoor niet.
+        """
+        if not isinstance(data, dict) or self._hersteld:
+            return 0
+        aantal = 0
+        with self._lock:
+            self._hersteld = True
+            for stage, values in list(data.items())[:_MAX_SCHAKELS]:
+                if not isinstance(values, (list, tuple)):
+                    continue
+                oud: list[float] = []
+                for v in values[-self._window:]:
+                    try:
+                        getal = float(v)
+                    except (TypeError, ValueError):
+                        continue
+                    if getal == getal and getal not in (float("inf"), float("-inf")):
+                        oud.append(getal)
+                if not oud:
+                    continue
+                huidig = self._samples.get(str(stage))
+                bucket: deque[float] = deque(oud, maxlen=self._window)
+                if huidig:
+                    bucket.extend(huidig)
+                self._samples[str(stage)] = bucket
+                aantal += len(bucket)
+        return aantal
 
     def slowest_stage(self) -> tuple[str, float] | None:
         """Welke schakel kost mediaan de meeste tijd."""
