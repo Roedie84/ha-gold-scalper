@@ -14,3 +14,9 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Onderbouwing: 07-10 23:25: 4 van 21 tests in `tests/test_unconfirmed_orders.py` falen tijdens de dagpauze van de markt, ook op main zonder wijziging; met de klok vast op 10:00 UTC slagen ze. Een release in de pauze kan daardoor niet met een groene suite.
 - Bouw: in die tests (of in conftest) de tijd vastzetten op een handelsmoment, of de markttijd injecteren.
 - Meten na bouw: volledige suite groen om 21:30 UTC.
+
+## L-GS-003 · transactiewaarschuwing: juiste venstertekst en geen vals alarm
+- Status: **gepland (zelf bouwen: logging/rapportage, raakt geen handelslogica)** — pas na installatie van 1.7.1, samen met L-GS-002
+- Onderbouwing: 08-10 03:02-03:41: `broker/ig_capital.py` `closed_deal` waarschuwt bij <3 transacties "over de afgelopen vierentwintig uur … datumbereik komt vermoedelijk niet aan", elke ~80 s. Het venster is sluiten −6 u .. +12 u en wordt wel toegepast (telling 2→1 toen het voorbij 07-10 schoof); na de avondpauze is het venster normaal bijna leeg.
+- Bouw: heuristiek vergelijken met het aantal eigen trades in hetzelfde venster; tekst met het echte venster; eens per ticket loggen. Test.
+- Meten na bouw: 0 van deze waarschuwingen in een nacht zonder echte afwijking.

@@ -10,3 +10,6 @@
 | Slippage gemeten/aanname | 3,0× | n=56 | 07-10 23:15 |
 | Latency p90 totaal | 207 ms | n=56 | 07-10 23:15 |
 | Doel geraakt (bewijs) | 19,6 % | n=56 | 07-10 23:15 |
+| Latency totaal p50 / p99 (cycli) | 176 / 514 ms | n=1000 cycli | 08-10 03:40 |
+| Netto/bruto/kosten per trade (dag) | −1,61 / +0,34 / 1,95 USD | 07-10, n=40, 4 clusters | 08-10 03:40 |
+| Clusters nodig voor bruto-edge t=2 | ~18 | sd 28,1 bij 8 clusters | 08-10 03:40 |

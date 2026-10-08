@@ -21,3 +21,36 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-07 23:45,TUSSEN,gs_latency_p99_ms,252.7,56,sensor latency_p99
 2026-10-07 23:45,TUSSEN,gs_max_drawdown_pct,1.89,56,sensor max_drawdown
 2026-10-07 23:45,TUSSEN,gs_versie_geinstalleerd,1.7.0,1,1.7.1 beschikbaar
+2026-10-07,DAG,gs_trades,40,40,19 winst / 21 verlies (clusters 4-7)
+2026-10-07,DAG,gs_clusters,4,40,herinstap <10 min = zelfde cluster
+2026-10-07,DAG,gs_winst_pct,47.5,40,
+2026-10-07,DAG,gs_netto_usd,-64.41,40,"bruto 13.69, kosten 78.11"
+2026-10-07,DAG,gs_netto_per_trade_usd,-1.61,40,
+2026-10-07,DAG,gs_bruto_per_trade_usd,0.34,40,
+2026-10-07,DAG,gs_kosten_per_trade_usd,1.95,40,
+2026-10-07,DAG,gs_t_netto_clusters,-1.19,4,4 clusters: geen conclusie
+2026-10-07,DAG,gs_t_bruto_clusters,0.18,4,zelf berekend uit per_cluster
+2026-10-07,DAG,gs_tests_main,1707,1712,"1707 groen, 5 overgeslagen om 01:51 UTC (buiten dagpauze)"
+2026-10-08 03:40,TUSSEN,gs_trades,61,61,"+5 sinds 23:44 (03:00-03:35), 1 winst / 4 verlies"
+2026-10-08 03:40,TUSSEN,gs_clusters,8,61,"+1 (cluster 8, 35 min)"
+2026-10-08 03:40,TUSSEN,gs_netto_usd,-148.10,61,"bruto -39.41, kosten 108.70; nacht: netto -27.58, bruto -20.77"
+2026-10-08 03:40,TUSSEN,gs_netto_per_trade_usd,-2.43,61,nacht 5 trades: -5.52
+2026-10-08 03:40,TUSSEN,gs_bruto_per_trade_usd,-0.65,61,nacht: -4.15
+2026-10-08 03:40,TUSSEN,gs_kosten_per_trade_usd,1.78,61,"56 gemeten, 5 berekend (91.8%)"
+2026-10-08 03:40,TUSSEN,gs_winst_pct,42.62,61,
+2026-10-08 03:40,TUSSEN,gs_profit_factor,0.62,61,nacht 0.38
+2026-10-08 03:40,TUSSEN,gs_t_netto_clusters,-2.51,8,"gem -18.51, sd 20.90"
+2026-10-08 03:40,TUSSEN,gs_t_bruto_clusters,-0.50,8,"gem -4.93, sd 28.13"
+2026-10-08 03:40,TUSSEN,gs_clusters_nodig_bruto_edge,18,8,"t=2 bij edge = kosten/cluster 13.59, sd 28.13"
+2026-10-08 03:40,TUSSEN,gs_slippage_ratio,3.5,61,"0.07 tegen 0.02 (5 nieuwe berekend)"
+2026-10-08 03:40,TUSSEN,gs_latency_p50_ms,176.4,1000,"basis nu 1000 cycli"
+2026-10-08 03:40,TUSSEN,gs_latency_p99_ms,514.5,1000,"niet vergelijkbaar met 252.7 (n=56 trades); max 4127.7"
+2026-10-08 03:40,TUSSEN,gs_doel_geraakt_pct_bewijs,19.7,61,"12/61, ondergrens (1 onbekend)"
+2026-10-08 03:40,TUSSEN,gs_doel_geraakt_pct_geleerd,14.8,61,meetfout L-GS-001 nog actief (1.7.0)
+2026-10-08 03:40,TUSSEN,gs_geschatte_uitstap,1,61,"trade 03:35, netto -11.23; correctielus zoekt tot 2 d"
+2026-10-08 03:40,TUSSEN,gs_afstemming,in_orde,61,"56/56; 5 nog niet in brokeroverzicht"
+2026-10-08 03:40,TUSSEN,gs_regime_range_t,-2.98,21,"netto -125.39; alle 5 nachttrades range"
+2026-10-08 03:40,TUSSEN,gs_regime_trend_t,-0.29,40,netto -22.71
+2026-10-08 03:40,TUSSEN,gs_max_drawdown_pct,2.06,61,equity 7138.19
+2026-10-08 03:40,TUSSEN,gs_versie_geinstalleerd,1.7.0,1,1.7.1 beschikbaar
+2026-10-08 03:40,TUSSEN,gs_transactiewaarschuwing_bug,nee,1,"vals alarm (heuristiek len<3); tekst '24 uur' klopt niet (venster -6/+12 u)"
