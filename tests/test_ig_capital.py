@@ -232,6 +232,27 @@ def test_positions_map_direction_and_stop():
     assert positions[0].comment == "gold_scalper-x"
 
 
+def test_positions_carry_open_time():
+    """L-GS-005: zonder openingstijd vuren tijdstop en maximale duur nooit."""
+    from datetime import datetime, timezone
+    payload = ({"positions": [{
+        "position": {"dealId": "D1", "direction": "BUY", "size": 1.0,
+                     "level": 3300.0, "createdDateUTC": "2026-10-08T09:12:34"},
+        "market": {"epic": "GOLD", "bid": 3301.0},
+    }]}, 200)
+    positions = asyncio.run(ig({"/positions": payload}).positions("GOLD"))
+    assert positions[0].open_time == datetime(2026, 10, 8, 9, 12, 34, tzinfo=timezone.utc)
+
+
+def test_positions_without_created_date_have_no_open_time():
+    payload = ({"positions": [{
+        "position": {"dealId": "D1", "direction": "BUY", "size": 1.0, "level": 3300.0},
+        "market": {"epic": "GOLD", "bid": 3301.0},
+    }]}, 200)
+    positions = asyncio.run(ig({"/positions": payload}).positions("GOLD"))
+    assert positions[0].open_time is None
+
+
 def test_venues_report_real_spread():
     """In tegenstelling tot publieke bronnen meten deze de echte spread."""
     assert ig({}).has_real_spread is True

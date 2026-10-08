@@ -1,5 +1,19 @@
 # Changelog — Gold Scalper
 
+## 1.7.4
+
+* **Tijdstops werken weer op IG (L-GS-005).** De posities van IG kwamen
+  binnen zonder openingstijd; de leeftijd van een positie was daardoor altijd
+  nul en de ontworpen tijdstop (240 s binnen 0,3×ATR) en de maximale duur
+  (900 s) vuurden nooit. Gemeten: gemiddelde duur 1408 s, langste 5272 s.
+  Nu wordt `createdDateUTC` van de broker gelezen; ontbreekt die, dan geldt
+  de openingstijd van de eigen trade op hetzelfde ticket (per ticket
+  onthouden, niet elke cyclus opnieuw opgevraagd). **Geen parameterwijziging**:
+  doel, stop, break-even, tijdstop en maximale duur hebben dezelfde waarden;
+  ze gaan nu alleen werken zoals ontworpen. Geen nieuwe run. Let op: een
+  positie die bij het installeren al langer dan 900 s open staat, wordt in de
+  eerste cyclus gesloten.
+
 ## 1.7.3
 
 * **Uitstapprijs navragen voordat een schatting blijft staan.** Op 8 oktober

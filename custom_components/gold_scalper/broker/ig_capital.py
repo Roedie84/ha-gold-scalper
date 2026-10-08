@@ -1068,6 +1068,9 @@ class IgStyleVenue(ExecutionVenue):
                     float(position["upl"]) if position.get("upl") is not None else None
                 ),
                 comment=position.get("dealReference"),
+                # 1.7.4 (L-GS-005): zonder openingstijd was de leeftijd van
+                # elke positie nul en vuurden tijdstop en maximale duur nooit.
+                open_time=_utc(position.get("createdDateUTC")),
             ))
         return out
 
