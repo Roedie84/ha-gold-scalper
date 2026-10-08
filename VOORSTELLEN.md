@@ -3,7 +3,7 @@
 Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. Nooit live handelen, nooit pyramiding, geen knoppen.
 
 ## L-GS-001 · doel-/stoptreffers in "geleerd" op de effectieve sluitreden
-- Status: **gebouwd v1.7.1** (07-10 23:38) — verifiëren na installatie
+- Status: **geverifieerd 08-10 07:40** (gebouwd v1.7.1 07-10 23:38; geïnstalleerd 07:03): geleerd 0,185 = sensor 18,5% (n=65)
 - Onderbouwing: 07-10, n=56: `analyse_execution` gebruikt `t.close_reason`; 24 trades staan daar als `broker_gesloten_gecorrigeerd`. Daardoor target_hit_rate 0,143 / stop_hit_rate 0,429 tegen 19,6% / 80,4% op bewijs (`exit_stats.effective_reason`). De notitie "ATR mogelijk overschat" rust op een ondergrens.
 - Bouw: `learning/analysis.py` → `effective_reason(t)` in plaats van `t.close_reason`; test met gecorrigeerde trades. Raakt geen handelslogica.
 - Verwacht effect: geleerd.execution gelijk aan sensoren Doel/Stop geraakt; geen misleidende ATR-notitie.

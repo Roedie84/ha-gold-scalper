@@ -54,3 +54,19 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-08 03:40,TUSSEN,gs_max_drawdown_pct,2.06,61,equity 7138.19
 2026-10-08 03:40,TUSSEN,gs_versie_geinstalleerd,1.7.0,1,1.7.1 beschikbaar
 2026-10-08 03:40,TUSSEN,gs_transactiewaarschuwing_bug,nee,1,"vals alarm (heuristiek len<3); tekst '24 uur' klopt niet (venster -6/+12 u)"
+2026-10-08 07:40,TUSSEN,gs_versie_geinstalleerd,1.7.1,1,"herstart 07:03"
+2026-10-08 07:40,TUSSEN,gs_trades,65,65,"+4 sinds 03:45 (netto -31.72)"
+2026-10-08 07:40,TUSSEN,gs_clusters,9,65,"cluster 8 01:00-02:03 UTC 6 tr -38.63; cluster 9 02:15-05:26 UTC 3 tr -20.67"
+2026-10-08 07:40,TUSSEN,gs_netto_usd,-179.82,65,"bruto -65.98, kosten 113.84 (1.75/trade)"
+2026-10-08 07:40,TUSSEN,gs_t_netto_clusters,-2.92,9,"gem -19.98, sd 20.51"
+2026-10-08 07:40,TUSSEN,gs_t_bruto_clusters,-0.80,9,"gem -7.33, sd 27.45"
+2026-10-08 07:40,TUSSEN,gs_clusters_nodig_bruto_edge,19,9,"t=2 bij edge = kosten/cluster 12.65, sd 27.45"
+2026-10-08 07:40,TUSSEN,gs_profit_factor,0.575,65,winst 41.5%
+2026-10-08 07:40,TUSSEN,gs_regime_range_t,-3.22,22,"netto -136.44, winst 27.3%"
+2026-10-08 07:40,TUSSEN,gs_regime_trend_t,-0.55,43,"netto -43.38, winst 48.8%"
+2026-10-08 07:40,TUSSEN,gs_doel_geraakt_pct_bewijs,18.5,65,12/65
+2026-10-08 07:40,TUSSEN,gs_doel_geraakt_pct_geleerd,18.5,65,"gelijk aan bewijs -> L-GS-001 geverifieerd"
+2026-10-08 07:40,TUSSEN,gs_kosten_gemeten_pct,96.9,65,"2 berekend (nog niet bij broker)"
+2026-10-08 07:40,TUSSEN,gs_latency_p99_ms,393.5,1000,cycli
+2026-10-08 07:40,TUSSEN,gs_max_drawdown_pct,2.43,65,equity 7116.21
+2026-10-08 07:40,TUSSEN,gs_verliesoorzaak_verkeerde_richting,0.947,38,"36/38; stop_te_krap 2/38"

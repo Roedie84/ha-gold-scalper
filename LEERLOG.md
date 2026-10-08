@@ -43,3 +43,15 @@ laatste ronde: 07-10 23:45, gemeten t/m 07-10 23:44
 - Geen release (1.7.1 wacht op installatie; niets acuut).
 
 laatste ronde: 08-10 04:40, gemeten t/m 08-10 03:45
+
+## 08-10 07:40 · tussenronde
+- 1.7.1 geïnstalleerd (herstart 07:03). **L-GS-001 geverifieerd:** geleerd `target_hit_rate` 0,185 = sensor Doel geraakt 18,5% (12/65); de ATR-notitie rust nu op de juiste telling (18% tegen 40% verwacht).
+- Sinds 03:45: 4 trades (netto −31,72). Totaal 65 trades, 9 clusters: netto −179,82 = bruto −65,98 − kosten 113,84 (1,75/trade). PF 0,575, winst 41,5%.
+- t netto −2,92, t bruto −0,80 (n=9). Voor een bruto-edge ter grootte van de kosten (12,65/cluster, sd 27,45) ~19 clusters nodig → nog 10. Geen oordeel over de strategie.
+- H-GS-3 (regime): range n=22, t −3,22, winst 27%; trend n=43, t −0,55, winst 49%. Trades in een cluster niet onafhankelijk; per regime clusters nog niet geteld → volgen, geen conclusie.
+- H-GS-2: geschatte uitstap van 03:35 — alle 65 sluitredenen nu bekend/bewezen; kosten 63 gemeten, 2 berekend (nieuwste, nog niet bij de broker).
+- Geleerd: 36/38 verliezen "verkeerde richting", 2 "stop te krap" (fixable 5%).
+- Latency p99 393,5 ms (1000 cycli; was 514,5). Drawdown 2,43%.
+- Geen release.
+
+laatste ronde: 08-10 07:40, gemeten t/m 08-10 07:43
