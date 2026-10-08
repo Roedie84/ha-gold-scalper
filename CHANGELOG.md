@@ -1,5 +1,38 @@
 # Changelog — Gold Scalper
 
+## 1.7.3
+
+* **Uitstapprijs navragen voordat een schatting blijft staan.** Op 8 oktober
+  werden vier trades afgerekend op een geschatte uitstapprijs (03:35, 04:55,
+  06:22, 09:21), drie terwijl HA gewoon draaide. Oorzaak: de broker had de
+  posities zelf gesloten op stop of doel, en de enige bron die werd gevraagd
+  was het transactieoverzicht - dat loopt uren achter (in het log: "Slechts 1
+  transactie(s)"). Stond de koers bij het ontdekken al terug van het niveau,
+  dan bleef alleen de ontdekkingskoers over. Nu, alleen boekhouding:
+  * valt het transactieoverzicht leeg, dan wordt het activiteitenoverzicht
+    gevraagd (`/history/activity` v3, `detailed`; `closed_deal_activity`),
+    dat een sluiting binnen seconden kent. Koppeling streng op een actie
+    `POSITION_CLOSED` met het dealId van de positie (`match_activity`); de
+    openingsactiviteit telt nooit. Noemt de activiteit geen niveau, dan de
+    `dealReference` bij `/confirms` navragen;
+  * lukt dat bij het ontdekken niet, dan wordt de trade zoals voorheen
+    voorlopig geboekt (`broker_gesloten_geschat`, `pending`) en daarna nog
+    hooguit vier keer nagevraagd, 20/60/120/240 s na het afrekenen
+    (`HERKANSING_SCHEMA`), één verzoek per poging. Daarna neemt de bestaande
+    correctie uit het transactieoverzicht het over;
+  * een correctie (herkansing of transactieoverzicht) zet nu in één keer
+    uitstapprijs, sluitreden én gemeten kosten (`meet_kosten`), en rekent
+    zonder brokerbedrag het eurobedrag opnieuw om. Voorheen ging de
+    kostenbron eerst terug naar "berekend" en werd pas een afstemmingsronde
+    later gemeten;
+  * de afstemming behandelt een voorlopige trade als schatting: de prijs van
+    de broker wordt overgenomen (ook bij een zwakke koppeling, zoals de
+    correctie al deed) zonder vals alarm, met sluitreden en gemeten kosten
+    (`voorlopig_bijgewerkt` in de uitslag).
+  `raw_responses` toont ook `activity_v3`, zodat de veldnamen tegen het echte
+  antwoord te controleren zijn. Strategie, risico, positiegrootte en
+  entry/exit zijn niet aangeraakt.
+
 ## 1.7.2
 
 * **Geen vals alarm meer over het transactieoverzicht.** `closed_deal`

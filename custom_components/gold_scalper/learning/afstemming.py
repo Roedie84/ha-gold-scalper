@@ -35,6 +35,13 @@ koppeling blijft een groter verschil wel een afwijking.
 de trade gemeten (zie ``kosten.py``) en gaat ``cost_source`` naar
 ``measured``.
 
+**Voorlopige afwikkelingen (1.7.3).** Een trade die op een geschatte
+uitstapprijs is afgerekend (``reconciliation_status == "pending"``) krijgt
+hier de prijs van de broker, ook bij een zwakke koppeling: zijn eigen prijs
+was een schatting, dus een verschil is geen afwijking. Tegelijk krijgt hij
+zijn sluitreden en daarmee gemeten kosten, zodat ``sluitreden_onbekend`` en
+``kosten_gemeten`` niet op een aparte correctieronde hoeven te wachten.
+
 **Wat niet telt.** Trades die nog niet in het overzicht staan. Dat overzicht
 loopt uren achter, dus een ontbrekende trade van vandaag is geen afwijking maar
 geduld. Pas na twee dagen heet hij ontbrekend.
@@ -44,7 +51,7 @@ from __future__ import annotations
 
 import json
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Sequence
 
@@ -88,6 +95,9 @@ class Afstemming:
     slippage_overgenomen: int = 0
     #: Trades waarvan de kosten in deze ronde zijn gemeten.
     kosten_gemeten: int = 0
+    #: 1.7.3: voorlopige afwikkelingen (geschatte uitstap) die hier hun
+    #: brokerprijs en sluitreden kregen.
+    voorlopig_bijgewerkt: int = 0
     afwijkingen: list = field(default_factory=list)
     #: Trades waarvan bedrag, koers of omvang naar de broker is bijgewerkt:
     #: ``{"trade_id", "ticket", "velden": {...}}``. De coordinator legt ze vast.
@@ -129,6 +139,7 @@ class Afstemming:
             "bijgewerkt": len(self.overnames),
             "slippage_overgenomen": self.slippage_overgenomen,
             "kosten_gemeten": self.kosten_gemeten,
+            "voorlopig_bijgewerkt": self.voorlopig_bijgewerkt,
             "in_orde": self.in_orde,
             "samenvatting": self.samenvatting(),
         }
@@ -186,9 +197,26 @@ def stem_af(
         broker_uit = match.get("exit_price")
         uit_velden: dict = {}
         slippage = False
+        voorlopig = _voorlopig(trade)
         if broker_uit is not None and trade.close_price is not None:
             verschil = round(broker_uit - trade.close_price, 6)
-            if abs(verschil) > PRIJS_TOLERANTIE + 1e-9 and _sterk(trade, match, units):
+            if abs(verschil) > PRIJS_TOLERANTIE + 1e-9 and voorlopig:
+                # 1.7.3: de eigen prijs was uitdrukkelijk een schatting. Een
+                # verschil is dan geen afwijking maar precies wat er nog
+                # ontbrak; de correctie neemt dezelfde koppeling ook over.
+                slippage = True
+                uit_velden = {
+                    "close_price": broker_uit,
+                    "exit_price_provenance": json.dumps({
+                        "original_local": trade.close_price, "broker": broker_uit,
+                        "difference": verschil,
+                        "status": "ADOPTED_BROKER_SETTLEMENT_ESTIMATE",
+                        "matched_on": match.get("matched_on"),
+                        "broker_reference": match.get("reference"),
+                        "source": "broker_transactions", "at": now.isoformat(),
+                    }, sort_keys=True),
+                }
+            elif abs(verschil) > PRIJS_TOLERANTIE + 1e-9 and _sterk(trade, match, units):
                 # Zeker dezelfde trade: het verschil is slippage. De broker is
                 # de afrekening.
                 slippage = True
@@ -250,8 +278,20 @@ def stem_af(
             netto = round((broker_uit - trade.open_price) * richting * units, 4)
             velden["net_pnl"] = netto
 
+        # 1.7.3: een voorlopige afwikkeling krijgt met de brokerprijs ook
+        # zijn sluitreden. Zonder die reden kan meet_kosten niets en bleef de
+        # trade "onbekend" en "berekend" tot de correctie hem apart oppakte.
+        meet_op = trade
+        if voorlopig and broker_uit is not None and prijs_klopt:
+            reden = _reden_velden(trade, broker_uit, now)
+            velden.update(reden)
+            uitslag.voorlopig_bijgewerkt += 1
+            meet_op = replace(trade, **{
+                k: v for k, v in reden.items() if k != "close_reason"
+            })
+
         if trade.cost_source != "measured" and broker_uit is not None and prijs_klopt:
-            kosten = meet_kosten(trade, broker_uit, contract_size)
+            kosten = meet_kosten(meet_op, broker_uit, contract_size)
             if kosten is not None:
                 netto = velden.get("net_pnl", trade.net_pnl)
                 velden.update({
@@ -278,6 +318,38 @@ def stem_af(
             uitslag.kloppend += 1
 
     return uitslag
+
+
+def _voorlopig(trade: Trade) -> bool:
+    """Is deze trade afgerekend op een geschatte uitstapprijs die nog open staat?"""
+    status = getattr(trade, "reconciliation_status", None)
+    if status == "pending":
+        return True
+    return status is None and trade.close_reason == "broker_gesloten_geschat"
+
+
+def _reden_velden(trade: Trade, broker_uit: float, now: datetime) -> dict:
+    """Sluitreden uit de brokerprijs, zoals de coordinator die afleidt.
+
+    Dezelfde regel als ``_apply_reconciliation``: de stop telt alleen als
+    bewijs bij uitvoeringsversie 2 of later, want daarvóór kan de stop in de
+    database verouderd zijn.
+    """
+    from .exit_stats import derive_close_reason
+
+    afgeleid = derive_close_reason(
+        broker_uit, trade.take_profit, trade.stop_loss,
+        (getattr(trade, "execution_semantics", None) or 0) >= 2,
+    )
+    return {
+        "reconciled_close_reason": afgeleid.reden,
+        "close_reason_source": afgeleid.bron,
+        "close_reason_evidence": afgeleid.bewijs,
+        "reconciliation_status": "reconciled",
+        "reconciled_at": now.isoformat(),
+        "reconciliation_source": "broker_transactions",
+        "close_reason": "broker_gesloten_gecorrigeerd",
+    }
 
 
 def _sterk(trade: Trade, match: dict, units: float) -> bool:

@@ -128,6 +128,14 @@ def _as_int(value, fallback: int) -> int:
         return fallback
 
 
+#: 1.7.3: na zoveel seconden na een afwikkeling op een schatting wordt de
+#: uitstapprijs opnieuw bij de broker nagevraagd (activiteitenoverzicht en
+#: bevestiging). Vier pogingen in vier minuten, één verzoek per poging; daarna
+#: neemt de gewone correctie het over. De lus draait elke twintig seconden, dus
+#: een poging valt hooguit een cyclus later dan gepland.
+HERKANSING_SCHEMA = (20, 60, 120, 240)
+
+
 @dataclass(slots=True)
 class _TicketOnly:
     """Minimale positieverwijzing voor het afsluiten van een verdwenen trade.
@@ -366,6 +374,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._geschatte_afwikkelingen = 0
         #: Cyclusteller voor het bijwerken van geschatte afwikkelingen.
         self._correctie_teller = 0
+        #: 1.7.3: verse schattingen die nog kort bij de broker worden
+        #: nagevraagd: ``ticket -> {"pogingen", "sinds"}``.
+        self._herkansingen: dict = {}
         self.backtest: dict = {}
         self.audit: dict = {}
         self._use_schedule: bool = options.get(CONF_USE_SCHEDULE, True)
@@ -1462,6 +1473,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # nergens in mee, want de bewijsfase kijkt naar gesloten trades.
         if self.mode.places_orders and quote.tradeable:
             await self._settle_vanished_positions(quote, now)
+            # 1.7.3: verse schattingen binnen enkele minuten nog een paar keer
+            # bij de broker navragen. Alleen opvragen en boeken.
+            await self._herkans_voorlopige_afwikkelingen(now)
 
             # Eerder geschatte afwikkelingen bijwerken. Het overzicht van de
             # broker loopt uren achter, dus de eerste poging mislukt vaak en
@@ -2559,7 +2573,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         """
         return (getattr(trade, "execution_semantics", None) or 0) >= 2
 
-    def _apply_reconciliation(self, trade, exit_price, now: datetime) -> None:
+    def _apply_reconciliation(
+        self, trade, exit_price, now: datetime,
+        bron: str = "broker_transactions",
+    ) -> None:
         """Afstemming met de broker vastleggen, zonder de oorspronkelijke
         sluitreden te raken."""
         from .learning.exit_stats import derive_close_reason
@@ -2573,7 +2590,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         trade.close_reason_evidence = afgeleid.bewijs
         trade.reconciliation_status = "reconciled"
         trade.reconciled_at = now.isoformat()
-        trade.reconciliation_source = "broker_transactions"
+        trade.reconciliation_source = bron
 
     async def _ledger_cost(self) -> float:
         """Cumulatieve kosten uit het tradeledger - ook in demomodus.
@@ -2698,157 +2715,190 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     )
                 continue
 
-            exit_price = float(werkelijk["exit_price"])
-            long = trade.side == "buy"
-            richting = 1.0 if long else -1.0
-            units = trade.volume * CONTRACT_SIZE
-            half = (trade.close_spread or 0.6) / 2.0
-
             oud = trade.net_pnl or 0.0
-            trade.close_price = exit_price
-            trade.close_mid = exit_price + (half if long else -half)
-            trade.close_reason = "broker_gesloten_gecorrigeerd"
-            # Niet-destructief: de oorspronkelijke reden blijft staan, de
-            # afgeleide reden komt er alleen met bewijs bij.
-            self._apply_reconciliation(trade, exit_price, now)
-            # De omrekenkoers van de broker onthouden: als controle op de
-            # richting, en bij verlies als voorzichtige koers voor de grootte.
-            broker_koers = werkelijk.get("conversion_rate")
-            if broker_koers:
-                self._broker_fx_ref = broker_koers
-                if (werkelijk.get("profit_account") or 0) < 0:
-                    self._loss_fx_rate, self._loss_fx_at = broker_koers, now
-                    self._state.conversion_loss_rate = broker_koers
-                    self._state.conversion_loss_rate_at = now.isoformat()
-
-            # Het bedrag in accountvaluta van de broker zelf: geen omrekening.
-            if werkelijk.get("profit_account") is not None:
-                trade.net_pnl_account = float(werkelijk["profit_account"])
-                trade.account_currency = self.conversion.account
-                trade.fx_source = "broker_settlement"
-                # De koers die de broker zelf noemt; anders afgeleid.
-                trade.fx_rate = broker_koers or (
-                    round(trade.net_pnl_account / trade.net_pnl, 6)
-                    if trade.net_pnl else self.conversion.rate
-                )
-                trade.fx_timestamp = now.isoformat()
-            # De kosten volgen hier uit de spread en de omvang, niet uit een
-            # fill: berekend.
-            trade.cost_source = "calculated"
-
-            # Het resultaat van de broker overnemen, niet zelf narekenen.
-            #
-            # De broker meldt het bedrag waarmee hij werkelijk heeft
-            # afgerekend. Zelf narekenen uit prijzen leverde steeds weer
-            # afwijkingen op - bij één trade 7,46 tegen de 10,48 die de broker
-            # boekte - en elke keer was de oorzaak een detail dat ik niet kon
-            # controleren: afronding, een halve spread, een gedeeltelijke
-            # sluiting.
-            #
-            # Het bedrag van de broker is per definitie juist: dat is wat er op
-            # de rekening gebeurde. Alles wat ik eruit afleid kan dat alleen
-            # benaderen.
-            # Het sluitmoment van de broker overnemen.
-            #
-            # Het eigen tijdstempel is het moment waarop de beheerlus de
-            # positie afwikkelde, en dat liep tot negentig minuten uit de pas
-            # met wat de broker meldt. Naast het overzicht van de broker was
-            # het rapport daardoor niet te lezen: je vergelijkt rijen op
-            # tijdstip en koppelt dan de verkeerde trades aan elkaar.
-            #
-            # De broker bepaalt wanneer een positie sloot, dus zijn tijdstip is
-            # het juiste.
-            gemeld = werkelijk.get("closed_at")
-            if gemeld:
-                try:
-                    moment = datetime.fromisoformat(str(gemeld))
-                except (TypeError, ValueError):
-                    moment = None
-                # Alleen overnemen als er een tijd in zit; een datum zonder
-                # tijd zou het sluitmoment op middernacht zetten.
-                if moment is not None and (
-                    moment.hour or moment.minute or moment.second
-                ):
-                    if moment.tzinfo is None:
-                        moment = moment.replace(tzinfo=timezone.utc)
-                    trade.close_time = moment.isoformat()
-                    # De looptijd volgt eruit en moet meeschuiven.
-                    opende = _as_datetime(trade.open_time, moment)
-                    trade.duration_seconds = max(
-                        0, int((moment - opende).total_seconds())
-                    )
-
-            winst_account = werkelijk.get("profit_account")
-            # De koers van de broker zelf, niet de middenkoers. De broker
-            # rekent verlies tegen een hogere koers om dan winst; terugrekenen
-            # met het midden maakte elk verlies 0,5 tot 1 procent te groot en
-            # elke winst te klein (30-09: -11,38 in plaats van -11,30).
-            koers = broker_koers or self.conversion.rate
-
-            if winst_account is not None and koers and koers > 0:
-                # Van accountvaluta naar instrumentvaluta, want de hele
-                # administratie rekent in die laatste.
-                trade.net_pnl = round(winst_account / koers, 4)
-                trade.total_cost = round(
-                    abs(trade.close_spread or 0.6) * units, 4
-                )
-                trade.gross_pnl = round(
-                    (trade.net_pnl or 0) + (trade.total_cost or 0), 4
-                )
-            else:
-                # Zonder koers of zonder bedrag terugvallen op de berekening.
-                trade.gross_pnl = round(
-                    (trade.close_mid - trade.open_mid) * richting * units, 4
-                )
-                trade.net_pnl = round(
-                    (exit_price - trade.open_price) * richting * units, 4
-                )
-                trade.total_cost = round(
-                    (trade.gross_pnl or 0) - (trade.net_pnl or 0), 4
-                )
-
-            await self.hass.async_add_executor_job(self.db.update_trade, trade)
-            # De wisselkoers uit dezelfde gegevens halen.
-            #
-            # De correctie heeft de winst in accountvaluta al in handen; die
-            # niet gebruiken zou betekenen dat de koers onbekend blijft
-            # terwijl hij op tafel ligt - en dan blijft de positiegrootte acht
-            # procent naast de bedoeling.
-            winst = werkelijk.get("profit_account")
-            if winst and self.conversion.needed and trade.net_pnl:
-                koers = winst / trade.net_pnl
-                if 0.1 < koers < 10.0 and koers != self.conversion.rate and \
-                        self._apply_rate(koers, "broker_settlement"):
-                    _LOGGER.info(
-                        "Wisselkoers %s/%s uit een gecorrigeerde trade: %.4f",
-                        self.conversion.instrument, self.conversion.account,
-                        koers,
-                    )
-
-            # Narekenen en melden bij afwijking.
-            #
-            # Als de prijs die de broker meldt en het bedrag dat hij boekt niet
-            # met elkaar rijmen, is er iets aan de hand dat ik niet ken - een
-            # gedeeltelijke sluiting, een aanpassing, een fout van mijn kant.
-            # Die afwijking hoort zichtbaar te zijn en niet weggerekend.
-            if winst_account is not None and koers:
-                verwacht = (exit_price - trade.open_price) * richting * units
-                afwijking = abs(verwacht - (trade.net_pnl or 0))
-                if afwijking > max(1.0, abs(verwacht) * 0.25):
-                    _LOGGER.warning(
-                        "Trade %s: het bedrag van de broker (%.2f) en de "
-                        "prijsbeweging (%.2f) verschillen %.2f. Het bedrag "
-                        "van de broker is aangehouden; het verschil wijst op "
-                        "een gedeeltelijke sluiting of een aanpassing.",
-                        trade.broker_ticket, trade.net_pnl, verwacht,
-                        afwijking,
-                    )
+            exit_price = float(werkelijk["exit_price"])
+            await self._boek_brokerprijs(trade, werkelijk, now)
+            self._herkansingen.pop(str(trade.broker_ticket), None)
 
             _LOGGER.info(
                 "Trade %s gecorrigeerd: netto van %.2f naar %.2f "
                 "(uitstapprijs %.2f in plaats van een schatting).",
                 trade.broker_ticket, oud, trade.net_pnl, exit_price,
             )
+
+    async def _boek_brokerprijs(
+        self, trade, werkelijk: dict, now: datetime,
+        bron: str = "broker_transactions",
+    ) -> None:
+        """Boek een voorlopig afgerekende trade om naar de prijs van de broker.
+
+        Eén plek voor de correctie uit het transactieoverzicht én de
+        herkansing uit het activiteitenoverzicht (1.7.3), zodat beide hetzelfde
+        bijwerken: uitstapprijs, sluitreden, kosten en bedrag.
+        """
+        exit_price = float(werkelijk["exit_price"])
+        long = trade.side == "buy"
+        richting = 1.0 if long else -1.0
+        units = trade.volume * CONTRACT_SIZE
+        half = (trade.close_spread or 0.6) / 2.0
+
+        trade.close_price = exit_price
+        trade.close_mid = exit_price + (half if long else -half)
+        trade.close_reason = "broker_gesloten_gecorrigeerd"
+        # Niet-destructief: de oorspronkelijke reden blijft staan, de
+        # afgeleide reden komt er alleen met bewijs bij.
+        self._apply_reconciliation(trade, exit_price, now, bron)
+        # De omrekenkoers van de broker onthouden: als controle op de
+        # richting, en bij verlies als voorzichtige koers voor de grootte.
+        broker_koers = werkelijk.get("conversion_rate")
+        if broker_koers:
+            self._broker_fx_ref = broker_koers
+            if (werkelijk.get("profit_account") or 0) < 0:
+                self._loss_fx_rate, self._loss_fx_at = broker_koers, now
+                self._state.conversion_loss_rate = broker_koers
+                self._state.conversion_loss_rate_at = now.isoformat()
+
+        # Het bedrag in accountvaluta van de broker zelf: geen omrekening.
+        if werkelijk.get("profit_account") is not None:
+            trade.net_pnl_account = float(werkelijk["profit_account"])
+            trade.account_currency = self.conversion.account
+            trade.fx_source = "broker_settlement"
+            # De koers die de broker zelf noemt; anders afgeleid.
+            trade.fx_rate = broker_koers or (
+                round(trade.net_pnl_account / trade.net_pnl, 6)
+                if trade.net_pnl else self.conversion.rate
+            )
+            trade.fx_timestamp = now.isoformat()
+        # De kosten volgen hier uit de spread en de omvang, niet uit een
+        # fill: berekend - tenzij ze hieronder met de brokerprijs te meten
+        # zijn (1.7.3).
+        trade.cost_source = "calculated"
+
+        # Het resultaat van de broker overnemen, niet zelf narekenen.
+        #
+        # De broker meldt het bedrag waarmee hij werkelijk heeft
+        # afgerekend. Zelf narekenen uit prijzen leverde steeds weer
+        # afwijkingen op - bij één trade 7,46 tegen de 10,48 die de broker
+        # boekte - en elke keer was de oorzaak een detail dat ik niet kon
+        # controleren: afronding, een halve spread, een gedeeltelijke
+        # sluiting.
+        #
+        # Het bedrag van de broker is per definitie juist: dat is wat er op
+        # de rekening gebeurde. Alles wat ik eruit afleid kan dat alleen
+        # benaderen.
+        # Het sluitmoment van de broker overnemen.
+        #
+        # Het eigen tijdstempel is het moment waarop de beheerlus de
+        # positie afwikkelde, en dat liep tot negentig minuten uit de pas
+        # met wat de broker meldt. Naast het overzicht van de broker was
+        # het rapport daardoor niet te lezen: je vergelijkt rijen op
+        # tijdstip en koppelt dan de verkeerde trades aan elkaar.
+        #
+        # De broker bepaalt wanneer een positie sloot, dus zijn tijdstip is
+        # het juiste.
+        gemeld = werkelijk.get("closed_at")
+        if gemeld:
+            try:
+                moment = datetime.fromisoformat(str(gemeld))
+            except (TypeError, ValueError):
+                moment = None
+            # Alleen overnemen als er een tijd in zit; een datum zonder
+            # tijd zou het sluitmoment op middernacht zetten.
+            if moment is not None and (
+                moment.hour or moment.minute or moment.second
+            ):
+                if moment.tzinfo is None:
+                    moment = moment.replace(tzinfo=timezone.utc)
+                trade.close_time = moment.isoformat()
+                # De looptijd volgt eruit en moet meeschuiven.
+                opende = _as_datetime(trade.open_time, moment)
+                trade.duration_seconds = max(
+                    0, int((moment - opende).total_seconds())
+                )
+
+        winst_account = werkelijk.get("profit_account")
+        # De koers van de broker zelf, niet de middenkoers. De broker
+        # rekent verlies tegen een hogere koers om dan winst; terugrekenen
+        # met het midden maakte elk verlies 0,5 tot 1 procent te groot en
+        # elke winst te klein (30-09: -11,38 in plaats van -11,30).
+        koers = broker_koers or self.conversion.rate
+
+        if winst_account is not None and koers and koers > 0:
+            # Van accountvaluta naar instrumentvaluta, want de hele
+            # administratie rekent in die laatste.
+            trade.net_pnl = round(winst_account / koers, 4)
+            trade.total_cost = round(
+                abs(trade.close_spread or 0.6) * units, 4
+            )
+            trade.gross_pnl = round(
+                (trade.net_pnl or 0) + (trade.total_cost or 0), 4
+            )
+        else:
+            # Zonder koers of zonder bedrag terugvallen op de berekening.
+            trade.gross_pnl = round(
+                (trade.close_mid - trade.open_mid) * richting * units, 4
+            )
+            trade.net_pnl = round(
+                (exit_price - trade.open_price) * richting * units, 4
+            )
+            trade.total_cost = round(
+                (trade.gross_pnl or 0) - (trade.net_pnl or 0), 4
+            )
+            # Zonder bedrag van de broker het bedrag in accountvaluta opnieuw
+            # omrekenen: anders bleef het eurobedrag van de schatting staan.
+            if winst_account is None:
+                self._record_account_amount(trade)
+
+        # 1.7.3: met een uitstapprijs van de broker en een bewezen sluitreden
+        # zijn de kosten te meten, net als in de afstemming. Anders bleef een
+        # gecorrigeerde schatting op "berekend" staan tot de volgende
+        # afstemmingsronde, en telde hij zolang niet mee in kosten_gemeten.
+        from .learning.kosten import meet_kosten
+
+        gemeten = meet_kosten(trade, exit_price, CONTRACT_SIZE)
+        if gemeten is not None:
+            trade.total_cost = gemeten["total_cost"]
+            trade.spread_cost = gemeten["spread_cost"]
+            trade.slippage_cost = gemeten["slippage_cost"]
+            trade.gross_pnl = round((trade.net_pnl or 0) + gemeten["total_cost"], 4)
+            trade.cost_source = "measured"
+
+        await self.hass.async_add_executor_job(self.db.update_trade, trade)
+        # De wisselkoers uit dezelfde gegevens halen.
+        #
+        # De correctie heeft de winst in accountvaluta al in handen; die
+        # niet gebruiken zou betekenen dat de koers onbekend blijft
+        # terwijl hij op tafel ligt - en dan blijft de positiegrootte acht
+        # procent naast de bedoeling.
+        winst = werkelijk.get("profit_account")
+        if winst and self.conversion.needed and trade.net_pnl:
+            koers = winst / trade.net_pnl
+            if 0.1 < koers < 10.0 and koers != self.conversion.rate and \
+                    self._apply_rate(koers, "broker_settlement"):
+                _LOGGER.info(
+                    "Wisselkoers %s/%s uit een gecorrigeerde trade: %.4f",
+                    self.conversion.instrument, self.conversion.account,
+                    koers,
+                )
+
+        # Narekenen en melden bij afwijking.
+        #
+        # Als de prijs die de broker meldt en het bedrag dat hij boekt niet
+        # met elkaar rijmen, is er iets aan de hand dat ik niet ken - een
+        # gedeeltelijke sluiting, een aanpassing, een fout van mijn kant.
+        # Die afwijking hoort zichtbaar te zijn en niet weggerekend.
+        if winst_account is not None and koers:
+            verwacht = (exit_price - trade.open_price) * richting * units
+            afwijking = abs(verwacht - (trade.net_pnl or 0))
+            if afwijking > max(1.0, abs(verwacht) * 0.25):
+                _LOGGER.warning(
+                    "Trade %s: het bedrag van de broker (%.2f) en de "
+                    "prijsbeweging (%.2f) verschillen %.2f. Het bedrag "
+                    "van de broker is aangehouden; het verschil wijst op "
+                    "een gedeeltelijke sluiting of een aanpassing.",
+                    trade.broker_ticket, trade.net_pnl, verwacht,
+                    afwijking,
+                )
 
     async def _settle_vanished_positions(
         self, quote: VenueQuote, now: datetime
@@ -2931,6 +2981,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         trade.broker_ticket, err,
                     )
 
+            # 1.7.3: staat hij (nog) niet in het transactieoverzicht, dan het
+            # activiteitenoverzicht en de bevestiging proberen. Dat overzicht
+            # loopt uren achter; de activiteit van een sluiting op stop of doel
+            # staat er binnen seconden. Op 8 oktober werden zo vier trades op
+            # een schatting afgerekend die de broker allang kende.
+            bron = "broker_transactions"
+            if not (werkelijk and werkelijk.get("exit_price")):
+                activiteit = await self._zoek_activiteit(trade)
+                if activiteit:
+                    werkelijk = activiteit
+                    bron = activiteit.get("source") or "broker_activity"
+
             if werkelijk and werkelijk.get("exit_price"):
                 exit_price = float(werkelijk["exit_price"])
                 half = quote.spread / 2.0
@@ -2972,6 +3034,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 # beste dat er is, maar dan wél als schatting gemarkeerd.
                 settle = quote
                 reason = "broker_gesloten_geschat"
+                # 1.7.3: voorlopig. De komende minuten wordt de uitstapprijs
+                # nog een paar keer bij de broker nagevraagd
+                # (:meth:`_herkans_voorlopige_afwikkelingen`); daarna neemt de
+                # gewone correctie en de afstemming het over.
+                self._herkansingen[str(trade.broker_ticket)] = {
+                    "pogingen": 0, "sinds": now,
+                }
 
                 # En luid melden. Een schatting die stil doorgaat, produceert
                 # cijfers die eruitzien als metingen - dat is precies hoe de
@@ -2988,7 +3057,87 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     )
 
             await self._record_broker_close(
-                _TicketOnly(str(trade.broker_ticket)), settle, reason, now
+                _TicketOnly(str(trade.broker_ticket)), settle, reason, now,
+                bron=bron,
+            )
+
+    async def _zoek_activiteit(self, trade) -> dict | None:
+        """Uitstapprijs uit het activiteitenoverzicht van de broker (1.7.3).
+
+        None als de venue dat niet kent, de broker faalt of er nog niets
+        staat. Raakt niets aan; alleen opvragen.
+        """
+        zoek = getattr(self.venue, "closed_deal_activity", None)
+        if zoek is None or not trade.broker_ticket:
+            return None
+        try:
+            gevonden = await zoek(
+                str(trade.broker_ticket), trade.side, trade.open_price,
+                _as_datetime(trade.open_time, None),
+            )
+        except VenueError as err:
+            _LOGGER.debug(
+                "Activiteit van %s niet op te halen: %s", trade.broker_ticket, err
+            )
+            return None
+        if gevonden and gevonden.get("exit_price"):
+            return gevonden
+        return None
+
+    async def _herkans_voorlopige_afwikkelingen(self, now: datetime) -> None:
+        """Vraag de uitstapprijs van verse schattingen nog een paar keer na.
+
+        1.7.3. Een sluiting op stop of doel staat soms pas na enkele seconden
+        in het activiteitenoverzicht; bij het ontdekken was hij er dan net
+        niet. Begrensd: hooguit :data:`HERKANSING_SCHEMA` pogingen, op vaste
+        momenten na het afwikkelen (samen een paar minuten), één verzoek per
+        poging. Daarna blijft de trade voorlopig en zoekt de gewone correctie
+        hem in het transactieoverzicht, zoals voorheen.
+        """
+        if not self._herkansingen or self.run_id is None:
+            return
+        geschat = None
+        for ticket, staat in list(self._herkansingen.items()):
+            pogingen = staat["pogingen"]
+            if pogingen >= len(HERKANSING_SCHEMA):
+                self._herkansingen.pop(ticket, None)
+                continue
+            if (now - staat["sinds"]).total_seconds() < HERKANSING_SCHEMA[pogingen]:
+                continue
+            staat["pogingen"] = pogingen + 1
+            if geschat is None:
+                geschat = {
+                    str(t.broker_ticket): t
+                    for t in await self.hass.async_add_executor_job(
+                        self.db.estimated_trades, self.run_id
+                    )
+                }
+            trade = geschat.get(ticket)
+            if trade is None:
+                # Al gecorrigeerd (of uit een andere run): klaar.
+                self._herkansingen.pop(ticket, None)
+                continue
+            gevonden = await self._zoek_activiteit(trade)
+            if not gevonden:
+                if staat["pogingen"] >= len(HERKANSING_SCHEMA):
+                    self._herkansingen.pop(ticket, None)
+                    _LOGGER.info(
+                        "Uitstapprijs van %s na %d herkansingen nog niet bij de "
+                        "broker; blijft voorlopig tot het transactieoverzicht "
+                        "hem heeft.", ticket, staat["pogingen"],
+                    )
+                continue
+            self._herkansingen.pop(ticket, None)
+            oud = trade.net_pnl or 0.0
+            await self._boek_brokerprijs(
+                trade, gevonden, now, gevonden.get("source") or "broker_activity"
+            )
+            self._geschatte_afwikkelingen = max(0, self._geschatte_afwikkelingen - 1)
+            _LOGGER.info(
+                "Trade %s alsnog op de brokerprijs afgerekend bij herkansing %d: "
+                "netto van %.2f naar %.2f (uitstapprijs %.2f).",
+                ticket, staat["pogingen"], oud, trade.net_pnl or 0.0,
+                trade.close_price,
             )
 
     async def _audit_against_broker(self) -> None:
@@ -3268,7 +3417,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         )
 
     async def _record_broker_close(
-        self, position, quote: VenueQuote, reason: str, now: datetime
+        self, position, quote: VenueQuote, reason: str, now: datetime,
+        bron: str = "broker_transactions",
     ) -> None:
         """Werk de open trade bij tot een gesloten trade.
 
@@ -3358,7 +3508,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             trade.close_reason_source = "estimated"
         elif reason == "broker_gesloten_gemeten":
             # Uitstapprijs direct van de broker: meteen afleiden, met bewijs.
-            self._apply_reconciliation(trade, exit_price, now)
+            self._apply_reconciliation(trade, exit_price, now, bron)
         elif reason in ("stop_loss", "take_profit") and afwikkeling:
             # Afgeleid uit de koers op het moment van ontdekken: de koers stond
             # voorbij het niveau. Een aanwijzing, geen bevestiging van de broker.

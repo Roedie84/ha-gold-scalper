@@ -299,6 +299,75 @@ def match_transaction(
         return None
 
 
+#: Sluitacties in het activiteitenoverzicht. Alleen een volledige sluiting:
+#: een gedeeltelijke sluiting laat de positie bestaan, en dan verdwijnt hij
+#: ook niet uit de lijst.
+_SLUITACTIES = {"POSITION_CLOSED"}
+
+#: Zoveel mag een sluitniveau relatief van de instapprijs afliggen voordat het
+#: als onzin geldt (een verkeerd veld, een ander instrument).
+_ACTIVITEIT_MAX_AFSTAND = 0.05
+
+
+def match_activity(
+    activiteiten: list, ticket, side: str | None = None,
+    open_price: float | None = None,
+) -> dict | None:
+    """Zoek in het activiteitenoverzicht de sluiting van positie ``ticket``.
+
+    1.7.3. Het transactieoverzicht loopt uren achter; het activiteitenoverzicht
+    niet - daar staat een sluiting op stop of doel binnen seconden in. Een
+    sluiting herken je aan een actie ``POSITION_CLOSED`` met het dealId van de
+    positie als ``affectedDealId`` (Capital.com: ``dealId``).
+
+    Bewust streng. De openingsactiviteit heeft hetzelfde dealId en als
+    ``level`` de *instap*prijs; die als uitstap boeken zou elke trade op nul
+    zetten. Daarom alleen een expliciete sluitactie, geaccepteerd, met een
+    richting tegengesteld aan de positie als die erbij staat, en een niveau in
+    de buurt van de instap.
+    """
+    ticket = str(ticket or "")
+    if not ticket:
+        return None
+    eigen = {"buy": "BUY", "sell": "SELL"}.get(str(side or "").lower())
+    for act in activiteiten or ():
+        if not isinstance(act, dict):
+            continue
+        status = str(act.get("status") or "ACCEPTED").upper()
+        if status not in ("ACCEPTED", "EXECUTED"):
+            continue
+        details = act.get("details") or {}
+        if not isinstance(details, dict):
+            details = {}
+        acties = details.get("actions") or act.get("actions") or []
+        sluit = any(
+            isinstance(a, dict)
+            and str(a.get("actionType") or "").upper() in _SLUITACTIES
+            and str(a.get("affectedDealId") or a.get("dealId") or "") == ticket
+            for a in acties
+        )
+        if not sluit:
+            continue
+        richting = str(details.get("direction") or act.get("direction") or "").upper()
+        if eigen and richting and richting == eigen:
+            # Zelfde richting als de positie: dat is geen sluiting ervan.
+            continue
+        niveau = _als_getal(details.get("level"))
+        if niveau is None:
+            niveau = _als_getal(act.get("level"))
+        if niveau is not None and open_price:
+            if abs(niveau - open_price) / open_price > _ACTIVITEIT_MAX_AFSTAND:
+                niveau = None
+        return {
+            "exit_price": niveau,
+            "deal_reference": details.get("dealReference") or act.get("dealReference"),
+            "closing_deal_id": act.get("dealId"),
+            "activity_date": act.get("dateUTC") or act.get("dateUtc") or act.get("date"),
+            "source": "broker_activity",
+        }
+    return None
+
+
 def _conversie_uit(omschrijving) -> float | None:
     """De omrekenkoers uit "... converted at 0.8866", of None."""
     gevonden = re.search(r"converted at ([0-9]+(?:\.[0-9]+)?)", str(omschrijving or ""))
@@ -1218,6 +1287,12 @@ class IgStyleVenue(ExecutionVenue):
                 "from": (nu - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%S"),
                 "to": nu.strftime("%Y-%m-%dT%H:%M:%S"),
             }),
+            # 1.7.3: de bron van de snelle uitstapprijs; hiermee zijn de
+            # veldnamen tegen het echte antwoord te controleren.
+            "activity_v3": ("GET", "/history/activity", "3", {
+                "from": (nu - timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%S"),
+                "detailed": "true", "pageSize": "20",
+            }),
         }
         if self._market_id:
             verzoeken["clientsentiment"] = (
@@ -1384,6 +1459,73 @@ class IgStyleVenue(ExecutionVenue):
                 "; ".join(dichtst) or "geen enkele met openLevel",
             )
         return None
+
+    async def closed_deal_activity(
+        self, ticket: str, side: str | None = None,
+        open_price: float | None = None, since=None,
+    ) -> dict | None:
+        """De uitstapprijs uit het activiteitenoverzicht, of via de bevestiging.
+
+        1.7.3. Een positie die de broker zelf sloot (stop of doel) staat pas
+        uren later in het transactieoverzicht. Op 8 oktober leverde dat vier
+        afwikkelingen op een geschatte prijs op, drie terwijl HA gewoon draaide.
+        Het activiteitenoverzicht (``/history/activity``, v3, ``detailed``)
+        heeft de sluiting binnen seconden, mét het niveau waarop gevuld is.
+
+        Staat er een sluitactiviteit zonder niveau, dan wordt de
+        dealReference ervan bij ``/confirms`` nagevraagd - de bevestiging
+        noemt het niveau wel.
+
+        Eén verzoek per aanroep (twee met de bevestiging). Telt niet tegen het
+        datapuntenquotum. Gooit VenueError bij een fout van de broker; geeft
+        None als er (nog) niets te vinden is.
+        """
+        nu = datetime.now(timezone.utc)
+        begin = _utc(since) if since is not None else None
+        # Twee uur speling vóór de opening: het activiteitenoverzicht is niet
+        # overal eenduidig over de tijdzone van ``from``. Te vroeg beginnen kost
+        # niets; te laat beginnen mist de sluiting.
+        if begin is None:
+            begin = nu - timedelta(hours=3)
+        begin = max(begin - timedelta(hours=2), nu - timedelta(days=2))
+        payload = await self._request(
+            "GET", "/history/activity", version="3",
+            params={
+                "from": begin.strftime("%Y-%m-%dT%H:%M:%S"),
+                "detailed": "true",
+                "pageSize": "500",
+            },
+        )
+        activiteiten = payload.get("activities") or []
+        gevonden = match_activity(activiteiten, ticket, side, open_price)
+        if gevonden is None:
+            _LOGGER.debug(
+                "Geen sluitactiviteit voor %s tussen %d activiteit(en).",
+                ticket, len(activiteiten),
+            )
+            return None
+        if gevonden.get("exit_price") is None and gevonden.get("deal_reference"):
+            try:
+                bevestiging = await self._request(
+                    "GET", f"/confirms/{gevonden['deal_reference']}"
+                )
+            except VenueError as err:
+                _LOGGER.debug("Bevestiging van de sluiting niet op te halen: %s", err)
+                bevestiging = {}
+            if str(bevestiging.get("dealStatus", "")).upper() == "ACCEPTED":
+                niveau = _als_getal(bevestiging.get("level"))
+                if niveau is not None and (
+                    not open_price
+                    or abs(niveau - open_price) / open_price <= _ACTIVITEIT_MAX_AFSTAND
+                ):
+                    gevonden["exit_price"] = niveau
+                    gevonden["source"] = "broker_confirm"
+        if gevonden.get("exit_price") is None:
+            _LOGGER.debug(
+                "Sluitactiviteit voor %s gevonden, maar zonder niveau.", ticket
+            )
+            return None
+        return gevonden
 
     def _controleer_volledigheid(
         self, aantal: int, eigen_sluitingen, van: datetime, tot: datetime,

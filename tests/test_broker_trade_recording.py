@@ -37,6 +37,14 @@ def _method(name: str) -> str:
     raise AssertionError(f"{name} bestaat niet")
 
 
+def _correctie() -> str:
+    """De correctie plus het boeken zelf: sinds 1.7.3 staat dat laatste in
+    ``_boek_brokerprijs``, gedeeld met de herkansing uit het
+    activiteitenoverzicht."""
+    return (_method("_correct_estimated_settlements") + "\n"
+            + _method("_boek_brokerprijs"))
+
+
 def test_orders_are_written_to_the_database():
     body = _method("_open_position")
     assert "_record_broker_open" in body, (
@@ -269,7 +277,7 @@ def test_estimated_settlements_are_corrected_later():
     uitstapprijs er dus nog niet in, en valt de afwikkeling terug op een
     schatting die tien dollar mis kan zijn. Eén poging is niet genoeg.
     """
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "estimated_trades" in body
     assert "broker_gesloten_gecorrigeerd" in body
     assert "update_trade" in body
@@ -286,7 +294,7 @@ def test_the_correction_runs_periodically():
 def test_the_correction_is_batched():
     """Vijftig trades in één cyclus corrigeren zou de lus laten vastlopen op
     netwerkverzoeken."""
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "geschat[:5]" in body
 
 
@@ -320,7 +328,7 @@ def test_the_estimate_count_comes_from_the_database():
     Een getal dat verkeerd kan staan is erger dan geen getal, want je
     vertrouwt erop.
     """
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "self._geschatte_afwikkelingen = len(geschat)" in body
 
 
@@ -328,7 +336,7 @@ def test_the_correction_also_derives_the_exchange_rate():
     """De correctie heeft de winst in accountvaluta al in handen. Die niet
     gebruiken zou betekenen dat de koers onbekend blijft terwijl hij op tafel
     ligt - en dan blijft de positiegrootte acht procent naast de bedoeling."""
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "profit_account" in body
     # De koers wordt op één plek gezet, met bron en tijdstip.
     assert "self._apply_rate(koers, \"broker_settlement\")" in body
@@ -341,7 +349,7 @@ def test_the_rate_is_derived_from_the_correction():
     Bij een correctie is het bedrag waarmee de broker werkelijk heeft
     afgerekend wél bekend, en dat is preciezer dan elke schatting.
     """
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "profit_account" in body
     # De koers wordt op één plek gezet, met bron en tijdstip.
     assert "self._apply_rate(koers, \"broker_settlement\")" in body
@@ -400,7 +408,7 @@ def test_an_unfindable_exit_keeps_its_price():
     Een eigen label maakt het verschil zichtbaar tussen "nog niet geprobeerd"
     en "niet te vinden".
     """
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "broker_gesloten_onvindbaar" in body
 
 
@@ -415,7 +423,7 @@ def test_giving_up_is_based_on_age_not_attempts():
     comprimeert naar nul: de gemiddelde winst zakte van 14,51 naar 10,61 - een
     meetfout die eruitzag als een verslechterende strategie.
     """
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "leeftijd > 2.0" in body, "er wordt niet op leeftijd opgegeven"
 
     # Alleen naar code kijken, niet naar commentaar: de vorige regel staat
@@ -430,7 +438,7 @@ def test_giving_up_is_based_on_age_not_attempts():
 def test_the_close_time_is_passed_to_the_lookup():
     """Zonder het sluitmoment ligt het zoekvenster rond nu, en dan is een trade
     van gisteren onvindbaar."""
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "_as_datetime(trade.close_time" in body
 
 
@@ -460,7 +468,7 @@ def test_the_brokers_own_amount_is_used():
     afronding, een halve spread, een gedeeltelijke sluiting. Het bedrag van de
     broker is per definitie juist: dat is wat er op de rekening gebeurde.
     """
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "winst_account / koers" in body, (
         "het resultaat wordt nog zelf berekend in plaats van overgenomen"
     )
@@ -470,7 +478,7 @@ def test_a_mismatch_between_price_and_amount_is_reported():
     """Rijmen de prijs en het bedrag van de broker niet, dan is er iets aan de
     hand dat de code niet kent. Die afwijking hoort zichtbaar te zijn en niet
     weggerekend."""
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "verschillen" in body
     assert "gedeeltelijke sluiting" in body
 
@@ -478,7 +486,7 @@ def test_a_mismatch_between_price_and_amount_is_reported():
 def test_there_is_a_fallback_without_a_rate():
     """Zonder wisselkoers is het bedrag van de broker niet om te rekenen; dan
     moet de berekening uit prijzen overblijven."""
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "else:" in body
     assert "(exit_price - trade.open_price)" in body
 
@@ -493,7 +501,7 @@ def test_the_brokers_close_time_is_adopted():
     elkaar. De broker bepaalt wanneer een positie sloot, dus zijn tijdstip is
     het juiste.
     """
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert 'werkelijk.get("closed_at")' in body
     assert "trade.close_time = moment.isoformat()" in body
 
@@ -501,11 +509,11 @@ def test_the_brokers_close_time_is_adopted():
 def test_a_date_without_a_time_is_ignored():
     """Het veld `date` bevat alleen de dag; dat overnemen zou het sluitmoment
     op middernacht zetten."""
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "moment.hour or moment.minute or moment.second" in body
 
 
 def test_the_duration_follows_the_close_time():
     """Anders staat er een looptijd die niet bij de tijdstempels past."""
-    body = _method("_correct_estimated_settlements")
+    body = _correctie()
     assert "trade.duration_seconds" in body
