@@ -594,6 +594,19 @@ class TradeDatabase:
         ).fetchall()
         return [self._row_to_trade(r) for r in rijen]
 
+    def recent_close_times(self, limit: int = 500) -> list[str]:
+        """Sluitmomenten van de recentste gesloten trades, over alle runs.
+
+        Alleen voor de diagnose van het transactieoverzicht van de broker:
+        dat bevat ook trades uit eerdere runs.
+        """
+        rijen = self.conn.execute(
+            "SELECT close_time FROM trades WHERE close_time IS NOT NULL "
+            "ORDER BY close_time DESC LIMIT ?",
+            (int(limit),),
+        ).fetchall()
+        return [r[0] for r in rijen]
+
     def open_trades(self, run_id: int) -> list[Trade]:
         rows = self.conn.execute(
             "SELECT * FROM trades WHERE run_id=? AND close_time IS NULL", (run_id,)

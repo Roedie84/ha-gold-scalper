@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 1.7.2
+
+* **Geen vals alarm meer over het transactieoverzicht.** `closed_deal`
+  waarschuwde bij minder dan drie transacties met "Slechts N transactie(s)
+  over de afgelopen vierentwintig uur … het datumbereik komt vermoedelijk
+  niet aan", bij elke correctiepoging opnieuw. Op 8 oktober tussen 03:15 en
+  04:03 kwam dat 22×, terwijl er niets mis was: het venster is sluiten −6 u ..
+  +12 u (geen 24 u), na de avondpauze bijna leeg, en het overzicht van IG
+  loopt achter. Nu vergelijkt de broker het aantal transacties met het aantal
+  eigen gesloten trades in hetzelfde venster (de correctielus geeft de
+  sluitmomenten mee, `own_close_times`). Alleen trades die al meer dan zes
+  uur dicht zijn (`TRANSACTIE_VERTRAGING`) tellen; ontbreken die, dan één
+  WARNING per uur met het echte venster in UTC, verder DEBUG. Ook de melding
+  "overzicht leeg" valt hieronder. Alleen logging; raakt geen handelslogica.
+
 ## 1.7.1
 
 * **Doel- en stoptreffers in *Geleerd* op de effectieve sluitreden.** De

@@ -98,6 +98,38 @@ def _utc(waarde) -> datetime | None:
     return m if m.tzinfo else m.replace(tzinfo=timezone.utc)
 
 
+#: Hoe lang het transactieoverzicht van de broker mag achterlopen voordat een
+#: ontbrekende trade een waarschuwing waard is. Gemeten liep het tot enkele
+#: uren achter; zes uur is ruim daarboven.
+TRANSACTIE_VERTRAGING = timedelta(hours=6)
+
+
+def ontbrekende_transacties(
+    aantal: int, eigen_sluitingen, van: datetime, tot: datetime,
+    nu: datetime, vertraging: timedelta = TRANSACTIE_VERTRAGING,
+) -> tuple[int, int]:
+    """Hoeveel eigen trades in het venster ontbreken in het overzicht?
+
+    Vergelijkt het aantal transacties dat de broker over ``van``..``tot``
+    teruggaf met het aantal eigen gesloten trades in datzelfde venster dat al
+    langer dan ``vertraging`` dicht is. Recentere sluitingen tellen niet mee:
+    die kunnen door de achterstand van de broker nog ontbreken zonder dat er
+    iets mis is.
+
+    Geeft ``(rijp, tekort)``: het aantal eigen trades dat er al had moeten
+    staan, en hoeveel daarvan het overzicht minstens mist.
+    """
+    grens = nu - vertraging
+    rijp = 0
+    for waarde in eigen_sluitingen or ():
+        moment = _utc(waarde)
+        if moment is None:
+            continue
+        if van <= moment <= tot and moment <= grens:
+            rijp += 1
+    return rijp, max(0, rijp - int(aantal))
+
+
 def broker_loopt_achter(transacties: list, moment: datetime) -> bool:
     """Staat de nieuwste transactie van de broker van voor ``moment``?
 
@@ -1094,6 +1126,10 @@ class IgStyleVenue(ExecutionVenue):
     #: Of de veldnamen van het transactieoverzicht al zijn gelogd.
     _velden_gelogd: bool = False
 
+    #: Het uur (``JJJJ-MM-DDTHH``) waarin een onvolledig transactieoverzicht
+    #: al als waarschuwing is gemeld; daarna blijft het dat uur bij debug.
+    _volledigheid_gemeld: str | None = None
+
     #: Kandidaten voor EUR/USD. Welke een account kent, verschilt per
     #: accounttype; de eerste die werkt wordt onthouden. Elk antwoord wordt
     #: gecontroleerd op de naam, zodat een verkeerd instrument nooit als
@@ -1199,6 +1235,7 @@ class IgStyleVenue(ExecutionVenue):
         self, ticket: str, open_price: float | None = None,
         side: str | None = None, around: datetime | None = None,
         units: float | None = None, open_time=None,
+        own_close_times=None,
     ) -> dict | None:
         """Zoek de werkelijke uitstapprijs van een gesloten positie.
 
@@ -1276,22 +1313,17 @@ class IgStyleVenue(ExecutionVenue):
                 len(transacties), sorted(transacties[0].keys()),
                 {k: v for k, v in transacties[0].items() if k != "instrumentName"},
             )
-        elif not transacties:
-            _LOGGER.warning(
-                "Het transactieoverzicht van de broker is leeg over de "
-                "afgelopen vierentwintig uur. Zonder die gegevens is de "
-                "werkelijke uitstapprijs niet te achterhalen en blijft elke "
-                "afwikkeling een schatting."
-            )
-        elif len(transacties) < 3:
-            # Eén of twee transacties over een etmaal wijst erop dat het
-            # datumbereik niet aankomt - precies de fout die dit moest
-            # oplossen.
-            _LOGGER.warning(
-                "Slechts %d transactie(s) over de afgelopen vierentwintig uur. "
-                "Dat is minder dan er trades zijn geweest; het datumbereik in "
-                "het verzoek komt vermoedelijk niet aan.", len(transacties),
-            )
+        # 1.7.2: een te klein overzicht alleen als waarschuwing wanneer er
+        # aantoonbaar eigen trades ontbreken die al lang genoeg dicht zijn.
+        #
+        # De oude regel waarschuwde bij minder dan drie transacties, met een
+        # tekst over "vierentwintig uur" terwijl het venster sluiten −6 u ..
+        # +12 u is. Na de avondpauze is dat venster gewoon bijna leeg, en
+        # direct na een sluiting loopt het overzicht nog achter. Op 8 oktober
+        # gaf dat tussen 03:15 en 04:03 tweeëntwintig valse waarschuwingen.
+        self._controleer_volledigheid(
+            len(transacties), own_close_times, van, tot, nu,
+        )
 
         # Alle kandidaten wegen, niet de eerste pakken.
         #
@@ -1352,6 +1384,51 @@ class IgStyleVenue(ExecutionVenue):
                 "; ".join(dichtst) or "geen enkele met openLevel",
             )
         return None
+
+    def _controleer_volledigheid(
+        self, aantal: int, eigen_sluitingen, van: datetime, tot: datetime,
+        nu: datetime,
+    ) -> None:
+        """Meld een onvolledig transactieoverzicht, hooguit eens per uur.
+
+        Alleen als waarschuwing wanneer eigen trades in het venster al langer
+        dan :data:`TRANSACTIE_VERTRAGING` dicht zijn en toch ontbreken. Zonder
+        eigen sluitingen om mee te vergelijken valt er niets te concluderen;
+        dan blijft het bij debug.
+        """
+        venster = (
+            f"{van.strftime('%d-%m %H:%M')} .. {tot.strftime('%d-%m %H:%M')} UTC"
+        )
+        if eigen_sluitingen is None:
+            _LOGGER.debug(
+                "Transactieoverzicht van de broker: %d transactie(s) over %s.",
+                aantal, venster,
+            )
+            return
+        rijp, tekort = ontbrekende_transacties(
+            aantal, eigen_sluitingen, van, tot, nu,
+        )
+        if not tekort:
+            _LOGGER.debug(
+                "Transactieoverzicht van de broker: %d transactie(s) over %s; "
+                "%d eigen trade(s) die er al in hoorden te staan.",
+                aantal, venster, rijp,
+            )
+            return
+        uur = nu.strftime("%Y-%m-%dT%H")
+        log = (
+            _LOGGER.debug if self._volledigheid_gemeld == uur
+            else _LOGGER.warning
+        )
+        self._volledigheid_gemeld = uur
+        log(
+            "Transactieoverzicht van de broker onvolledig: %d transactie(s) "
+            "over %s, terwijl %d eigen trade(s) in dat venster al meer dan %d "
+            "uur gesloten zijn (%d ontbreken). Zonder die gegevens blijft hun "
+            "afwikkeling een schatting.",
+            aantal, venster, rijp,
+            int(TRANSACTIE_VERTRAGING.total_seconds() // 3600), tekort,
+        )
 
     async def modify_stop(
         self, ticket: str, stop_loss: float, take_profit: float | None = None

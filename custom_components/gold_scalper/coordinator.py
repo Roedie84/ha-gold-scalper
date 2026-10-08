@@ -2637,6 +2637,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if not geschat:
             return
 
+        # 1.7.2: de eigen sluitmomenten meegeven, zodat de broker een te klein
+        # transactieoverzicht vergelijkt met wat er werkelijk gesloten is in
+        # plaats van met een vaste drempel. Alleen voor de logging.
+        try:
+            eigen_sluitingen = await self.hass.async_add_executor_job(
+                self.db.recent_close_times
+            )
+        except Exception:  # noqa: BLE001 - diagnose mag de correctie niet stoppen
+            eigen_sluitingen = None
+
         for trade in geschat[:5]:      # hoogstens vijf per cyclus
             try:
                 # Het sluitmoment meegeven zodat het zoekvenster erom heen
@@ -2648,6 +2658,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     _as_datetime(trade.close_time, None),
                     trade.volume * CONTRACT_SIZE,
                     trade.open_time,
+                    own_close_times=eigen_sluitingen,
                 )
             except VenueError:
                 return

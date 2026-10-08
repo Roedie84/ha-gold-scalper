@@ -179,7 +179,7 @@ def _coordinator(tmp_path, monkeypatch, transacties, deal=None):
         async def transactions(self, van, tot):
             return transacties
 
-        async def closed_deal(self, *args):
+        async def closed_deal(self, *args, **kwargs):
             return deal
 
     venue = Venue()
