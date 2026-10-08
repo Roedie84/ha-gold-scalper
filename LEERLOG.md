@@ -89,3 +89,7 @@ Vraag Ruud: kan de strategie meer opleveren? Alleen gelezen; geen knoppen, inste
 - Reproduceren: `analyse/2026-10-08-varianten/` (trades.json, price.json.gz uitpakken, `python3 grid.py`, `extra.py`, `need.py`).
 
 laatste ronde: 08-10 11:00, gemeten t/m 08-10 09:00 UTC
+
+## 08-10 11:40 (chatsessie)
+- L-GS-005 akkoord (Ruud 11:19), gebouwd en uitgebracht als 1.7.4. Meten: sluitreden tijdstop/maximale duur verschijnt; langste duur ≤ 910 s; netto/trade per cluster tegen baseline −2,95 (68 trades, 10 clusters). Beslissen na 10 nieuwe clusters.
+- Positiegrootte bewust niet verhoogd (demosaldo 10 mln): verandert de vingerafdruk en vervuilt de meting van L-GS-005.

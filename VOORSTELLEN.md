@@ -30,7 +30,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 
 
 ## L-GS-005 · tijdstops laten werken op IG (open_time van de positie vullen)
-- Status: **open — Ruud beslist** (verandert handelsgedrag; niet zelf bouwen)
+- Status: **akkoord 08-10 11:19 — gebouwd in 1.7.4** (geen parameterwijziging)
 - Onderbouwing (08-10, varianten-analyse, zie LEERLOG 08-10 11:00): `broker/ig_capital.py` bouwt `VenuePosition` zonder `open_time`; `coordinator._manage_open_positions` doet `_as_datetime(None, now)` → leeftijd altijd 0 s. Daardoor vuren de ontworpen tijdstop (240 s binnen 0,3×ATR) en de harde limiet (900 s) uit `broker/exits.py` nooit. Gemeten: gem. duur 1408 s, langste 5272 s (> 900). Backtest/Lab rekenen wél met tijdstops → live en backtest zijn op dit punt niet vergelijkbaar.
 - Wat verandert: alleen dat `open_time` gevuld wordt (IG `position.createdDateUTC`, terugval: `open_time` van de eigen trade via ticket) + test. **Geen parameterwijziging**; daardoor gaan de bestaande defaults werken: `time_stop_seconds=240`, `time_stop_deadzone_atr=0.3`, `max_hold_seconds=900`. Doel 1,5×ATR, stop 1,0×ATR, break-even 0,8×ATR blijven gelijk.
 - Verwacht effect (replay van 66 live trades op het 10-s koerspad, IS = clusters 1-5, OOS = 6-10): netto/trade −3,83 → −1,34 (IS −3,63 → −2,18; OOS −4,04 → −0,49); 49/66 exits worden tijdexits, gem. duur ~1576 → ~263 s, doel geraakt 20% → 8%. Gepaarde t per cluster +2,15 (10 clusters; kritiek 2,26 bij df 9) → **niet bewezen**, en netto blijft negatief: dit verkleint verlies, maakt de strategie niet winstgevend. Replay modelleert niet dat posities sneller vrijkomen en er dus vaker opnieuw ingestapt wordt (meer kosten).
