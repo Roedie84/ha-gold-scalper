@@ -16,7 +16,8 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Meten na bouw: volledige suite groen om 21:30 UTC.
 
 ## L-GS-003 · transactiewaarschuwing: juiste venstertekst en geen vals alarm
-- Status: **gepland (zelf bouwen: logging/rapportage, raakt geen handelslogica)** — pas na installatie van 1.7.1, samen met L-GS-002
+- Status: **gebouwd 1.7.2 (08-10, chatsessie)** — commit 6ed4659, release v1.7.2 groen, HACS ververst; nog niet geïnstalleerd. L-GS-002 niet meegenomen.
+- Uitvoering: vaste drempel <3 vervangen door vergelijking met eigen gesloten trades in hetzelfde venster (alleen trades >6 u dicht tellen); WARNING hooguit 1× per uur met het echte venster in UTC, anders DEBUG; ook 'overzicht leeg' valt hieronder. 7 nieuwe tests; suite 1714 groen, 5 overgeslagen.
 - Onderbouwing: 08-10 03:02-03:41: `broker/ig_capital.py` `closed_deal` waarschuwt bij <3 transacties "over de afgelopen vierentwintig uur … datumbereik komt vermoedelijk niet aan", elke ~80 s. Het venster is sluiten −6 u .. +12 u en wordt wel toegepast (telling 2→1 toen het voorbij 07-10 schoof); na de avondpauze is het venster normaal bijna leeg.
 - Bouw: heuristiek vergelijken met het aantal eigen trades in hetzelfde venster; tekst met het echte venster; eens per ticket loggen. Test.
 - Meten na bouw: 0 van deze waarschuwingen in een nacht zonder echte afwijking.

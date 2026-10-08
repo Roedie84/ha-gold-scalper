@@ -54,4 +54,7 @@ laatste ronde: 08-10 04:40, gemeten t/m 08-10 03:45
 - Latency p99 393,5 ms (1000 cycli; was 514,5). Drawdown 2,43%.
 - Geen release.
 
+
+## 08-10 · chatsessie
+- **L-GS-003 gebouwd 1.7.2 (08-10, chatsessie):** transactiewaarschuwing (22× tussen 03:15-04:03) vergelijkt nu met eigen trades die >6 u dicht zijn; 1× per uur WARNING, anders DEBUG. Alleen logging. Release v1.7.2 groen, HACS ververst. Meten na installatie: 0 van deze waarschuwingen in een nacht zonder echte afwijking.
 laatste ronde: 08-10 07:40, gemeten t/m 08-10 07:43
