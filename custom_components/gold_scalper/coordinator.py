@@ -15,6 +15,7 @@ Alles draait binnen HA. Er is geen tweede proces, geen bridge, geen Windows.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -84,7 +85,7 @@ from .storage.periods import build_periods
 from .settings import candle_source, resolve
 from .timeutil import parse_utc, trading_day
 from .storage.database import MODE_LIVE, MODE_PAPER, Trade, TradeDatabase
-from .storage.state import RuntimeState, StateStore
+from .storage.state import ResultsStore, RuntimeState, StateStore
 from .storage.latency import LatencyBudget, LatencyTracker, install_buffered_signals
 from .strategy.scalping import STRATEGY_VERSION, ScalpConfig, evaluate
 from .learning.robustness import evaluate_robustness
@@ -95,6 +96,9 @@ from .strategy.sizing import SizingConfig, position_size
 from .strategy.streaming import StreamState
 
 _LOGGER = logging.getLogger(__name__)
+
+#: Standaard voor ``_on_bars_closed``: dezelfde bars archiveren als binnenkomen.
+_ZELFDE = object()
 
 #: Koersen uit de markt van de broker: die gaan voor op een uit een trade
 #: afgeleide koers.
@@ -118,6 +122,16 @@ def _as_datetime(value, fallback: datetime) -> datetime:
         except ValueError:
             return fallback
     return fallback
+
+
+def _veilig_utc(waarde) -> datetime | None:
+    """Een bewaarde tijd als UTC, of None als hij ontbreekt of onleesbaar is."""
+    if not waarde:
+        return None
+    try:
+        return parse_utc(waarde)
+    except (TypeError, ValueError):
+        return None
 
 
 def _as_int(value, fallback: int) -> int:
@@ -406,51 +420,6 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._previous_risk_state: str | None = None
         #: Opeenvolgende cycli die langer duurden dan het pollinterval.
         self._slow_cycles = 0
-        #: Posities zoals ze deze cyclus bij de broker stonden. Aan het begin
-        #: van elke cyclus gewist, en na elke order verversd.
-        self._positions_cache: list | None = None
-
-        self.sizing = SizingConfig(
-            fixed_units=self.units,
-            risk_based=options.get(CONF_RISK_BASED_SIZING, False),
-            risk_per_trade_pct=options.get(CONF_RISK_PER_TRADE_PCT, 0.5),
-            scale_with_confidence=options.get(CONF_SCALE_WITH_CONFIDENCE, False),
-            max_units=options.get(CONF_MAX_UNITS, DEFAULT_MAX_UNITS),
-        )
-        self.pyramid = PyramidConfig(
-            enabled=options.get(CONF_PYRAMID_ENABLED, False),
-            trigger_atr=options.get(CONF_PYRAMID_TRIGGER_ATR, 1.0),
-            max_additions=_as_int(options.get(CONF_PYRAMID_MAX_ADDITIONS), 2),
-        )
-        #: Per ticket: hoeveel toevoegingen en op welke prijs de laatste.
-        self._pyramid_state: dict[str, dict] = {}
-        #: Per ticket de uiterste mee- en tegenbeweging sinds de instap.
-        #:
-        #: Bij brokertrades werden die niet bijgehouden, terwijl de
-        #: verliesanalyse erop filtert. Gevolg: die analyse sloeg elke
-        #: demotrade over en meldde "0 verliezende trades" naast een
-        #: performance die er wél telde - dood in precies de modus die ertoe
-        #: doet.
-        self._excursions: dict[str, dict] = {}
-        self.robustness: dict = {}
-        self.periods: dict = {}
-        self.sessions: dict = {}
-        self.news_impact: dict = {}
-        self.backtest: dict = {}
-        self.audit: dict = {}
-        self.last_sizing: dict = {}
-
-        service = options.get(CONF_NOTIFY_SERVICE, NOTIFY_NONE)
-        self.notifier = Notifier(hass, NotifierConfig(
-            service=None if service in (NOTIFY_NONE, "", None) else service,
-            hourly=options.get(CONF_NOTIFY_HOURLY, True),
-            critical=options.get(CONF_NOTIFY_CRITICAL, True),
-            skip_quiet_hours=options.get(CONF_NOTIFY_SKIP_QUIET, True),
-        ))
-        #: Vorige risicostand, om een overgang naar noodstop te herkennen.
-        self._previous_risk_state: str | None = None
-        #: Opeenvolgende cycli die langer duurden dan het pollinterval.
-        self._slow_cycles = 0
         self.executor_notes: list[str] = []
 
         self.lifecycle = LifecycleController(DrainPolicy.WAIT_THEN_CLOSE)
@@ -507,6 +476,20 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._enabled: bool = False
         self._store = StateStore(hass, entry.entry_id)
         self._state = RuntimeState()
+        #: 1.7.5: backtest, validatie, lab en sluitingswaarneming, in een eigen
+        #: bestand naast de toestand.
+        self._results_store = ResultsStore(hass, entry.entry_id)
+        self._resultaten_bewaard_om: datetime | None = None
+        #: 1.7.5: één cyclus tegelijk, en het afsluiten wacht op een lopende
+        #: cyclus voordat de database dichtgaat.
+        self._cyclus_slot = asyncio.Lock()
+        self._afgesloten = False
+        #: 1.7.5: kwam de accountvaluta bij het opstarten niet van de broker
+        #: maar uit de laatst bekende waarde? Dan wordt de vingerafdruk van een
+        #: run er nooit op aangepast.
+        self._valuta_onzeker = False
+        #: 1.7.5: kwam de verzendtoestand van de meldingen uit de opslag?
+        self._notify_hersteld = False
 
         super().__init__(
             hass,
@@ -587,6 +570,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 self.risk.state.trades_today = self._state.trades_today
             except ValueError:
                 _LOGGER.debug("Bewaarde handelsdag onleesbaar; opnieuw beginnen")
+        self._herstel_geheugen()
 
         path = self.hass.config.path(DATABASE_FILENAME)
         self.db = TradeDatabase(path)
@@ -622,16 +606,34 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # standaardwaarde en veranderde dus nooit, waardoor een
         # valutaomschakeling stilzwijgend in dezelfde bewijsfase belandde.
         if self.mode.places_orders:
+            bevestigd = False
             try:
                 snapshot = await self.venue.account()
                 valuta = getattr(snapshot, "currency", None)
                 if valuta:
                     self.conversion.account = valuta
+                    bevestigd = True
             except VenueError as err:
                 _LOGGER.debug(
-                    "Accountvaluta nog niet op te halen: %s. De vingerafdruk "
-                    "gebruikt de standaardwaarde.", err,
+                    "Accountvaluta nog niet op te halen: %s. De laatst bekende "
+                    "waarde geldt.", err,
                 )
+            if not bevestigd:
+                # 1.7.5: niet terugvallen op de standaard "USD". Een korte
+                # storing bij de broker tijdens de herstart liet de
+                # vingerafdruk dan van valuta wisselen: de run werd "met een
+                # gewijzigde standaardwaarde" voortgezet en zijn vingerafdruk
+                # overschreven - of er begon zelfs een nieuwe bewijsfase.
+                bekend = await self._laatst_bekende_valuta()
+                if bekend:
+                    self.conversion.account = bekend
+                    _LOGGER.info(
+                        "Accountvaluta bij het opstarten niet op te halen; de "
+                        "laatst bekende (%s) geldt tot de broker antwoordt.", bekend,
+                    )
+                self._valuta_onzeker = True
+            else:
+                self._state.account_currency = self.conversion.account
 
         material = self._fingerprint_material(config)
         config["fingerprint_material"] = material
@@ -694,6 +696,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 ),
             )
 
+        # 1.7.5: wat uit de run zelf volgt terugzetten (papersaldo, laatste
+        # instap, beginstand van het uurbericht), en wat bewaard was.
+        await self._herstel_uit_run()
+
         # Historie opwarmen. Zonder dit begint elke herstart met een blinde
         # periode van 60 candles - bij 1m een heel uur.
         if self._build_from_quotes:
@@ -711,8 +717,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 "Opwarmen uit live koersen: %d bars beschikbaar",
                 self._aggregator.bar_count,
             )
-            await self._reconcile()
-            await self._refresh_gate()
+            await self._na_opwarmen()
             return
 
         try:
@@ -727,7 +732,28 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         except VenueError as err:
             raise UpdateFailed(f"Kon historie niet ophalen: {err}") from err
 
+        await self._na_opwarmen()
+
+    async def _na_opwarmen(self) -> None:
+        """Afstemmen, leren en de poort berekenen: het laatste deel van het
+        opstarten.
+
+        1.7.5: eerst onbevestigde orders uit de vorige sessie terugzoeken. Een
+        order die tijdens de herstart is uitgevoerd, stond anders bij de
+        afstemming als onbekende positie en legde de handel stil. Daarna eerst
+        leren en dan pas de poort: de poort leest de robuustheid, en die was
+        bij het opstarten nog leeg - waardoor de live-poort na elke herstart
+        dicht bleef tot er een trade bij kwam, en in live-modus komt die er
+        met een dichte poort nooit.
+        """
+        if self.mode.places_orders and self.executor.has_pending:
+            await self._resolve_pending_orders()
         await self._reconcile()
+        if self.run_id is not None:
+            closed = await self.hass.async_add_executor_job(
+                self.db.closed_trades, self.run_id
+            )
+            await self._relearn(closed)
         await self._refresh_gate()
 
     async def _warmup_from_quotes(self) -> Candles | None:
@@ -977,6 +1003,20 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 )
                 self.run_changed_because = sorted(user_chosen | structural)
                 return None
+
+            if self._valuta_onzeker:
+                # 1.7.5: de accountvaluta komt nu niet van de broker maar uit
+                # de laatst bekende waarde. Dan de run voortzetten maar de
+                # vingerafdruk níet bijwerken: een terugvalwaarde mag nooit
+                # vastleggen hoe een run eruitziet. Bij de volgende start met
+                # een antwoord van de broker gebeurt dat alsnog, of niet.
+                _LOGGER.info(
+                    "Bewijsfase voortgezet (%s verschilt); de vingerafdruk "
+                    "blijft staan omdat de accountvaluta nog niet door de "
+                    "broker is bevestigd.", ", ".join(sorted(differences)),
+                )
+                self.adopted_defaults = sorted(differences - {"account_currency"})
+                return run
 
             # Alleen standaardwaarden verschillen; run voortzetten en de
             # vingerafdruk bijwerken zodat het de volgende keer meteen matcht.
@@ -1247,7 +1287,277 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._state.run_id = self.run_id
         if self._aggregator is not None:
             self._state.bars = self._aggregator.to_dict()
+        # 1.7.5: wat verder nog alleen in het geheugen stond.
+        self._state.paused_until = (
+            self.risk.state.paused_until.isoformat()
+            if self.risk.state.state is TradingState.PAUSED
+            and self.risk.state.paused_until else None
+        )
+        self._state.risk_triggered = list(self.risk.state.triggered[-50:])
+        self._state.excursions = {
+            str(t): {"mfe": float(r.get("mfe", 0.0)), "mae": float(r.get("mae", 0.0))}
+            for t, r in self._excursions.items()
+        }
+        if self.paper is not None:
+            self._state.paper_excursions = {
+                str(t.id): {"mfe": float(t.mfe or 0.0), "mae": float(t.mae or 0.0)}
+                for t in self.paper.open_positions if t.id is not None
+            }
+        self._state.last_entry_ts = self._last_entry_ts or None
+        if not self._valuta_onzeker and self.mode.places_orders:
+            self._state.account_currency = self.conversion.account
+        self._state.pending_orders = self.executor.export_pending(
+            self._context_naar_dict
+        )
+        self._state.herkansingen = {
+            str(t): {
+                "pogingen": int(v.get("pogingen", 0)),
+                "sinds": (
+                    v["sinds"].isoformat() if isinstance(v.get("sinds"), datetime)
+                    else v.get("sinds")
+                ),
+            }
+            for t, v in self._herkansingen.items()
+        }
+        self._state.audit_gemeld = sorted(self._audit_gemeld)
+        self._state.notify_sent = self.notifier.export()
         await self._store.async_save(self._state)
+        await self._bewaar_resultaten()
+
+    # -- herstartbestendigheid (1.7.5) -------------------------------------- #
+
+    #: Hoe vaak de sluitingswaarneming tussentijds wordt weggeschreven. De
+    #: uitkomsten van diensten gaan meteen; bij afsluiten gaat alles mee.
+    RESULTATEN_INTERVAL = timedelta(minutes=15)
+
+    #: Hoe lang het afsluiten wacht op een lopende cyclus.
+    AFSLUITEN_WACHT_S = 15.0
+
+    #: Signaalonderdelen die bij het vastleggen van een teruggevonden order
+    #: nodig zijn (zie ``_record_broker_open``). Meer wordt er niet bewaard.
+    _CONTEXT_ONDERDELEN = (
+        "regime", "atr", "adx", "rsi_reversion", "ema_dist", "trend",
+        "momentum", "williams_r", "cci",
+    )
+
+    def _resultaten(self) -> dict:
+        return {
+            "closures": self.closures.export(),
+            "backtest": self.backtest or {},
+            "validation": self.validation or {},
+            "lab": self.lab or {},
+        }
+
+    async def _bewaar_resultaten(self, direct: bool = False) -> None:
+        """Uitkomsten en sluitingswaarneming wegschrijven, begrensd in tempo."""
+        nu = datetime.now(timezone.utc)
+        if (
+            not direct and self._resultaten_bewaard_om is not None
+            and nu - self._resultaten_bewaard_om < self.RESULTATEN_INTERVAL
+        ):
+            return
+        self._resultaten_bewaard_om = nu
+        try:
+            await self._results_store.async_save(self._resultaten())
+        except Exception as err:  # noqa: BLE001 - meting mag de lus niet slopen
+            _LOGGER.debug("Uitkomsten niet bewaard: %s", err)
+
+    async def async_bewaar_resultaten(self) -> None:
+        """Na een backtest, validatie of indicatorlab: meteen bewaren."""
+        await self._bewaar_resultaten(direct=True)
+
+    async def _herstel_resultaten(self) -> None:
+        data = await self._results_store.async_load()
+        if not data:
+            return
+        self.closures.restore(data.get("closures"))
+        for veld in ("backtest", "validation", "lab"):
+            waarde = data.get(veld)
+            if isinstance(waarde, dict) and waarde and not getattr(self, veld):
+                setattr(self, veld, waarde)
+
+    def _herstel_geheugen(self) -> None:
+        """Wat uit de bewaarde toestand alleen terug in het geheugen hoeft.
+
+        Vóór de eerste cyclus, net als de noodstop. Alles is optioneel: een
+        toestand van een oudere versie heeft deze velden niet.
+        """
+        st = self._state
+        # Pauze na een verliesreeks. Verlopen is niet erg: de eerste toets
+        # hervat dan vanzelf, precies zoals zonder herstart.
+        if st.paused_until and not st.halted:
+            moment = _veilig_utc(st.paused_until)
+            if moment is not None:
+                self.risk.state.state = TradingState.PAUSED
+                self.risk.state.paused_until = moment
+        if st.risk_triggered:
+            self.risk.state.triggered = [str(r) for r in st.risk_triggered][-50:]
+        # De vorige risicostand is de bewaarde: een teruggezette noodstop is
+        # geen nieuwe overgang en hoort geen tweede melding te geven.
+        self._previous_risk_state = self.risk.state.state.value
+
+        self._excursions = {}
+        for ticket, r in (st.excursions or {}).items():
+            try:
+                self._excursions[str(ticket)] = {
+                    "mfe": float(r.get("mfe", 0.0)), "mae": float(r.get("mae", 0.0)),
+                }
+            except (AttributeError, TypeError, ValueError):
+                continue
+        if st.last_entry_ts:
+            try:
+                self._last_entry_ts = max(self._last_entry_ts, float(st.last_entry_ts))
+            except (TypeError, ValueError):
+                pass
+        self._herkansingen = {}
+        for ticket, v in (st.herkansingen or {}).items():
+            sinds = _veilig_utc(v.get("sinds")) if isinstance(v, dict) else None
+            if sinds is None:
+                continue
+            try:
+                self._herkansingen[str(ticket)] = {
+                    "pogingen": int(v.get("pogingen", 0)), "sinds": sinds,
+                }
+            except (TypeError, ValueError):
+                continue
+        self._audit_gemeld = set(st.audit_gemeld or [])
+        self._notify_hersteld = self.notifier.restore(st.notify_sent)
+        if st.pending_orders:
+            aantal = self.executor.restore_pending(
+                st.pending_orders, self._context_uit_dict
+            )
+            if aantal:
+                _LOGGER.warning(
+                    "%d onbevestigde order(s) uit de vorige sessie; die worden "
+                    "eerst bij de broker teruggezocht. Er gaat geen nieuwe "
+                    "order uit tot dat is gebeurd.", aantal,
+                )
+
+    async def _herstel_uit_run(self) -> None:
+        """Wat uit de database van de lopende run volgt.
+
+        Het papersaldo stond na elke herstart weer op de startbalans, en de
+        tijd sinds de laatste instap op "nooit". Beide volgen uit de trades
+        van de run zelf; de database is de bron.
+        """
+        if self.run_id is None or self.db is None:
+            return
+        await self._herstel_resultaten()
+        gesloten = await self.hass.async_add_executor_job(
+            self.db.closed_trades, self.run_id
+        )
+        if self.paper is not None:
+            netto = sum(t.net_pnl or 0.0 for t in gesloten)
+            kosten = sum(t.total_cost or 0.0 for t in gesloten)
+            self.paper.balance = self.paper.starting_balance + netto
+            self.paper.cumulative_cost = kosten
+            # Uitersten van open papertrades: die staan pas bij het sluiten
+            # in de database.
+            bewaard = self._state.paper_excursions or {}
+            for trade in self.paper.open_positions:
+                r = bewaard.get(str(trade.id))
+                if not isinstance(r, dict):
+                    continue
+                try:
+                    trade.mfe = max(trade.mfe or 0.0, float(r.get("mfe", 0.0)))
+                    trade.mae = min(trade.mae or 0.0, float(r.get("mae", 0.0)))
+                except (TypeError, ValueError):
+                    continue
+
+        laatste = await self.hass.async_add_executor_job(
+            self.db.latest_open_time, self.run_id
+        )
+        if laatste is not None:
+            self._last_entry_ts = max(self._last_entry_ts, laatste.timestamp())
+
+        # Beginstand van het uurbericht uit de run, als er geen bewaarde stand
+        # is (oudere versie) of het uurbericht nog nooit een vertrekpunt had.
+        if not self._notify_hersteld or not self.notifier.has_hourly_baseline:
+            stats = await self.hass.async_add_executor_job(
+                performance.compute_for_run, self.db, self.run_id, gesloten,
+            )
+            self.notifier.seed(stats.get("trades") or 0, stats.get("net_pnl") or 0.0)
+
+        # Uitersten van tickets die niet meer open staan, opruimen.
+        if self._excursions:
+            open_trades = await self.hass.async_add_executor_job(
+                self.db.open_trades_by_tickets, list(self._excursions)
+            )
+            nog_open = {str(t.broker_ticket) for t in open_trades if t.broker_ticket}
+            self._excursions = {
+                t: r for t, r in self._excursions.items() if t in nog_open
+            }
+
+    async def _laatst_bekende_valuta(self) -> str | None:
+        """De accountvaluta zoals die het laatst van de broker kwam.
+
+        Eerst de bewaarde toestand; anders de vingerafdruk of de opening van de
+        laatste open run. Niet de ``account_currency`` in de runconfiguratie:
+        die werd vóór de opvraging samengesteld en bevat de standaard.
+        """
+        if self._state.account_currency:
+            return str(self._state.account_currency)
+        try:
+            run = await self.hass.async_add_executor_job(self.db.latest_open_run)
+        except Exception:  # noqa: BLE001
+            return None
+        if not run:
+            return None
+        try:
+            materiaal = json.loads(run.get("config_json") or "{}").get(
+                "fingerprint_material"
+            ) or {}
+        except (TypeError, ValueError, AttributeError):
+            materiaal = {}
+        return materiaal.get("account_currency") or run.get("account_currency")
+
+    def _context_naar_dict(self, context) -> dict | None:
+        """Ordercontext (signaal, koers, richting, moment) als platte gegevens."""
+        signal, quote, side, moment = context
+        onderdelen = {}
+        for naam in self._CONTEXT_ONDERDELEN:
+            waarde = (getattr(signal, "components", None) or {}).get(naam)
+            if isinstance(waarde, bool) or waarde is None:
+                continue
+            if isinstance(waarde, (int, float)):
+                if waarde == waarde and abs(waarde) != float("inf"):
+                    onderdelen[naam] = float(waarde)
+            elif isinstance(waarde, str):
+                onderdelen[naam] = waarde
+        return {
+            "direction": int(getattr(signal, "direction", 0) or 0),
+            "score": float(getattr(signal, "score", 0.0) or 0.0),
+            "confidence": float(getattr(signal, "confidence", 0.0) or 0.0),
+            "stop_loss": getattr(signal, "stop_loss", None),
+            "take_profit": getattr(signal, "take_profit", None),
+            "components": onderdelen,
+            "bid": float(quote.bid), "ask": float(quote.ask),
+            "quote_time": quote.time.isoformat(),
+            "side": side,
+            "moment": moment.isoformat(),
+        }
+
+    def _context_uit_dict(self, data: dict):
+        """Terug naar de vorm die ``_resolve_pending_orders`` verwacht."""
+        from .strategy.scalping import ScalpSignal
+
+        signal = ScalpSignal(
+            direction=int(data.get("direction", 0)),
+            score=float(data.get("score", 0.0)),
+            confidence=float(data.get("confidence", 0.0)),
+            should_trade=True, reject_reason=None,
+            reason="onbevestigde order uit de vorige sessie",
+            stop_loss=data.get("stop_loss"), take_profit=data.get("take_profit"),
+            components=dict(data.get("components") or {}),
+        )
+        quote = VenueQuote(
+            bid=float(data["bid"]), ask=float(data["ask"]),
+            time=parse_utc(data["quote_time"]),
+        )
+        side = str(data["side"])
+        if side not in ("buy", "sell"):
+            raise ValueError(f"onbekende richting {side!r}")
+        return signal, quote, side, parse_utc(data["moment"])
 
     async def async_prepare_shutdown(self) -> dict:
         """Wikkel af zodat HA veilig herstart kan worden."""
@@ -1420,6 +1730,20 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         )
 
     # -- de lus ------------------------------------------------------------- #
+
+    async def _async_refresh(self, *args, **kwargs) -> None:
+        """Eén cyclus tegelijk, en niet meer na het afsluiten (1.7.5).
+
+        Om de verversing van Home Assistant heen, zodat de cyclus zelf
+        ongewijzigd blijft. Het afsluiten wacht op dit slot: de database gaat
+        niet dicht terwijl een cyclus er nog in schrijft.
+        """
+        if self._afgesloten:
+            return
+        async with self._cyclus_slot:
+            if self._afgesloten:
+                return
+            await super()._async_refresh(*args, **kwargs)
 
     async def _async_update_data(self) -> dict:
         budget = LatencyBudget()
@@ -1724,11 +2048,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             closed = await self.hass.async_add_executor_job(
                 self.db.closed_trades, self.run_id
             )
-            await self._refresh_gate()
+            # Eerst leren, dan de poort: de poort leest de robuustheid die
+            # het leren berekent (1.7.5; omgekeerd keek hij naar die van de
+            # vorige keer, en na een herstart naar niets).
             await self._relearn(closed)
+            await self._refresh_gate()
             self._gate_trade_count = trade_count
+            # 1.7.5: met de drawdown op de equity, zoals bovenaan deze cyclus.
+            # Zonder viel hij weg in elke cyclus waarin het aantal trades
+            # veranderde - en dus in de eerste cyclus na elke herstart.
             stats = await self.hass.async_add_executor_job(
-                performance.compute_for_run, self.db, self.run_id, closed
+                performance.compute_for_run, self.db, self.run_id, closed,
+                self.account_drawdown or None,
             )
 
         # Elke cyclus bewaren, niet alleen bij afsluiten: een noodstop die
@@ -1987,7 +2318,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # broker: dit is de bar die er toch al was, en zonder dit archief werd
         # hij bij de volgende herstart weggegooid.
         if closed:
-            await self._on_bars_closed(self._aggregator.candles(2), "quotes")
+            # 1.7.5: een bar die door een herstart onvolledig is, niet als
+            # volwaardige bar archiveren; het sentiment hoort wel bij de bar
+            # die net sloot.
+            await self._on_bars_closed(
+                self._aggregator.candles(2), "quotes",
+                archief=self._aggregator.archiveerbaar(2),
+            )
         if not closed:
             return
 
@@ -2012,7 +2349,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             self._candles = fresh
         self._last_bar_ts = fresh.timestamp[-1]
 
-    async def _on_bars_closed(self, candles, bron: str) -> None:
+    async def _on_bars_closed(self, candles, bron: str, archief=_ZELFDE) -> None:
         """Verwerk afgesloten bars: archiveren en sentiment vastleggen.
 
         Eerst gebeurde het archiveren alleen in het pad voor zelfgebouwde
@@ -2024,12 +2361,17 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         """
         if self.archive is None or candles is None or not len(candles):
             return
-        try:
-            await self.hass.async_add_executor_job(
-                self.archive.store, self.symbol, self.timeframe, candles, bron,
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Bar niet gearchiveerd: %s", err)
+        # ``archief``: welke bars het archief in gaan, als dat er minder zijn
+        # dan ``candles`` (1.7.5); None is geen enkele.
+        te_bewaren = candles if archief is _ZELFDE else archief
+        if te_bewaren is not None and len(te_bewaren):
+            try:
+                await self.hass.async_add_executor_job(
+                    self.archive.store, self.symbol, self.timeframe, te_bewaren,
+                    bron,
+                )
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Bar niet gearchiveerd: %s", err)
 
         haal = getattr(self.venue, "client_sentiment", None)
         if haal is None:
@@ -2206,7 +2548,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # Grootte bepalen vóór de order. Bij risicogestuurde schaling
             # volgt hij uit de stopafstand, zodat elke trade hetzelfde bedrag
             # riskeert ongeacht de volatiliteit.
-            equity = self.paper.equity if self.paper else self.starting_balance
+            # ``equity`` is bij de papersimulatie een methode die de koers
+            # nodig heeft; zonder aanroep kwam hier de methode zelf binnen en
+            # faalde risicogestuurde grootte in papermodus (1.7.5).
+            equity = (
+                self.paper.equity(self._paper_quote(quote))
+                if self.paper else self.starting_balance
+            )
             entry_price = quote.ask if side == "buy" else quote.bid
             sized = position_size(
                 self.sizing, equity, entry_price, signal.stop_loss,
@@ -3192,6 +3540,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # De accountvaluta pas hier bekend; hem vastleggen zodat de omrekening
         # weet of er iets om te rekenen valt.
         valuta = getattr(account, "currency", None)
+        if valuta:
+            # 1.7.5: nu door de broker bevestigd; vanaf hier wordt hij bewaard.
+            self._valuta_onzeker = False
         if valuta and valuta != self.conversion.account:
             self.conversion.account = valuta
             note = self.conversion.note()
@@ -3553,11 +3904,38 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     # -- afsluiten ---------------------------------------------------------- #
 
     async def async_shutdown_hook(self) -> None:
-        """Bij het HA-stop-event: administratie veiligstellen."""
-        flushes = []
-        if self.db is not None:
-            if hasattr(self.db, "flush_signals"):
-                flushes.append(self.db.flush_signals)
+        """Bij het HA-stop-event en bij het ontladen: administratie veiligstellen.
+
+        1.7.5: wacht eerst (begrensd) op een lopende cyclus, bewaart dan de
+        toestand en de uitkomsten, en sluit pas daarna de bestanden - buiten de
+        eventloop. Eerst werd de toestand hier niet bewaard, gingen flush en
+        sluiten in de eventloop zelf, en bleef het archief open. Wordt hij
+        twee keer aangeroepen (stop-event én ontladen), dan doet de tweede
+        keer niets.
+        """
+        if self._afgesloten:
+            return
+        verkregen = False
+        try:
+            await asyncio.wait_for(
+                self._cyclus_slot.acquire(), timeout=self.AFSLUITEN_WACHT_S
+            )
+            verkregen = True
+        except (asyncio.TimeoutError, TimeoutError):
+            _LOGGER.warning(
+                "Lopende cyclus na %.0f s niet klaar; er wordt toch afgesloten.",
+                self.AFSLUITEN_WACHT_S,
+            )
+        try:
+            if self._afgesloten:
+                return
+            self._afgesloten = True
+            try:
+                await self._persist()
+            except Exception:  # noqa: BLE001 - afsluiten gaat altijd door
+                _LOGGER.exception("Toestand bewaren bij afsluiten mislukt")
+            await self._bewaar_resultaten(direct=True)
+
             # De run bewust NIET afsluiten bij een herstart.
             #
             # end_run zet ended_at, en find_matching_run zoekt alleen naar runs
@@ -3569,5 +3947,32 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             #
             # Een run hoort alleen te eindigen als de opzet wijzigt of als je
             # er zelf een nieuwe begint.
-            flushes.append(self.db.close)
-        await self.lifecycle.emergency_shutdown(flushes)
+            await self.hass.async_add_executor_job(self._sluit_bestanden)
+            await self.lifecycle.emergency_shutdown([])
+        finally:
+            if verkregen:
+                self._cyclus_slot.release()
+
+    def _sluit_bestanden(self) -> None:
+        """Signalen wegschrijven, dan database en archief sluiten (in een thread).
+
+        Eerst wegschrijven, dan sluiten: anders vielen de gebufferde
+        evaluaties weg. Elk onderdeel apart, zodat een fout in het ene het
+        andere niet tegenhoudt.
+        """
+        if self.db is not None:
+            flush = getattr(self.db, "flush_signals", None)
+            if flush is not None:
+                try:
+                    flush()
+                except Exception:  # noqa: BLE001
+                    _LOGGER.exception("Signalen wegschrijven bij afsluiten mislukt")
+            try:
+                self.db.close()
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Database sluiten mislukt")
+        if self.archive is not None:
+            try:
+                self.archive.close()
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Archief sluiten mislukt")

@@ -613,6 +613,27 @@ class TradeDatabase:
         ).fetchall()
         return [self._row_to_trade(r) for r in rows]
 
+    def latest_open_time(self, run_id: int) -> datetime | None:
+        """Het laatste instapmoment in deze run, open of gesloten (1.7.5).
+
+        Op tijd vergeleken en niet als tekst: papertrades staan op seconden,
+        brokertrades met microseconden, en dan sorteert tekst verkeerd.
+        """
+        laatste: datetime | None = None
+        for (waarde,) in self.conn.execute(
+            "SELECT open_time FROM trades WHERE run_id=? AND open_time IS NOT NULL",
+            (run_id,),
+        ).fetchall():
+            try:
+                moment = datetime.fromisoformat(str(waarde))
+            except (TypeError, ValueError):
+                continue
+            if moment.tzinfo is None:
+                moment = moment.replace(tzinfo=timezone.utc)
+            if laatste is None or moment > laatste:
+                laatste = moment
+        return laatste
+
     def open_trades_by_tickets(self, tickets) -> list[Trade]:
         """Open trades met deze tickets, in welke run ook.
 

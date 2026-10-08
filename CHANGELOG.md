@@ -1,5 +1,63 @@
 # Changelog — Gold Scalper
 
+## 1.7.5
+
+* **Een herstart verandert niets meer.** Alleen herstartbestendigheid:
+  strategie, in- en uitstap, risicolimieten, parameters, standaardwaarden en
+  positiegrootte zijn niet aangeraakt, en er gaat nooit een order uit door
+  iets hieronder. Geen nieuwe run. Wat een herstart tot nu toe veranderde, en
+  nu niet meer:
+  * **papersaldo** stond weer op de startbalans (en de kostenteller op nul);
+    nu startbalans plus het netto van de gesloten trades van de run;
+  * **uitersten (MFE/MAE)** van open posities begonnen opnieuw bij nul; nu
+    bewaard per ticket (ook voor open papertrades), en tickets die niet meer
+    open staan worden opgeruimd;
+  * **live-poort**: bij het opstarten en in de cyclus werd de poort berekend
+    vóór de robuustheid. Na een herstart bleef de poort daardoor dicht tot er
+    een trade bij kwam - in live-modus dus voorgoed. Nu eerst leren, dan de
+    poort (de bedoelde volgorde; geen drempel gewijzigd). Ook de gemeten
+    slippage geldt zo al vanaf de eerste cyclus;
+  * **pauze na een verliesreeks** (`paused_until`) werd opgeheven; nu bewaard
+    en teruggezet, net als de recente risicogebeurtenissen;
+  * **accountvaluta**: faalde de opvraging bij het opstarten, dan gold "USD"
+    en kon de vingerafdruk van de run daarop herschreven worden (of een nieuwe
+    bewijsfase beginnen). Nu geldt de laatst door de broker bevestigde valuta,
+    en een terugvalwaarde past nooit een vingerafdruk aan;
+  * **afsluiten**: wacht (hooguit 15 s) op een lopende cyclus, bewaart de
+    toestand, schrijft de signalen weg en sluit database én archief, buiten de
+    eventloop. Tweede aanroep (stop-event én ontladen) doet niets; na het
+    afsluiten draait geen cyclus meer;
+  * **laatste instap** stond op "nooit"; nu uit de laatste trade van de run;
+  * **onbevestigde orders** stonden alleen in het geheugen. Nu minimaal
+    bewaard (eigen ordernummer, richting, tijdstip, stop en de gegevens om een
+    teruggevonden positie vast te leggen) en bij het opstarten eerst
+    teruggezocht, vóór de afstemming. Een order die tijdens de herstart is
+    uitgevoerd, wordt zo herkend in plaats van als onbekende positie de handel
+    stil te leggen; tot hij is teruggevonden, afgewezen of verlopen gaat er
+    geen nieuwe order uit. Er wordt hierbij nooit iets verstuurd;
+  * **meldingen**: een teruggezette noodstop gaf geen tweede melding meer
+    (vorige risicostand uit de toestand), de onderdrukking van vier uur en het
+    vertrekpunt van het uurbericht worden bewaard (bij een oudere toestand uit
+    de run zelf), zodat het eerste uurbericht niet alle trades als "dit uur"
+    telt;
+  * **lopende zelfgebouwde bar** ging verloren, en de eerste bar na de herstart
+    begon halverwege zijn interval maar ging als volwaardige bar het archief
+    in. Nu wordt de lopende bar bewaard en in hetzelfde interval gewoon
+    voortgezet; anders worden de afgebroken bar en de eerste bar na de herstart
+    als onvolledig gemarkeerd: ze blijven in de reeks, maar niet in het
+    archief;
+  * **sluitingswaarneming, backtest, validatie en indicatorlab** gingen
+    verloren; nu in een eigen opslag (`gold_scalper_results`);
+  * **drawdown op de equity** viel weg in elke cyclus waarin het aantal trades
+    veranderde - en dus in de eerste cyclus na elke herstart; nu meegenomen;
+  * **herkansingen** van voorlopige uitstapprijzen en al **gemelde
+    controlebevindingen** worden bewaard; de **evaluaties** worden vóór het
+    sluiten weggeschreven, zodat de teller nooit terugloopt.
+  Daarnaast: risicogestuurde grootte in papermodus riep de equity van de
+  simulatie niet aan (de methode zelf ging de berekening in en faalde); en een
+  dubbel stuk in de initialisatie van de coordinator is weggehaald. Oude
+  bewaarde toestand zonder de nieuwe velden laadt gewoon.
+
 ## 1.7.4
 
 * **Tijdstops werken weer op IG (L-GS-005).** De posities van IG kwamen

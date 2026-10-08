@@ -210,6 +210,31 @@ class ClosureObservation:
         if not broker_says_open:
             self.closed_by_hour[hour] = self.closed_by_hour.get(hour, 0) + 1
 
+    def export(self) -> dict:
+        """De ruwe tellingen, om over een herstart heen te bewaren (1.7.5)."""
+        return {
+            "closed_by_hour": {str(h): n for h, n in self.closed_by_hour.items()},
+            "seen_by_hour": {str(h): n for h, n in self.seen_by_hour.items()},
+        }
+
+    def restore(self, data: dict | None) -> None:
+        """Bewaarde tellingen terugzetten; onleesbare regels overslaan.
+
+        JSON kent alleen tekst als sleutel, dus de uren komen als tekst terug
+        en worden hier weer getallen - anders telde hetzelfde uur dubbel.
+        """
+        if not isinstance(data, dict):
+            return
+        for veld in ("closed_by_hour", "seen_by_hour"):
+            doel = getattr(self, veld)
+            for uur, aantal in (data.get(veld) or {}).items():
+                try:
+                    h, n = int(uur), int(aantal)
+                except (TypeError, ValueError):
+                    continue
+                if 0 <= h <= 23 and n >= 0:
+                    doel[h] = doel.get(h, 0) + n
+
     def as_dict(self) -> dict:
         """Per uur het aandeel waarnemingen waarin de markt dicht was.
 

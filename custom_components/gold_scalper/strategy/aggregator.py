@@ -120,6 +120,18 @@ class QuoteAggregator:
         self.max_bars = max_bars
         self._closed: list[list] = []
         self._current: _Bar | None = None
+        #: 1.7.5: begintijden van bars die door een herstart onvolledig zijn:
+        #: de eerste bar na het opstarten (begin gemist) en een bewaarde bar
+        #: die tijdens de herstart afliep (eind gemist). Ze blijven in de reeks
+        #: - een gat is erger - maar gaan niet als volwaardige bar het archief
+        #: in.
+        self._onvolledig: set[int] = set()
+        #: Is de lopende bar de eerste na het opstarten zonder bewaarde bar?
+        self._current_onvolledig = False
+        #: Komt deze aggregator uit de opslag (herstart)?
+        self._na_herstart = False
+        #: Is de lopende bar uit de opslag teruggezet en nog niet voortgezet?
+        self._hersteld = False
 
     # -- opbouwen ------------------------------------------------------------ #
 
@@ -149,15 +161,28 @@ class QuoteAggregator:
 
         if self._current is None:
             self._current = _Bar(start, price, price, price, price)
+            # 1.7.5: de eerste bar na het opstarten begint midden in zijn
+            # interval; het begin is gemist.
+            self._current_onvolledig = self._na_herstart
+            self._na_herstart = False
             return False
 
         if start > self._current.start:
             # Een bar met één monster zegt niets over high en low; toch
             # bewaren, want een gat in de reeks is erger dan een grove bar.
+            #
+            # 1.7.5: een bewaarde bar die tijdens de herstart afliep, mist zijn
+            # eind; de bar die nu begint, mist zijn begin. Beide markeren.
+            nieuw_onvolledig = self._hersteld
+            if self._current_onvolledig or self._hersteld:
+                self._onvolledig.add(int(self._current.start))
+            self._hersteld = False
             self._closed.append(self._current.as_row())
             if len(self._closed) > self.max_bars:
                 del self._closed[: len(self._closed) - self.max_bars]
             self._current = _Bar(start, price, price, price, price)
+            self._current_onvolledig = nieuw_onvolledig
+            self._snoei_onvolledig()
             return True
 
         if start < self._current.start:
@@ -165,8 +190,44 @@ class QuoteAggregator:
             _LOGGER.debug("Koers met een oudere tijdstempel genegeerd")
             return False
 
+        # Zelfde interval als de bewaarde bar: gewoon doorbouwen. Alleen de
+        # koersen tijdens de herstart ontbreken, net als bij een gemiste poll.
+        self._hersteld = False
         self._current.update(price)
         return False
+
+    def _snoei_onvolledig(self) -> None:
+        if self._onvolledig:
+            aanwezig = {int(r[0]) for r in self._closed}
+            self._onvolledig &= aanwezig
+
+    def is_onvolledig(self, start: int) -> bool:
+        """Is de bar met deze begintijd door een herstart onvolledig? (1.7.5)"""
+        return int(start) in self._onvolledig
+
+    def archiveerbaar(self, count: int) -> Candles | None:
+        """De laatste ``count`` afgesloten bars zonder de onvolledige (1.7.5).
+
+        Een bar waarvan door een herstart het begin of het eind ontbreekt, is
+        geen volwaardige bar en hoort niet als zodanig in het archief - dat
+        overschrijft bij gelijke tijd een betere bar van de broker niet, maar
+        zou anders een te krappe bar als meting vastleggen. None als er niets
+        overblijft.
+        """
+        rows = [
+            r for r in self._closed[-count:]
+            if int(r[0]) not in self._onvolledig
+        ]
+        if not rows:
+            return None
+        return Candles(
+            timestamp=[int(r[0]) for r in rows],
+            open=[r[1] for r in rows],
+            high=[r[2] for r in rows],
+            low=[r[3] for r in rows],
+            close=[r[4] for r in rows],
+            volume=[r[5] for r in rows],
+        )
 
     # -- uitlezen ------------------------------------------------------------ #
 
@@ -220,10 +281,19 @@ class QuoteAggregator:
     # -- opslag -------------------------------------------------------------- #
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "timeframe": self.timeframe,
             "bars": self._closed,
         }
+        # 1.7.5: ook de lopende bar, met zijn begintijd. Zonder dit begon na
+        # een herstart een nieuwe bar halverwege het interval, en die ging
+        # later als volwaardige bar de reeks en het archief in.
+        if self._current is not None:
+            data["current"] = self._current.as_row()
+            data["current_onvolledig"] = bool(self._current_onvolledig)
+        if self._onvolledig:
+            data["onvolledig"] = sorted(self._onvolledig)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], timeframe: str) -> QuoteAggregator:
@@ -233,6 +303,7 @@ class QuoteAggregator:
         vijf uur voordat de analyse weer iets kan zeggen.
         """
         aggregator = cls(timeframe)
+        aggregator._na_herstart = True
         stored = data.get("bars") or []
         if data.get("timeframe") != timeframe:
             _LOGGER.info(
@@ -246,6 +317,30 @@ class QuoteAggregator:
                     aggregator._closed.append(list(row))
             except (TypeError, ValueError):
                 continue
+        # 1.7.5: de lopende bar terugzetten. Valt de eerste koers na de
+        # herstart in hetzelfde interval, dan bouwt hij gewoon door; anders
+        # wordt hij afgesloten en als onvolledig gemarkeerd (zie ``add``).
+        lopend = data.get("current")
+        try:
+            if (
+                isinstance(lopend, (list, tuple)) and len(lopend) >= 6
+                and all(isinstance(x, (int, float)) for x in lopend[:6])
+            ):
+                aggregator._current = _Bar(
+                    int(lopend[0]), float(lopend[1]), float(lopend[2]),
+                    float(lopend[3]), float(lopend[4]), int(lopend[5]),
+                )
+                aggregator._current_onvolledig = bool(
+                    data.get("current_onvolledig", False)
+                )
+                aggregator._hersteld = True
+                aggregator._na_herstart = False
+        except (TypeError, ValueError):
+            aggregator._current = None
+        for start in data.get("onvolledig") or []:
+            if isinstance(start, (int, float)):
+                aggregator._onvolledig.add(int(start))
+        aggregator._snoei_onvolledig()
         if aggregator._closed:
             _LOGGER.info(
                 "Opwarmfase hervat met %d eerder opgebouwde bars",

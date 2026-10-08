@@ -179,6 +179,68 @@ class SafeExecutor:
     def has_pending(self) -> bool:
         return bool(self.pending)
 
+    # -- over een herstart heen (1.7.5) ------------------------------------- #
+
+    def export_pending(self, context_to_dict=None) -> list[dict]:
+        """Onbevestigde orders als platte gegevens, om te bewaren.
+
+        Alleen wat nodig is om de order bij de broker terug te vinden (eigen
+        ordernummer, richting) en om een teruggevonden positie vast te leggen
+        (``context``). Er staat niets in waarmee een order verstuurd kan worden.
+        """
+        rijen = []
+        for order in self.pending.values():
+            context = None
+            if context_to_dict is not None and order.context is not None:
+                try:
+                    context = context_to_dict(order.context)
+                except Exception:  # noqa: BLE001 - zonder context blijft hij geldig
+                    context = None
+            rijen.append({
+                "client_id": order.client_id,
+                "symbol": order.symbol,
+                "side": order.side,
+                "created": order.created.isoformat(),
+                "stop_loss": order.stop_loss,
+                "context": context,
+            })
+        return rijen
+
+    def restore_pending(self, rows, context_from_dict=None) -> int:
+        """Bewaarde onbevestigde orders terugzetten. Geeft het aantal.
+
+        Uitsluitend terugzetten in de wachtrij: daarmee wordt een order die
+        tijdens de herstart is uitgevoerd herkend in plaats van als onbekende
+        positie gezien, en gaat er geen nieuwe order uit tot hij is
+        teruggevonden, afgewezen of verlopen. Er wordt hier nooit iets
+        verstuurd. Onleesbare rijen worden overgeslagen.
+        """
+        aantal = 0
+        for rij in rows or []:
+            try:
+                client_id = str(rij["client_id"])
+                side = str(rij["side"])
+                created = datetime.fromisoformat(str(rij["created"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if side not in ("buy", "sell") or not client_id:
+                continue
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            stop = rij.get("stop_loss")
+            context = None
+            if context_from_dict is not None and rij.get("context"):
+                try:
+                    context = context_from_dict(rij["context"])
+                except Exception:  # noqa: BLE001
+                    context = None
+            self.pending[client_id] = PendingOrder(
+                client_id, str(rij.get("symbol") or ""), side, created,
+                float(stop) if isinstance(stop, (int, float)) else None, context,
+            )
+            aantal += 1
+        return aantal
+
     # -- openen -------------------------------------------------------------- #
 
     async def open_protected(

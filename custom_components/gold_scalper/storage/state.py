@@ -77,6 +77,38 @@ class RuntimeState:
     #: herstart dezelfde positie opnieuw gehalveerd, en bij herhaling tot niets.
     partial_taken: list | None = None
 
+    # -- 1.7.5: herstartbestendigheid --------------------------------------- #
+    #
+    # Alles hieronder is optioneel: een toestand van een oudere versie heeft
+    # deze velden niet en laadt gewoon, met de standaardwaarde.
+
+    #: Uiterste mee- en tegenbeweging per open ticket (``ticket -> {mfe, mae}``).
+    #: Zonder dit begon de meting na een herstart opnieuw bij nul en kreeg de
+    #: verliesanalyse een kleinere beweging dan er werkelijk was.
+    excursions: dict | None = None
+    #: Hetzelfde voor open papertrades (``trade-id -> {mfe, mae}``); die worden
+    #: pas bij het sluiten in de database gezet.
+    paper_excursions: dict | None = None
+    #: Einde van een pauze na een verliesreeks, ISO in UTC. Zonder dit hief
+    #: een herstart de pauze op.
+    paused_until: str | None = None
+    #: Laatste risicogebeurtenissen (pauze, noodstop), voor de sensor.
+    risk_triggered: list | None = None
+    #: Moment van de laatste instap (epoch-seconden). De strategie wacht een
+    #: minimale tijd tussen twee instappen; na een herstart was dat nul.
+    last_entry_ts: float | None = None
+    #: Laatst door de broker bevestigde accountvaluta. Valt de opvraging bij
+    #: het opstarten weg, dan geldt deze en niet de standaard "USD".
+    account_currency: str | None = None
+    #: Onbevestigde orders, minimaal (zie ``SafeExecutor.export_pending``).
+    pending_orders: list | None = None
+    #: Verse schattingen die nog bij de broker worden nagevraagd.
+    herkansingen: dict | None = None
+    #: Controlebevindingen die al gemeld zijn.
+    audit_gemeld: list | None = None
+    #: Onderdrukking en uurbericht van de meldingen (``Notifier.export``).
+    notify_sent: dict | None = None
+
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
@@ -111,5 +143,41 @@ class StateStore:
 
     async def async_remove(self) -> None:
         """Opruimen als de entry verwijderd wordt."""
+        self._all.pop(self._entry_id, None)
+        await self._store.async_save(self._all)
+
+
+RESULTS_KEY = "gold_scalper_results"
+
+
+class ResultsStore:
+    """Uitkomsten die geen handelstoestand zijn maar een herstart moeten overleven.
+
+    1.7.5. Backtest, validatie, indicatorlab en de waarneming van de
+    sluitingsuren stonden alleen in het geheugen: na een herstart waren ze weg
+    en moest een backtest van minuten opnieuw, en begon de waarneming van de
+    sluitingsuren weer bij nul. Een eigen bestand, los van de toestand: dit is
+    meting, geen noodrem, en hoort die niet te kunnen beschadigen.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        self._store: Store = Store(hass, STORAGE_VERSION, RESULTS_KEY)
+        self._entry_id = entry_id
+        self._all: dict[str, Any] = {}
+
+    async def async_load(self) -> dict[str, Any]:
+        try:
+            self._all = await self._store.async_load() or {}
+        except Exception as err:  # noqa: BLE001 - meting mag het opstarten niet breken
+            _LOGGER.warning("Bewaarde uitkomsten niet te lezen: %s", err)
+            self._all = {}
+        raw = self._all.get(self._entry_id)
+        return dict(raw) if isinstance(raw, dict) else {}
+
+    async def async_save(self, data: dict[str, Any]) -> None:
+        self._all[self._entry_id] = data
+        await self._store.async_save(self._all)
+
+    async def async_remove(self) -> None:
         self._all.pop(self._entry_id, None)
         await self._store.async_save(self._all)

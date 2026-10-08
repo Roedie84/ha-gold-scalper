@@ -244,6 +244,8 @@ def _register_services(hass: HomeAssistant) -> None:
             summary = result.summary()
             summary["invert"] = omgekeerd
             coordinator.backtest = summary
+            # 1.7.5: bewaren, zodat de uitkomst een herstart overleeft.
+            await coordinator.async_bewaar_resultaten()
             _LOGGER.warning(
                 "Backtest%s over %d bars: %d trades, trefkans %.1f%%, "
                 "netto %.2f, bruto %.2f, kosten %.2f",
@@ -435,6 +437,8 @@ def _register_services(hass: HomeAssistant) -> None:
                 compare, trades, result
             )
             coordinator.validation = validatie.as_dict()
+            # 1.7.5: bewaren, zodat de uitkomst een herstart overleeft.
+            await coordinator.async_bewaar_resultaten()
 
             _LOGGER.info(
                 "Backtestvalidatie: %s. %s",
@@ -536,6 +540,8 @@ def _register_services(hass: HomeAssistant) -> None:
                 )
             )
             coordinator.lab = rapport.as_dict()
+            # 1.7.5: bewaren, zodat de uitkomst een herstart overleeft.
+            await coordinator.async_bewaar_resultaten()
             _LOGGER.warning("Indicatorlab: %s", rapport.conclusie)
             _toon("Gold Scalper: indicatorlab", rapport.conclusie, "lab")
             hass.bus.async_fire(f"{DOMAIN}_indicator_lab", coordinator.lab)
@@ -660,9 +666,10 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     Anders blijft een noodstop van een verwijderde configuratie in
     .storage staan en duikt hij op bij een gelijknamige nieuwe entry.
     """
-    from .storage.state import StateStore
+    from .storage.state import ResultsStore, StateStore
 
     await StateStore(hass, entry.entry_id).async_remove()
+    await ResultsStore(hass, entry.entry_id).async_remove()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

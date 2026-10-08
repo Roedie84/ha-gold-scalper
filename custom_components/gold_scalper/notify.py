@@ -76,6 +76,64 @@ class Notifier:
     def enabled(self) -> bool:
         return bool(self.config.service)
 
+    # -- over een herstart heen (1.7.5) ------------------------------------- #
+
+    def export(self) -> dict:
+        """Wat er al verstuurd is, om te bewaren.
+
+        Zonder dit kwam na elke herstart dezelfde waarschuwing opnieuw binnen
+        (de onderdrukking van vier uur was weg), en telde het eerste uurbericht
+        alle trades van de run als "dit uur".
+        """
+        return {
+            "keys": {k: v.isoformat() for k, v in self._sent.keys.items()},
+            "last_hourly": (
+                self._sent.last_hourly.isoformat() if self._sent.last_hourly else None
+            ),
+            "last_trade_count": self._sent.last_trade_count,
+            "last_net": self._sent.last_net,
+        }
+
+    def restore(self, data: dict | None) -> bool:
+        """Bewaarde verzendtoestand terugzetten. False als er niets bruikbaars was."""
+        if not isinstance(data, dict):
+            return False
+
+        def _moment(waarde) -> datetime | None:
+            try:
+                m = datetime.fromisoformat(str(waarde))
+            except (TypeError, ValueError):
+                return None
+            return m if m.tzinfo else m.replace(tzinfo=timezone.utc)
+
+        for sleutel, waarde in (data.get("keys") or {}).items():
+            moment = _moment(waarde)
+            if moment is not None:
+                self._sent.keys[str(sleutel)] = moment
+        if data.get("last_hourly"):
+            self._sent.last_hourly = _moment(data["last_hourly"])
+        try:
+            self._sent.last_trade_count = int(data.get("last_trade_count") or 0)
+            self._sent.last_net = float(data.get("last_net") or 0.0)
+        except (TypeError, ValueError):
+            return False
+        return True
+
+    @property
+    def has_hourly_baseline(self) -> bool:
+        """Is er al een vertrekpunt voor het uurbericht gezet?"""
+        return self._sent.last_hourly is not None
+
+    def seed(self, trade_count: int, net: float) -> None:
+        """Beginstand van het uurbericht uit de run zelf (1.7.5).
+
+        Voor een toestand van een oudere versie zonder bewaarde verzendtoestand:
+        anders telde het eerste uurbericht na de herstart alle trades van de
+        run als nieuw.
+        """
+        self._sent.last_trade_count = int(trade_count or 0)
+        self._sent.last_net = float(net or 0.0)
+
     async def _send(
         self, title: str, message: str, *, critical: bool = False,
         tag: str | None = None,
