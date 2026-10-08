@@ -118,3 +118,16 @@ laatste ronde: 08-10 11:45, gemeten t/m 08-10 11:44
 - Geen release (tussenronde, niets acuut).
 
 laatste ronde: 08-10 15:40, gemeten t/m 08-10 15:44
+
+## 08-10 19:40 · tussenronde
+- Geïnstalleerd: 1.7.6 (herstarts 16:31, 17:41, 18:36; lifecycle 18:36 reconciling → running). Run 100, demo.
+- Sinds 15:44: **26 trades in 2 clusters** (13: 17:15-18:45, 22 trades, netto −2,69, bruto +30,96; 14: 19:15-19:33, 4 trades, netto +4,27, bruto +8,10) → netto +1,58, bruto +39,06, kosten 37,48 (1,44/trade). Totaal 101 trades / 14 clusters: netto −195,88 = bruto −30,43 − kosten 165,45; PF 0,631; winst 36,6%; t −2,665 (clusters); max DD 2,76%.
+- **L-GS-005 (tijdstops):** regime `tijdstop` 33 trades / 4 clusters: netto +4,39 (+0,13/trade, PF 1,05, t 0,20), bruto +51,87 (+1,57/trade, t bruto 1,77 over 4 clusters) tegen `zonder_tijdstop` 68/10 netto −2,95/trade, bruto −1,21/trade. 24 tijdexits (23 tijdstop 240-567 s, 1 max-duur). **Geen conclusie:** 4 clusters; met de huidige spreiding (sd 11,2 USD/cluster, gem. +1,1) zijn ~400 clusters nodig voor netto t=2 — de netto-toets is praktisch onbereikbaar; de geplande gepaarde toets (≥10 clusters) blijft het beslismoment.
+- **H-GS-7 (nieuw):** tijdstops verhogen het tempo (cluster 13: 22 trades in 91 min; 8,3 trades/cluster tegen 6,8) en daarmee de kosten; het bruto voordeel (+1,57/trade) wordt grotendeels door kosten (1,44/trade) opgegeten. Toets bij ≥10 clusters: bruto/trade en kosten/cluster per regime.
+- **L-GS-004:** sluitreden onbekend 1/101 (was 0/75) — waarschijnlijk een trade die nog in de afstemming hangt (7 trades "nog niet in zijn overzicht", loopt uren achter; afstemming in_orde, 94/94 kloppend). Kosten 98 gemeten / 3 berekend (recente trades, zo ontworpen). Toetsen in de dagafsluiting: moet naar 0 na afstemming.
+- **H-GS-6 (latency):** p99 976 ms over n=1890 (niet meer indicatief; p50 239, max 4604 uit de herstartdrukte van 14-15 u). start→quote p99 357, exits→signal p99 318. Nachttoets zonder herstarts blijft staan.
+- Uitvoering: slippage gemeten 0,07 tegen 0,02 aangenomen (3,5×); doel geraakt 15,8% tegen 40% verwacht. Sessies: Londen −0,17/trade (n 42), New York −2,06 (38), Azië −5,25 (21) — geen sessie t > 0,1 → geen filter.
+- H-GS-4/5 (bevestiging, doel ×2): 4 nieuwe clusters sinds de varianten-analyse (drempel 20) → nog niet schaduwgemeten. H-GS-3 (regime): range −131,8 (55 tr, t −2,03), trend −63,8 (46, t −0,79).
+- Geen release (tussenronde, niets acuut). Geen knoppen, geen instellingen.
+
+laatste ronde: 08-10 19:40, gemeten t/m 08-10 19:44
