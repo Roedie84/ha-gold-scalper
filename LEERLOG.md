@@ -93,3 +93,16 @@ laatste ronde: 08-10 11:00, gemeten t/m 08-10 09:00 UTC
 ## 08-10 11:40 (chatsessie)
 - L-GS-005 akkoord (Ruud 11:19), gebouwd en uitgebracht als 1.7.4. Meten: sluitreden tijdstop/maximale duur verschijnt; langste duur ≤ 910 s; netto/trade per cluster tegen baseline −2,95 (68 trades, 10 clusters). Beslissen na 10 nieuwe clusters.
 - Positiegrootte bewust niet verhoogd (demosaldo 10 mln): verandert de vingerafdruk en vervuilt de meting van L-GS-005.
+
+## 08-10 11:45 · tussenronde
+- Geïnstalleerd: 1.7.3 (herstart 10:55; bevat 1.7.2). 1.7.4 (L-GS-005, tijdstops) stond in HACS nog niet als update → `update_information` gedaan: HACS toont nu 1.7.3 → 1.7.4 (wacht op installatie).
+- Sinds 07:43: 3 trades (08:42 −11,09; 09:21 −10,82 op geschatte uitstap; 10:04 +1,73) → netto −20,45, bruto −16,30, kosten 4,14. Sinds 10:04 geen trade (signaal flat, status "signaal te zwak"). Alle 3 zitten al in de varianten-analyse van 11:00 (t/m 09:00 UTC).
+- Totaal 68 trades, 10 clusters: netto −200,27 = bruto −82,29 − kosten 117,98 (1,73/trade); PF 0,551; winst 41,2%; t netto −3,28 (10 clusters); max drawdown 2,76%. Bruto-t niet opnieuw berekend (geen nieuw cluster sinds 11:00).
+- **L-GS-004:** de geschatte trade van 09:21 is bij de start van 10:55 afgestemd (sluitreden onbekend 0/68, `broker_gesloten_geschat` → `gecorrigeerd`). Sinds 1.7.3 nog geen trade → 0× "geschatte uitstapprijs" zegt nog niets. Kosten: 67 gemeten, 1 berekend (trade 10:04, broker-sluiting; berekend tot de afstemming is zo ontworpen) → meetcriterium "berekend alleen < 5 min oud" in de dagafsluiting toetsen.
+- **L-GS-003:** sinds 1.7.2/1.7.3 0× de transactiewaarschuwing (22× in de nacht ervoor); de nacht is de echte toets.
+- Latency p99 405,9 ms (n=295 cycli sinds 10:55; p50 174,9).
+- Opgeruimd: 185 per ongeluk gecommitte `__pycache__`-bestanden (commit 96dea9c) van de leerlog-branch gehaald + `.gitignore`.
+- H-GS-4/5 (instapbevestiging, doel ×2): geen nieuwe clusters → niets te schaduwmeten. H-GS-3 (regime) volgen.
+- Geen release.
+
+laatste ronde: 08-10 11:45, gemeten t/m 08-10 11:44

@@ -75,3 +75,13 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-08 11:00,ANALYSE,gs_duur_gem_s,1408,68,"max 5272 s; tijdstop 900 s vuurt niet (L-GS-005)"
 2026-10-08 11:00,ANALYSE,gs_replay_tijdstops_netto_per_trade,-1.34,66,"IS -2.18 OOS -0.49; gepaard t 2.15 (10 cl)"
 2026-10-08 11:00,ANALYSE,gs_varianten_getoetst,30,66,"Bonferroni |t|~3.6; hoogste netto-t 0.75"
+2026-10-08 11:45,TUSSEN,gs_versie_geinstalleerd,1.7.3,1,"herstart 10:55; 1.7.4 nu zichtbaar in HACS"
+2026-10-08 11:45,TUSSEN,gs_trades_sinds_0743,3,3,"netto -20.45, bruto -16.30, kosten 4.14"
+2026-10-08 11:45,TUSSEN,gs_netto_totaal_usd,-200.27,68,"bruto -82.29, kosten 117.98"
+2026-10-08 11:45,TUSSEN,gs_profit_factor,0.551,68,winst 41.2%
+2026-10-08 11:45,TUSSEN,gs_t_netto_clusters,-3.275,10,sensor t-statistiek
+2026-10-08 11:45,TUSSEN,gs_max_drawdown_pct,2.76,68,
+2026-10-08 11:45,TUSSEN,gs_sluitreden_onbekend,0,68,"geschatte trade 09:21 afgestemd bij start 10:55"
+2026-10-08 11:45,TUSSEN,gs_kosten_gemeten_pct,98.5,68,"1 berekend: trade 10:04 (broker-sluiting, wacht op afstemming)"
+2026-10-08 11:45,TUSSEN,gs_latency_p99_ms,405.9,295,"cycli sinds 10:55; p50 174.9"
+2026-10-08 11:45,TUSSEN,gs_transactiewaarschuwing,0,1,"sinds installatie 10:55-11:44; nacht nog toetsen"
