@@ -85,3 +85,16 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-08 11:45,TUSSEN,gs_kosten_gemeten_pct,98.5,68,"1 berekend: trade 10:04 (broker-sluiting, wacht op afstemming)"
 2026-10-08 11:45,TUSSEN,gs_latency_p99_ms,405.9,295,"cycli sinds 10:55; p50 174.9"
 2026-10-08 11:45,TUSSEN,gs_transactiewaarschuwing,0,1,"sinds installatie 10:55-11:44; nacht nog toetsen"
+2026-10-08 15:40,TUSSEN,gs_versie_geinstalleerd,1.7.6,1,"1.7.4/1.7.5/1.7.6 door chatsessie; run methodologisch gemengd"
+2026-10-08 15:40,TUSSEN,gs_trades_sinds_1144,7,7,"2 clusters; netto +2.80, bruto +12.79, kosten 9.99 (1.43/trade)"
+2026-10-08 15:40,TUSSEN,gs_netto_totaal_usd,-197.47,75,"kosten 127.97"
+2026-10-08 15:40,TUSSEN,gs_profit_factor,0.584,75,winst 40.0%
+2026-10-08 15:40,TUSSEN,gs_t_netto_clusters,-2.824,12,sensor t-statistiek
+2026-10-08 15:40,TUSSEN,gs_regime_tijdstop_netto_per_trade,0.40,7,"2 clusters, PF 1.098, t 0.106 (L-GS-005; te weinig)"
+2026-10-08 15:40,TUSSEN,gs_regime_zonder_tijdstop_netto_per_trade,-2.945,68,"10 clusters, PF 0.551, t -3.275"
+2026-10-08 15:40,TUSSEN,gs_tijdexits,4,7,"tijdstop 240/241/460 s, max duur 900 s (+9.17/oz)"
+2026-10-08 15:40,TUSSEN,gs_duur_gem_s,1316.3,75,"was 1408 (68)"
+2026-10-08 15:40,TUSSEN,gs_latency_p99_ms,1627.6,477,"indicatief; p50 262, max 4604; start->quote max 3381; 6 herstarts 12:16-15:39"
+2026-10-08 15:40,TUSSEN,gs_sluitreden_onbekend,0,75,
+2026-10-08 15:40,TUSSEN,gs_kosten_gemeten_pct,100,75,
+2026-10-08 15:40,TUSSEN,gs_waarschuwing_geschatte_uitstap,0,1,"logvenster 13:48-15:40 (L-GS-004)"

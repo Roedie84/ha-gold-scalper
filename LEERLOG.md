@@ -106,3 +106,15 @@ laatste ronde: 08-10 11:00, gemeten t/m 08-10 09:00 UTC
 - Geen release.
 
 laatste ronde: 08-10 11:45, gemeten t/m 08-10 11:44
+
+## 08-10 15:40 · tussenronde
+- Geïnstalleerd: 1.7.6 (1.7.4 L-GS-005, 1.7.5 herstartbestendigheid, 1.7.6 `exit_regime` per trade + bewaarde latencysteekproef; chatsessie). HA-herstarts sinds 11:45: 6. Run gemarkeerd als "methodologisch gemengd" (14:19) → cijfers per regime apart.
+- Sinds 11:44: 7 trades in 2 clusters (12:35-13:04: −11,12 −1,81 −2,61 +16,83 −2,68 −10,71; 14:45 +14,67; +0,23 afstemming 14:01) → netto +2,80, bruto +12,79, kosten 9,99 (1,43/trade, 100% gemeten). Totaal 75 trades: netto −197,47, PF 0,584, winst 40,0%, t −2,82, max DD 2,76%.
+- **L-GS-005 eerste meetpunt gehaald:** sluitredenen tijdstop 3× (na 240, 241, 460 s) en maximale duur 1× (900 s, bij +9,17 USD/oz); gem. duur 1408 → 1316 s. Regime `tijdstop` 7 trades/2 clusters +0,40/trade (PF 1,10, t 0,11) tegen `zonder_tijdstop` 68/10 −2,95 (t −3,28). **Geen conclusie:** 2 clusters; gepaarde toets na ≥10 nieuwe clusters (plan in VOORSTELLEN).
+- Opvallend: tijdstop van 460 s past bij de regel (na 240 s eerst buiten, later weer binnen 0,3×ATR); de 900-s-limiet sloot een winnende positie (+9,17/oz). Beide horen bij het ontwerp; volgen of de max-duur vaker winnaars afkapt dan verliezers.
+- **Latency:** p99 1628 ms (n=477, "indicatief"; p50 262, max 4,6 s; `start->quote` max 3,4 s) tegen 406 ms om 11:45 (n=295). 1.7.6 bewaart de steekproef over herstarts (n loopt door over 5 herstarts) → eerste meetpunt gehaald. **H-GS-6 (nieuw):** de staart komt van de herstarts/drukte rond 14:19-15:39 (6 herstarts), niet van IG. Toets: p99 in de nacht zonder herstarts (dagafsluiting).
+- **L-GS-003/004:** 0× transactiewaarschuwing en 0× "geschatte uitstapprijs" in het logvenster 13:48-15:40; sluitreden onbekend 0, kosten 100% gemeten.
+- H-GS-4/5 (instapbevestiging/doel ×2): 2 nieuwe clusters, nog niet schaduwgemeten (drempel 20 clusters). H-GS-3 volgen.
+- Geen release (tussenronde, niets acuut).
+
+laatste ronde: 08-10 15:40, gemeten t/m 08-10 15:44
