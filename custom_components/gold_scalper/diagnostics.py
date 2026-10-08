@@ -95,6 +95,9 @@ async def async_get_config_entry_diagnostics(
         # positiegrootte in de juiste eenheid wordt berekend, en dat scheelt
         # bij een euro-account met een dollarinstrument zo'n acht procent.
         "conversion": coordinator.conversion.as_dict(),
+        # 1.7.7: saldosprong zonder trade (dataprobleem) en de referentie die
+        # dan voor dagstart, run-opening en vloer geldt.
+        "saldosprong": coordinator.saldosprong.as_dict(),
         "indicator_lab": coordinator.lab,
         "exit_stats": coordinator.exit_stats,
         # Per metriek: over welke trades, in welke valuta, per welke dag en

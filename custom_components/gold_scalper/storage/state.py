@@ -108,6 +108,10 @@ class RuntimeState:
     audit_gemeld: list | None = None
     #: Onderdrukking en uurbericht van de meldingen (``Notifier.export``).
     notify_sent: dict | None = None
+    #: 1.7.7: saldosprongbewaking (``SaldoSprongBewaker.export``): de laatst
+    #: betrouwbare referentie en een eventuele actieve sprong. Zonder dit zou
+    #: een herstart tijdens een sprong de sprongwaarde als referentie nemen.
+    saldosprong: dict | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)

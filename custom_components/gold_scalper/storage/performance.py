@@ -343,6 +343,33 @@ def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict
     return result
 
 
+def met_teken(waarde: float) -> str:
+    """Afgerond op hele eenheden, met teken: "+31", "−31" of "0" (1.7.7)."""
+    afgerond = round(waarde)
+    if afgerond == 0:
+        return "0"
+    return f"+{afgerond}" if afgerond > 0 else f"\u2212{abs(afgerond)}"
+
+
+def kosten_reden(kosten: float, bruto: float) -> str:
+    """De zin over kosten tegenover bruto, inhoudelijk juist bij elk teken.
+
+    1.7.7: eerst stond hier de absolute waarde van bruto. Bij een bruto van
+    −30,53 las je dan "kosten (165) overtreffen de bruto marktbeweging die is
+    gevangen (31)", alsof er 31 aan beweging was gewonnen. Bij een negatief
+    bruto is er niets gevangen: de kosten komen bovenop een verlies.
+    """
+    if bruto < 0:
+        return (
+            f"de gevangen marktbeweging was al negatief (bruto {met_teken(bruto)}); "
+            f"de kosten ({kosten:.0f}) komen daar nog bovenop"
+        )
+    return (
+        f"kosten ({kosten:.0f}) overtreffen de bruto marktbeweging "
+        f"die is gevangen (bruto {met_teken(bruto)})"
+    )
+
+
 def verdict(stats: dict) -> dict:
     """Vertaal de cijfers naar een expliciet oordeel over de bewijsfase.
 
@@ -366,10 +393,7 @@ def verdict(stats: dict) -> dict:
     if stats["net_pnl"] <= 0:
         reasons.append("netto resultaat is niet positief")
     if stats["cost_ratio"] is not None and stats["cost_ratio"] >= 1.0:
-        reasons.append(
-            f"kosten ({stats['total_costs']:.0f}) overtreffen de bruto marktbeweging "
-            f"die is gevangen ({abs(stats['gross_pnl']):.0f})"
-        )
+        reasons.append(kosten_reden(stats["total_costs"], stats["gross_pnl"]))
     if stats["edge_surplus_per_oz"] <= 0:
         reasons.append(
             f"de gemiddeld gevangen beweging ({stats['avg_excursion_per_oz']:.3f} USD/oz) "

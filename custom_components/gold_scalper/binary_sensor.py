@@ -195,6 +195,9 @@ class DataIntegrity(GoldScalperEntity, BinarySensorEntity):
             return True
         if not data.get("candles_consistent", True):
             return True
+        # 1.7.7: een saldosprong zonder trade is een dataprobleem.
+        if (data.get("saldosprong") or {}).get("actief"):
+            return True
         # Te weinig historie is óók een dataprobleem: de indicatoren geven dan
         # waarden terug die nergens op steunen.
         return (data.get("candles") or 0) < 60
@@ -210,6 +213,9 @@ class DataIntegrity(GoldScalperEntity, BinarySensorEntity):
             "koers_leeftijd_seconden": data.get("koers_leeftijd_seconden"),
             "koers_mislukt_op_rij": data.get("koers_mislukt_op_rij", 0),
             "koers_fout": data.get("koers_fout"),
+            "saldosprong": bool((data.get("saldosprong") or {}).get("actief")),
+            "saldosprong_reden": (data.get("saldosprong") or {}).get("reden"),
+            "saldo_referentie": (data.get("saldosprong") or {}).get("referentie"),
             "hint": (
                 "Bij een probleem wordt de historie automatisch opnieuw opgehaald "
                 "bij de volgende cyclus."

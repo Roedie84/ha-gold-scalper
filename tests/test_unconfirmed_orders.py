@@ -16,6 +16,7 @@ import asyncio
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import pytest
 
@@ -288,11 +289,10 @@ def _coordinator_met(venue_cls, tmp_path, monkeypatch, respecteer_telling):
             return list(self._positions)
 
         async def quote(self, symbol=None):
-            from datetime import datetime, timezone
             from gold_scalper.broker.adapter import VenueQuote
             half = self.spread / 2
             return VenueQuote(bid=self.price - half, ask=self.price + half,
-                              time=datetime.now(timezone.utc), tradeable=True)
+                              time=_nu(), tradeable=True)
 
     def altijd(candles, bid, ask, cfg, uur, open_count, sinds, kant):
         if respecteer_telling and open_count:
@@ -309,6 +309,50 @@ def _coordinator_met(venue_cls, tmp_path, monkeypatch, respecteer_telling):
     from gold_scalper.lifecycle import LifecycleState
     coordinator.lifecycle._transition(LifecycleState.RUNNING, "test")
     return coordinator, venue
+
+
+#: Een vast handelsmoment: woensdag 7 oktober 2026, 12:00 Nederlandse tijd.
+#: De coordinatortests hieronder liepen op de echte klok en faalden tijdens de
+#: dagelijkse marktpauze (23:00-24:00) en in het weekend (L-GS-002).
+HANDELSMOMENT = datetime(2026, 10, 7, 10, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def handelsmoment(monkeypatch):
+    """Zet de klok van de integratie op ``HANDELSMOMENT``; de tijd loopt
+    vanaf daar gewoon door, zodat verstreken tijd in de lus blijft kloppen."""
+    import datetime as _dt
+    import gold_scalper.coordinator  # noqa: F401  alles laden vóór het patchen
+
+    echt = _dt.datetime
+    verschil = HANDELSMOMENT - echt.now(timezone.utc)
+
+    class Klok(echt):
+        @classmethod
+        def now(cls, tz=None):
+            nu = echt.now(timezone.utc) + verschil
+            return nu.astimezone(tz) if tz is not None else nu.replace(tzinfo=None)
+
+        @classmethod
+        def utcnow(cls):
+            return (echt.now(timezone.utc) + verschil).replace(tzinfo=None)
+
+    for naam, module in list(sys.modules.items()):
+        if (naam == "gold_scalper" or naam.startswith("gold_scalper.")) and \
+                getattr(module, "datetime", None) is echt:
+            monkeypatch.setattr(module, "datetime", Klok)
+    global _klok
+    _klok = Klok
+    yield
+    _klok = None
+
+
+_klok = None
+
+
+def _nu():
+    """De (eventueel vastgezette) klok van de integratie."""
+    return (_klok or datetime).now(timezone.utc)
 
 
 def _cycli(coordinator, n):

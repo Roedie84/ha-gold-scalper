@@ -46,6 +46,7 @@ from .broker.simulator import SimulatorVenue
 from .broker.paper import CONTRACT_SIZE, BrokerCosts, PaperBroker
 from .broker.paper import Quote as PaperQuote
 from .broker.risk import RiskLimits, RiskManager, TradingState
+from .broker.saldosprong import SaldoSprongBewaker
 from .const import (
     STRATEGY_WINDOW_BARS,
     EXECUTION_SEMANTICS_VERSION,
@@ -295,6 +296,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             ),
             self.starting_balance,
         )
+        #: 1.7.7: saldosprong zonder trade = dataprobleem.
+        self.saldosprong = SaldoSprongBewaker()
+        self.risk.saldosprong = self.saldosprong
 
         # Beschermingslaag rond echte orders. Papermodus kent de storingen die
         # hij afvangt niet, dus de bewijsfase leert je daar niets over.
@@ -576,6 +580,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 self.risk.state.trades_today = self._state.trades_today
             except ValueError:
                 _LOGGER.debug("Bewaarde handelsdag onleesbaar; opnieuw beginnen")
+        # 1.7.7: de laatst betrouwbare saldoreferentie en een eventuele actieve
+        # sprong. Na de installatie van 1.7.7 staat hier niets; de eerste
+        # meting wordt dan zonder vergelijking de referentie.
+        self.saldosprong.herstel(self._state.saldosprong)
         self._herstel_geheugen()
 
         path = self.hass.config.path(DATABASE_FILENAME)
@@ -1327,6 +1335,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         }
         self._state.audit_gemeld = sorted(self._audit_gemeld)
         self._state.notify_sent = self.notifier.export()
+        self._state.saldosprong = self.saldosprong.export()
         await self._store.async_save(self._state)
         await self._bewaar_resultaten()
 
@@ -1637,7 +1646,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     "startbalans: %s", err,
                 )
 
-        bericht = self.risk.reset_day(balance)
+        # 1.7.7: geen dagijkpunt op een onverklaarde saldosprong.
+        bericht = self.risk.reset_day(self.saldosprong.betrouwbaar(balance))
         await self._persist()
         await self.async_request_refresh()
         return bericht
@@ -1662,7 +1672,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     "Er wordt gerekend met de startbalans.", err,
                 )
 
-        allowed, message = self.risk.manual_resume(balance)
+        # 1.7.7: geen dagijkpunt op een onverklaarde saldosprong.
+        allowed, message = self.risk.manual_resume(
+            self.saldosprong.betrouwbaar(balance)
+        )
         if not allowed:
             _LOGGER.warning("Hervatten geweigerd: %s", message)
             return False
@@ -1915,14 +1928,20 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 await self._audit_against_broker()
 
         # -- boekhouding ----------------------------------------------------- #
+        #: 1.7.7: alleen een werkelijk gemeten equity telt voor de
+        #: saldosprongbewaking; de terugval op de startbalans bij een mislukte
+        #: opvraging is geen meting.
+        gemeten_equity: float | None = None
         if self.paper:
             self.paper.update_positions(self._paper_quote(quote))
             balance, equity = self.paper.balance, self.paper.equity(self._paper_quote(quote))
+            gemeten_equity = equity
         else:
             try:
                 snapshot = await self.venue.account()
                 balance, equity = snapshot.balance, snapshot.equity
                 self.current_equity = equity
+                gemeten_equity = equity
             except VenueError:
                 balance = equity = self.starting_balance
 
@@ -1938,6 +1957,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # in zijn lijst toont.
         aantal_open = len(open_positions) + (
             len(self.executor.pending) if self.mode.places_orders else 0
+        )
+
+        # 1.7.7: saldosprong zonder trade herkennen, vóór de risicotoets zodat
+        # een dagwissel in deze cyclus al op de betrouwbare referentie rolt.
+        self.saldosprong.meet(
+            now, gemeten_equity,
+            positie_open=bool(aantal_open or open_positions_precheck),
+            sluitingen=self.risk.sluitingen,
         )
 
         # -- signaal --------------------------------------------------------- #
@@ -2120,6 +2147,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "reject_reason": reject_reason,
             "balance": balance,
             "equity": equity,
+            # 1.7.7: onverklaarde saldosprong (dataprobleem).
+            "saldosprong": self.saldosprong.as_dict(),
             "open_positions": open_positions,
             "stats": stats,
             "gate": self.gate,
@@ -2719,6 +2748,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 account = await self.venue.account()
                 self.opening_equity = float(account.equity)
                 valuta = getattr(account, "currency", None) or valuta
+                # 1.7.7: geen run-opening (en dus geen vloer) op een
+                # onverklaarde saldosprong; de vorige referentie geldt.
+                if self.saldosprong.actief:
+                    _LOGGER.warning(
+                        "Run-opening op de vorige referentie in plaats van "
+                        "%.2f: %s", self.opening_equity, self.saldosprong.reden,
+                    )
+                    self.opening_equity = self.saldosprong.betrouwbaar(
+                        self.opening_equity
+                    )
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning(
                     "Equity bij de start van run %s niet op te halen: %s. De "

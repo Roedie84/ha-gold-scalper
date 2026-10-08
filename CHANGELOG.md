@@ -1,5 +1,52 @@
 # Changelog — Gold Scalper
 
+## 1.7.7
+
+* **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,
+  standaardwaarden, positiegrootte en vingerafdruk zijn niet aangeraakt.
+  Handel en noodstop worden door niets hieronder aan- of uitgezet.
+* **Bruto met teken in het oordeel.** De kostenzin toonde de absolute waarde
+  van bruto: bij bruto −30,53 en kosten 165,45 stond er "kosten (165)
+  overtreffen de bruto marktbeweging die is gevangen (31)". Nu met teken, en
+  bij een negatief bruto inhoudelijk juist: "de gevangen marktbeweging was al
+  negatief (bruto −31); de kosten (165) komen daar nog bovenop". Bij een
+  positief bruto blijft de bestaande zin, met "bruto +…".
+* **Saldosprong zonder trade = dataprobleem.** Op 08-10 veranderde het
+  IG-demosaldo zonder trade (saldo-aanpassing door de broker). Zo'n waarde
+  mag geen dagstart, run-opening of vermogensvloer bepalen. Nieuw
+  (`broker/saldosprong.py`): elke cyclus wordt de gemeten equity vergeleken
+  met de laatst betrouwbare referentie. Wijkt hij meer dan 10% (relatief) af
+  terwijl er in de afgelopen 5 minuten geen trade sloot (ook deelsluiting) en
+  geen positie of onbevestigde order open stond, dan:
+  * staat de binaire sensor *Dataprobleem* aan, met attributen `saldosprong`,
+    `saldosprong_reden` en `saldo_referentie`;
+  * rolt een nieuwe handelsdag naar de vorige referentie als dagstart, krijgt
+    een nieuwe run die referentie als opening (en dus als basis voor de vloer),
+    en gebruiken *Dag opnieuw* en *Hervatten* die referentie als dagijkpunt;
+  * komt er één WARNING per gebeurtenis, niet per cyclus.
+  Eerste meting zonder bewaarde referentie (eerste start na installatie) is
+  nooit een sprong; die wordt de referentie. Een mislukte saldo-opvraging telt
+  niet als meting.
+  Herstel zonder knop: keert de equity terug tot binnen 10% van de referentie,
+  dan is het dataprobleem weg (INFO); blijft de nieuwe waarde 24 uur binnen
+  10% van zichzelf, dan wordt hij de nieuwe referentie (INFO). Springt hij
+  intussen opnieuw, dan is dat een nieuwe gebeurtenis (nieuwe WARNING, de
+  24 uur beginnen opnieuw). Referentie en actieve sprong worden bewaard en
+  overleven een herstart; ook te zien in de diagnostiek.
+  Wat de bestaande logica doet: de sensor *Dataprobleem* is een melding, geen
+  handelspoort; er wordt niet gepauzeerd en geen noodstop gezet door de
+  sprong zelf. De bestaande limieten (daglimiet, vloer) blijven rekenen met de
+  werkelijke equity van dit moment tegen de vastgehouden referentie; valt die
+  equity onder de vloer, dan grijpt de bestaande vloertoets in zoals altijd.
+  Let op: de drempel is 10%; een kleine aanpassing (zoals de paar tientjes op
+  een saldo van tien miljoen) blijft daaronder en geldt als gewone meting.
+* **Testrobuustheid (L-GS-002).** Vier coordinatortests in
+  `tests/test_unconfirmed_orders.py` liepen op de echte klok en faalden
+  tijdens de dagelijkse marktpauze en in het weekend. De klok van de
+  integratie staat in die tests nu vast op een handelsmoment (woensdag
+  12:00 Nederlandse tijd) en loopt vanaf daar door.
+* Nieuwe tests: `tests/test_v177.py`.
+
 ## 1.7.6
 
 * **Alleen statistiek en rapportage.** Strategie, in- en uitstap,

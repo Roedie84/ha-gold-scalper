@@ -116,6 +116,13 @@ class RiskManager:
         self.state = RiskState(
             day=trading_day(parse_utc(moment)), day_start_balance=starting_balance,
         )
+        #: 1.7.7: aantal gesloten trades (ook deelsluitingen) sinds de start;
+        #: de saldosprongbewaker leest hieraan af of een sprong verklaard is.
+        self.sluitingen = 0
+        #: 1.7.7: bewaker op saldosprongen zonder trade. Is er een actieve
+        #: sprong, dan rolt de dagstart naar de vorige betrouwbare referentie
+        #: in plaats van naar de sprongwaarde. Wordt door de coordinator gezet.
+        self.saldosprong = None
 
     def floor_breakdown(
         self, starting_balance: float, opening_equity: float | None,
@@ -167,6 +174,14 @@ class RiskManager:
                 self.state.trades_today,
             )
             self.state.day = vandaag
+            # 1.7.7: geen nieuwe dagstart op een onverklaarde saldosprong.
+            if self.saldosprong is not None and self.saldosprong.actief:
+                betrouwbaar = self.saldosprong.betrouwbaar(balance)
+                _LOGGER.warning(
+                    "Dagstart op de vorige referentie %.2f in plaats van %.2f: "
+                    "%s", betrouwbaar, balance, self.saldosprong.reden,
+                )
+                balance = betrouwbaar
             self.state.day_start_balance = balance
             self.state.resumes_today = 0
             self.state.trades_today = 0
@@ -291,6 +306,7 @@ class RiskManager:
         self.state.trades_today += 1
 
     def record_close(self, net_pnl: float, now: datetime) -> None:
+        self.sluitingen += 1
         if net_pnl < 0:
             self.state.consecutive_losses += 1
             if self.state.consecutive_losses >= self.limits.max_consecutive_losses:

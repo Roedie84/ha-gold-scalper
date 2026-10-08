@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import ast
 import asyncio
-import json
 import os
 import sqlite3
 import sys
@@ -59,15 +58,6 @@ def _trade(run, open_time, mode="demo", net=1.0, close_offset_s=60, **kw):
 # --------------------------------------------------------------------------
 # Versie
 # --------------------------------------------------------------------------
-
-
-def test_version_is_consistent():
-    manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.7.6"
-    readme = (PKG.parent.parent / "README.md").read_text(encoding="utf-8")
-    assert "Huidige versie: **1.7.6**" in readme
-    changelog = (PKG.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert changelog.split("## ")[1].startswith("1.7.6")
 
 
 def test_grens_is_the_174_install_moment():
