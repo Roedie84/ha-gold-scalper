@@ -59,3 +59,33 @@ laatste ronde: 08-10 04:40, gemeten t/m 08-10 03:45
 - **L-GS-003 gebouwd 1.7.2 (08-10, chatsessie):** transactiewaarschuwing (22× tussen 03:15-04:03) vergelijkt nu met eigen trades die >6 u dicht zijn; 1× per uur WARNING, anders DEBUG. Alleen logging. Release v1.7.2 groen, HACS ververst. Meten na installatie: 0 van deze waarschuwingen in een nacht zonder echte afwijking.
 - **L-GS-004 gebouwd 1.7.3 (08-10, chatsessie):** 4 geschatte uitstappen vandaag kwamen doordat alleen het (achterlopende) transactieoverzicht werd gevraagd. Nu eerst het activiteitenoverzicht (+ /confirms), anders max. 4 herkansingen binnen 4 min; correctie/afstemming zetten bij een voorlopige trade meteen sluitreden en gemeten kosten. Alleen boekhouding. Release v1.7.3 groen, HACS ververst. Meten na installatie: 0× WARNING "geschatte uitstapprijs" per dag, Sluitreden onbekend/kosten berekend alleen voor trades < 5 min oud.
 laatste ronde: 08-10 07:40, gemeten t/m 08-10 07:43
+
+## 08-10 11:00 · varianten-analyse (onderzoek, niets aan de strategie veranderd)
+Vraag Ruud: kan de strategie meer opleveren? Alleen gelezen; geen knoppen, instellingen of code op main.
+- **Data:** tradedatabase/barsarchief zijn binair (SQLite) en niet leesbaar via de bestandseditor; daarom uit de HA-recorder: koers (mid, elke 10 s, 19 328 punten 06-10 00:00 – 08-10 09:00 UTC), open posities (zijde, units, instap, stop + verplaatsingen), signaal (regime). 66 van 68 trades teruggevonden (2 in cluster 6 vielen binnen één pollingcyclus), 10 clusters (herinstap < 10 min), regime 44 trend / 22 range = geleerd. Geen IG-aanroepen.
+- **Replay:** zelfde exitlogica als live (`exits.py`: doel/stop bij de broker, break-even 0,8×ATR, trailing 1,5/1,2), halve spread 0,40 (gemeten instap: fill − mid mediaan 0,40), stopslippage 0,06. Controle: 53/66 uitstaptijden binnen 60 s van live, zelfde uitkomsten; sim netto −253 (−3,83/trade) tegen live −200 (−2,95): de replay is ~0,9/trade pessimistischer, vergelijkingen zijn daarom gepaard (variant − basis op dezelfde trades).
+- **Bevinding (bug):** tijdstops (240 s / 900 s) vuren op IG nooit: `VenuePosition` heeft geen `open_time` → leeftijd 0. Live duur gem. 1408 s, max 5272 s. → **L-GS-005 (open, Ruud beslist)**.
+- **Resultaten** (netto in USD incl. spread en slippage; t_cl = cluster-t op netto per cluster; IS = clusters 1-5, OOS = 6-10; per trade):
+
+| variant | n | clusters | netto | netto/tr | PF | t_cl | IS n · /tr | OOS n · /tr |
+|---|---|---|---|---|---|---|---|---|
+| basis (doel 1,5 ATR) | 66 | 10 | −253 | −3,83 | 0,47 | −3,81 | 33 · −3,63 | 33 · −4,04 |
+| a. doel 2,25 ATR (×1,5) | 66 | 10 | −214 | −3,24 | 0,56 | −2,29 | 33 · −3,44 | 33 · −3,04 |
+| a. doel 3,0 ATR (×2) | 66 | 10 | −180 | −2,73 | 0,63 | −1,75 | 33 · −2,42 | 33 · −3,05 |
+| b. geen instap in range | 44 | 6 | −95 | −2,16 | 0,67 | −2,22 | 17 · −0,42 | 27 · −3,25 |
+| c1. 1 min bevestiging | 32 | 9 | −22 | −0,67 | 0,88 | −0,24 | 13 · −4,29 | 19 · +1,80 |
+| c2. 2 min bevestiging | 18 | 6 | −18 | −1,02 | 0,85 | −0,40 | 7 · −3,65 | 11 · +0,65 |
+| c3. +0,25 ATR binnen 3 min | 29 | 7 | −36 | −1,23 | 0,81 | −0,54 | 14 · −3,74 | 15 · +1,10 |
+| b + c3 | 21 | 4 | +17 | +0,80 | 1,14 | +0,43 | 6 · +0,04 | 15 · +1,10 |
+| doel 3,0 + c3 | 29 | 7 | +75 | +2,58 | 1,40 | +0,58 | 14 · +2,27 | 15 · +2,86 |
+| doel 3,0 + c2 (beste IS) | 18 | 6 | +67 | +3,71 | 1,56 | +0,60 | 7 · +6,38 | 11 · +2,01 |
+| tijdstops werkend (L-GS-005) | 66 | 10 | −88 | −1,34 | 0,57 | −1,35 | 33 · −2,18 | 33 · −0,49 |
+| tijdstops + c1 | 32 | 9 | +33 | +1,04 | 1,46 | +0,51 | 13 · −1,61 | 19 · +2,85 |
+
+- **Toets en multiple testing:** 30 varianten doorgerekend (3 doelen × regime aan/uit × 4 instapregels + 6 met tijdstops). Bonferroni: α 0,05/30 → |t| ≈ 3,6 nodig. **Geen variant heeft een netto-t boven 0,75**; de beste positieve rijen zijn de beste van 30 ruisuitkomsten op 3–7 clusters. Filters (b, c) lijken in de gepaarde vergelijking sterk (t 2–5), maar dat is grotendeels mechanisch: trades weglaten uit een verliesgevende basis verbetert het totaal altijd. Selectietoets (zelfde aantal willekeurige trades weglaten): c1 p 0,008, c3 p 0,005, b p 0,04 — op trade-niveau, trades in een cluster zijn niet onafhankelijk, dus te optimistisch.
+- **Tijd van de dag** (basis, netto/trade): Azië 00-07 −5,90 (24 tr, 6 cl), Londen 07-12 −2,48 (16, 5), NY 12-17 −1,49 (20, 2), laat 17-21 −7,00 (6, 2). Te weinig clusters per blok; geen filter getoetst.
+- **Hoeveel extra clusters:** tijdstops (gepaard verschil +16,5/cluster, sd 24,2): ~9 clusters voor t=2, ~28 voor t=3,6. Instapbevestiging c1: ~6 resp. ~18 (maar mechanisch effect, zie boven). Voor een **netto positief** resultaat met t=2: tijdstops+c1 ~156 clusters, doel 3,0+c3 ~120 — praktisch onbereikbaar op dit tempo (≈4 clusters/dag).
+- **Oordeel:** de strategie winstgevend maken is met deze data niet aan te tonen; geen parameter aanpassen op grond van deze tabel. Wel duidelijk: (1) tijdstops werken niet zoals ontworpen (bug) — herstellen verkleint het verlies waarschijnlijk (IS én OOS beter) → L-GS-005; (2) instapbevestiging en regimefilter worden hypotheses, niet ingebouwd: **H-GS-4** "1 min bevestiging in signaalrichting verbetert netto/trade" en **H-GS-5** "doel ×2 met bevestiging". Beide schaduw-meten met de replay op nieuwe clusters (geen codewijziging), oordeel pas na ≥ 20 nieuwe clusters, met correctie voor 30 geteste varianten. H-GS-3 (regime) blijft volgen: OOS hield het voordeel niet vast (−3,25/trade).
+- Reproduceren: `analyse/2026-10-08-varianten/` (trades.json, price.json.gz uitpakken, `python3 grid.py`, `extra.py`, `need.py`).
+
+laatste ronde: 08-10 11:00, gemeten t/m 08-10 09:00 UTC

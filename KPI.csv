@@ -70,3 +70,8 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-08 07:40,TUSSEN,gs_latency_p99_ms,393.5,1000,cycli
 2026-10-08 07:40,TUSSEN,gs_max_drawdown_pct,2.43,65,equity 7116.21
 2026-10-08 07:40,TUSSEN,gs_verliesoorzaak_verkeerde_richting,0.947,38,"36/38; stop_te_krap 2/38"
+2026-10-08 11:00,ANALYSE,gs_replay_netto_per_trade_basis,-3.83,66,"replay 10-s koerspad; live -2.95 (68)"
+2026-10-08 11:00,ANALYSE,gs_replay_exit_match_60s,0.803,66,53/66 uitstaptijden binnen 60 s van live
+2026-10-08 11:00,ANALYSE,gs_duur_gem_s,1408,68,"max 5272 s; tijdstop 900 s vuurt niet (L-GS-005)"
+2026-10-08 11:00,ANALYSE,gs_replay_tijdstops_netto_per_trade,-1.34,66,"IS -2.18 OOS -0.49; gepaard t 2.15 (10 cl)"
+2026-10-08 11:00,ANALYSE,gs_varianten_getoetst,30,66,"Bonferroni |t|~3.6; hoogste netto-t 0.75"
