@@ -19,6 +19,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -33,7 +34,7 @@ from .broker.adapter import (
 )
 from .broker.execution_safety import BrokerLimits, SafeExecutor
 from .broker.currency import Conversion, derive_rate_from_position
-from .broker.reconcile_audit import compare_positions
+from .broker.reconcile_audit import SLUIT_GENADE_SECONDEN, compare_positions
 from .broker.schedule import (
     SPOT_GOLD, ClosureObservation, cross_check, minutes_until_close,
 )
@@ -391,6 +392,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.lab: dict = {}
         #: Bevindingen die al gemeld zijn, om herhaling te onderdrukken.
         self._audit_gemeld: set = set()
+        #: 1.7.8: tickets waarvoor wij een sluitverzoek verstuurden, met het
+        #: moment (monotone klok). De controle telt zo'n positie binnen de
+        #: genadetermijn niet als wees: IG toont hem soms nog even.
+        self._sluitverzoeken: dict[str, float] = {}
         #: Aantal trades dat op een geschatte uitstapprijs is afgerekend.
         self._geschatte_afwikkelingen = 0
         #: Cyclusteller voor het bijwerken van geschatte afwikkelingen.
@@ -1239,9 +1244,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # 'DIAAAAYCJETQ7A8', alleen MetaTrader en OANDA leveren getallen.
         db_tickets = [str(t.broker_ticket) for t in open_trades if t.broker_ticket]
 
+        # 1.7.8: een positie die wij net sloten en die de broker nog even
+        # toont, is geen onbekende positie (binnen de genadetermijn).
+        onderweg = {
+            t for t, leeftijd in self._sluit_leeftijden().items()
+            if leeftijd <= SLUIT_GENADE_SECONDEN
+        }
         result = await self.lifecycle.reconcile(
             [{"ticket": str(p.ticket), "volume": p.units, "side": p.side}
-             for p in broker_positions],
+             for p in broker_positions if str(p.ticket) not in onderweg],
             db_tickets,
         )
         if not result.consistent:
@@ -1719,8 +1730,21 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     async def _close_position(self, position, reason: str) -> None:
         if self.mode.places_orders:
-            await self.venue.close(position.ticket)
+            ticket = str(position.ticket)
+            resultaat = await self.venue.close(position.ticket)
             self._positions_cache = None
+            # 1.7.8: alleen als gesloten boeken wat de broker aannam. Een
+            # geweigerd verzoek werd tot nu toe toch afgeboekt: dan stond de
+            # positie open bij de broker en dicht in de database - onbewaakt.
+            if not getattr(resultaat, "success", False):
+                _LOGGER.error(
+                    "Sluiten van %s (%s) niet aangenomen door de broker: %s. "
+                    "De positie blijft open en bewaakt.", ticket, reason,
+                    getattr(resultaat, "error", None) or "geen bevestiging",
+                )
+                return
+            # setdefault: een herhaald verzoek verlengt de termijn niet.
+            self._sluitverzoeken.setdefault(ticket, time.monotonic())
             if self._last_quote is not None:
                 await self._record_broker_close(
                     position, self._last_quote, reason,
@@ -3598,11 +3622,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if note:
                 _LOGGER.warning("Valuta: %s", note)
 
+        # 1.7.8: sluitverzoeken die de broker verwerkt heeft (positie weg)
+        # vergeten; de rest gaat mee naar de vergelijking.
+        live = {str(getattr(p, "ticket", "")) for p in positions}
+        self._sluitverzoeken = {
+            t: m for t, m in self._sluitverzoeken.items() if t in live
+        }
         audit = compare_positions(
             positions, open_trades,
             expected_currency=self.conversion.instrument,
             account_currency=valuta,
             conversion_known=self.conversion.usable,
+            sluitingen=self._sluit_leeftijden(),
         )
         self.audit = audit.as_dict()
 
@@ -3635,6 +3666,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 "audit", "Gold Scalper: administratie klopt niet",
                 audit.critical[0].message,
             )
+
+    def _sluit_leeftijden(self) -> dict[str, float]:
+        """Seconden sinds elk eigen sluitverzoek dat nog niet verwerkt is."""
+        nu = time.monotonic()
+        return {t: nu - m for t, m in self._sluitverzoeken.items()}
 
     def _track_excursion(self, position, quote: VenueQuote, ticket: str) -> None:
         """Werk de uiterste mee- en tegenbeweging van een open positie bij."""

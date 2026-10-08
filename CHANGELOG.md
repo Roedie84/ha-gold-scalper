@@ -1,5 +1,37 @@
 # Changelog — Gold Scalper
 
+## 1.7.8
+
+* **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,
+  standaardwaarden, positiegrootte en vingerafdruk zijn niet aangeraakt.
+* **Geen noodstop meer op een positie die we net zelf sloten.** Op 08-10 om
+  21:20:07 sloot de tijdstop DIAAAAYMFVR7YAY. De trade werd direct als
+  gesloten geboekt, en in dezelfde cyclus draaide de periodieke
+  brokercontrole (`_audit_against_broker`, elke tiende cyclus). IG's
+  posities-endpoint toonde de positie nog enkele seconden, dus zag de
+  controle "staat open bij de broker maar niet in de database" en ging de
+  noodstop aan - op een positie die al dicht was. Intermitterend: alleen als
+  de controle toevallig in die seconden viel.
+  Nu onthoudt de coordinator voor welke tickets wij een sluitverzoek
+  verstuurden. Staat zo'n positie nog bij de broker, dan is dat binnen 90 s
+  een melding (`sluiting_onderweg`, informatie) en geen noodstop; ook
+  *Hervatten* binnen die termijn ziet hem niet als onbekend. Staat hij er na
+  90 s nog, dan noodstop zoals voorheen, met de melding dat de sluiting niet
+  is uitgevoerd (`sluiting_niet_uitgevoerd`). Een positie die wij **niet**
+  sloten blijft direct een noodstop geven; die bescherming is ongewijzigd.
+* **Geweigerde sluiting wordt niet meer als gesloten geboekt.** De uitkomst
+  van het sluitverzoek werd genegeerd: ook zonder dealReference werd de
+  trade afgeboekt, waarna de positie open stond bij de broker en dicht in de
+  database. Nu blijft de trade open en bewaakt, met een ERROR in het logboek.
+  (Een verzoek dat IG aanneemt maar later afwijst, valt onder de 90-s-regel
+  hierboven: daarna noodstop met "niet uitgevoerd".)
+* **App-icoon.** De integratie levert haar icoon zelf mee in
+  `custom_components/gold_scalper/brand/` (`icon.png` 256×256,
+  `icon@2x.png` 512×512, bron `icon.svg`), zoals HA sinds 2026.3 ondersteunt.
+  Het verschijnt in Instellingen → Apparaten & diensten na een herstart van
+  Home Assistant. Het HACS-updatescherm toont het mogelijk nog niet; dat is
+  een HACS-bug (hacs/integration#5171).
+
 ## 1.7.7
 
 * **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,

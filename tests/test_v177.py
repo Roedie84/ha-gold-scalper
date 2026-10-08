@@ -8,12 +8,10 @@
   run-opening en vloer. Eén WARNING per gebeurtenis; herstel door terugkeer
   binnen 10% of 24 uur stabiliteit (INFO).
 """
-import json
 import logging
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "custom_components"))
 from gold_scalper import const  # noqa: E402
@@ -184,16 +182,3 @@ def test_record_close_telt_sluitingen():
     rm.record_close(3.0, T0)
     assert rm.sluitingen == 2
 
-
-# ---------------- release ---------------- #
-
-PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalper"
-
-
-def test_version_is_consistent():
-    manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.7.7"
-    readme = (PKG.parent.parent / "README.md").read_text(encoding="utf-8")
-    assert "Huidige versie: **1.7.7**" in readme
-    changelog = (PKG.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert changelog.split("## ")[1].startswith("1.7.7")

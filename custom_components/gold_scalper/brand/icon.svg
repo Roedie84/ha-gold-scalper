@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <!-- Donkere achtergrond: diep groenblauw, past naast Stormchase en EMS -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f3a4a"/>
+      <stop offset="100%" stop-color="#0d1a24"/>
+    </linearGradient>
+    <!-- Goudstaaf: bovenvlak licht, voorvlak dieper goud -->
+    <linearGradient id="top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe9a3"/>
+      <stop offset="100%" stop-color="#f5c94a"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0b429"/>
+      <stop offset="100%" stop-color="#b9780f"/>
+    </linearGradient>
+    <linearGradient id="side" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#c98a14"/>
+      <stop offset="100%" stop-color="#8f5a08"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+  <!-- raster -->
+  <g stroke="#ffffff" stroke-opacity="0.07" stroke-width="2">
+    <line x1="40" y1="70" x2="216" y2="70"/>
+    <line x1="40" y1="110" x2="216" y2="110"/>
+    <line x1="40" y1="150" x2="216" y2="150"/>
+  </g>
+  <!-- candles -->
+  <g stroke-width="3" stroke-linecap="round">
+    <line x1="72" y1="92" x2="72" y2="134" stroke="#e05d5d"/>
+    <rect x="64" y="100" width="16" height="24" rx="3" fill="#e05d5d"/>
+    <line x1="104" y1="74" x2="104" y2="122" stroke="#3ccf8e"/>
+    <rect x="96" y="82" width="16" height="30" rx="3" fill="#3ccf8e"/>
+    <line x1="136" y1="80" x2="136" y2="112" stroke="#e05d5d"/>
+    <rect x="128" y="86" width="16" height="18" rx="3" fill="#e05d5d"/>
+    <line x1="168" y1="48" x2="168" y2="102" stroke="#3ccf8e"/>
+    <rect x="160" y="56" width="16" height="36" rx="3" fill="#3ccf8e"/>
+  </g>
+  <!-- goudstaaf (trapezium in perspectief) -->
+  <polygon points="78,150 178,150 200,196 56,196" fill="url(#front)"/>
+  <polygon points="92,132 164,132 178,150 78,150" fill="url(#top)"/>
+  <polygon points="178,150 164,132 186,176 200,196" fill="url(#side)" opacity="0"/>
+  <polygon points="56,196 200,196 196,204 60,204" fill="#7a4c06"/>
+  <!-- glans -->
+  <polygon points="100,138 128,138 122,146 96,146" fill="#ffffff" opacity="0.45"/>
+  <line x1="84" y1="162" x2="104" y2="162" stroke="#ffe9a3" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+</svg>

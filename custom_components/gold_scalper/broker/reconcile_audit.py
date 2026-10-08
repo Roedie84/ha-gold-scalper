@@ -28,7 +28,7 @@ from .adapter import size_is_known, size_says_closed
 
 import logging
 from dataclasses import dataclass, field
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from ..storage.database import Trade
 from .adapter import VenuePosition
@@ -40,6 +40,12 @@ SIZE_TOLERANCE = 0.005
 
 #: Verschil in prijsniveau waaronder we niets zeggen.
 PRICE_TOLERANCE = 0.01
+
+#: 1.7.8: hoe lang een positie die wij zelf net sloten nog bij de broker mag
+#: staan voordat dat als fout telt. IG's posities-endpoint toont een gesloten
+#: positie soms nog enkele seconden; op 08-10 viel de controle precies in dat
+#: gat en ging de noodstop aan op een positie die al dicht was.
+SLUIT_GENADE_SECONDEN = 90.0
 
 
 @dataclass(slots=True)
@@ -80,8 +86,18 @@ def compare_positions(
     expected_currency: str | None = None,
     account_currency: str | None = None,
     conversion_known: bool = False,
+    sluitingen: Mapping[str, float] | None = None,
+    genade: float = SLUIT_GENADE_SECONDEN,
 ) -> Audit:
-    """Leg de posities bij de broker naast de open trades in de database."""
+    """Leg de posities bij de broker naast de open trades in de database.
+
+    ``sluitingen``: tickets waarvoor wij zelf een sluitverzoek verstuurden,
+    met het aantal seconden sinds dat verzoek (1.7.8). Zo'n positie die de
+    broker nog toont, is binnen ``genade`` seconden een vertraging en geen
+    wees. Daarna is de sluiting kennelijk niet uitgevoerd: kritiek. Een
+    positie die wij níét sloten blijft direct kritiek.
+    """
+    sluitingen = {str(k): v for k, v in (sluitingen or {}).items()}
     audit = Audit(positions_checked=len(broker))
     by_ticket = {
         str(t.broker_ticket): t for t in database if t.broker_ticket
@@ -127,6 +143,26 @@ def compare_positions(
             ))
 
         trade = by_ticket.get(ticket)
+        if trade is None and ticket in sluitingen:
+            leeftijd = sluitingen[ticket]
+            if leeftijd <= genade:
+                audit.findings.append(Finding(
+                    "informatie", "sluiting_onderweg",
+                    f"Positie {ticket} is {leeftijd:.0f}s geleden door ons "
+                    "gesloten maar staat nog bij de broker; de broker heeft "
+                    "de sluiting nog niet verwerkt.",
+                    ticket,
+                ))
+            else:
+                audit.findings.append(Finding(
+                    "kritiek", "sluiting_niet_uitgevoerd",
+                    f"Positie {ticket} staat {leeftijd:.0f}s na ons "
+                    "sluitverzoek nog open bij de broker. De sluiting is niet "
+                    "uitgevoerd; de positie staat niet meer in de database en "
+                    "wordt door niemand bewaakt.",
+                    ticket,
+                ))
+            continue
         if trade is None:
             audit.findings.append(Finding(
                 "kritiek", "onbekende_positie",
