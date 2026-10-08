@@ -471,6 +471,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: waardoor dezelfde positie opnieuw voor de helft gesloten werd - en
         #: bij herhaling tot niets. Gaat nu mee in de bewaarde toestand.
         self._partial_taken: set[str] = set()
+        self._open_time_cache: dict[str, datetime] = {}
         self._last_quote: VenueQuote | None = None
         #: 1.7.0: mislukte koersopvragingen op rij, het moment van de laatste
         #: geslaagde, en wat die cyclus teruggaf. Zo blijft bij een losse
@@ -2106,7 +2107,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         for position in await self._open_positions():
             ticket = str(getattr(position, "ticket", None) or getattr(position, "id", ""))
-            opened = _as_datetime(getattr(position, "open_time", None), now)
+            opened = await self._position_opened_at(position, ticket, now)
             # Paper-trades bewaren volume in lots, venue-posities in ounces.
             size = getattr(position, "units", None)
             if size is None:
@@ -2555,6 +2556,32 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         )
         self._carried_tickets &= {str(t.broker_ticket) for t in meegenomen}
         return eigen + [t for t in meegenomen if t.run_id != self.run_id]
+
+    async def _position_opened_at(self, position, ticket: str, now: datetime) -> datetime:
+        """Openingstijd van een positie, voor tijdstop en maximale duur.
+
+        1.7.4 (L-GS-005): IG gaf de positie zonder openingstijd door, waardoor
+        de leeftijd altijd nul was en de tijdstops nooit vuurden. Eerst wat de
+        broker meldt; ontbreekt dat, dan de openingstijd van de eigen trade op
+        hetzelfde ticket. Die wordt per ticket onthouden, zodat er niet elke
+        cyclus een database-opvraging bij komt.
+        """
+        eigen = getattr(position, "open_time", None)
+        if eigen is not None:
+            return _as_datetime(eigen, now)
+        cache = self._open_time_cache
+        if ticket in cache:
+            return cache[ticket]
+        if not ticket or not self.mode.places_orders:
+            return now
+        trade = await self._open_trade_by_ticket(ticket)
+        if trade is None or not getattr(trade, "open_time", None):
+            return now
+        opened = _as_datetime(trade.open_time, now)
+        if len(cache) > 50:
+            cache.clear()
+        cache[ticket] = opened
+        return opened
 
     async def _open_trade_by_ticket(self, ticket):
         """Een open trade op ticket, in welke run ook."""
