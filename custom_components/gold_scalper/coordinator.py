@@ -35,6 +35,11 @@ from .broker.adapter import (
 from .broker.execution_safety import BrokerLimits, SafeExecutor
 from .broker.currency import Conversion, derive_rate_from_position
 from .broker.reconcile_audit import SLUIT_GENADE_SECONDEN, compare_positions
+
+#: 1.7.9: hoe vaak een afgewezen sluiting automatisch opnieuw mag, en de
+#: wachttijd (s) na de eerste, tweede, ... weigering. Geen sluitstorm.
+SLUIT_MAX_POGINGEN = 5
+SLUIT_BACKOFF = (10, 30, 60, 120)
 from .broker.schedule import (
     SPOT_GOLD, ClosureObservation, cross_check, minutes_until_close,
 )
@@ -396,6 +401,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: moment (monotone klok). De controle telt zo'n positie binnen de
         #: genadetermijn niet als wees: IG toont hem soms nog even.
         self._sluitverzoeken: dict[str, float] = {}
+        #: 1.7.9: sluitverzoeken zonder bevestiging van de broker. Niet
+        #: geboekt; de trade blijft open en bewaakt. ``{"sinds", "reden"}``.
+        self._sluit_onderweg: dict[str, dict] = {}
+        #: 1.7.9: afgewezen sluitingen per ticket, voor de herhaallimiet.
+        #: ``{"weigeringen", "volgende", "opgegeven"}``.
+        self._sluit_pogingen: dict[str, dict] = {}
         #: Aantal trades dat op een geschatte uitstapprijs is afgerekend.
         self._geschatte_afwikkelingen = 0
         #: Cyclusteller voor het bijwerken van geschatte afwikkelingen.
@@ -1733,16 +1744,29 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             ticket = str(position.ticket)
             resultaat = await self.venue.close(position.ticket)
             self._positions_cache = None
-            # 1.7.8: alleen als gesloten boeken wat de broker aannam. Een
-            # geweigerd verzoek werd tot nu toe toch afgeboekt: dan stond de
+            # 1.7.9: onbekend is niet mislukt en niet gelukt. Niet boeken;
+            # de positielijst van de broker beslist (zie _bewaak_sluitingen).
+            if getattr(resultaat, "unconfirmed", False):
+                self._sluit_onderweg.setdefault(ticket, {
+                    "sinds": time.monotonic(), "reden": reason,
+                })
+                _LOGGER.warning(
+                    "Sluiten van %s (%s): geen bevestiging van de broker (%s). "
+                    "Niet geboekt; de positie blijft bewaakt tot de broker "
+                    "hem niet meer toont.", ticket, reason,
+                    getattr(resultaat, "error", None) or "onbekend",
+                )
+                return
+            # 1.7.8/1.7.9: alleen als gesloten boeken wat de broker bevestigde.
+            # Een geweigerd verzoek werd tot 1.7.8 toch afgeboekt: dan stond de
             # positie open bij de broker en dicht in de database - onbewaakt.
             if not getattr(resultaat, "success", False):
-                _LOGGER.error(
-                    "Sluiten van %s (%s) niet aangenomen door de broker: %s. "
-                    "De positie blijft open en bewaakt.", ticket, reason,
+                self._registreer_weigering(
+                    ticket, reason,
                     getattr(resultaat, "error", None) or "geen bevestiging",
                 )
                 return
+            self._sluit_pogingen.pop(ticket, None)
             # setdefault: een herhaald verzoek verlengt de termijn niet.
             self._sluitverzoeken.setdefault(ticket, time.monotonic())
             if self._last_quote is not None:
@@ -1753,6 +1777,106 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return
         if self.paper and self._last_quote:
             self.paper.close_position(position, self._paper_quote(self._last_quote), reason)
+
+    def _registreer_weigering(self, ticket: str, reason: str, fout: str) -> None:
+        """Een niet uitgevoerde sluiting: loggen en de herhaling afremmen."""
+        staat = self._sluit_pogingen.setdefault(
+            ticket, {"weigeringen": 0, "volgende": 0.0, "opgegeven": False},
+        )
+        staat["weigeringen"] += 1
+        n = staat["weigeringen"]
+        if n >= SLUIT_MAX_POGINGEN:
+            staat["opgegeven"] = True
+            _LOGGER.error(
+                "Sluiten van %s (%s) niet uitgevoerd: %s. Na %d pogingen "
+                "probeert de bot het niet meer automatisch; de positie blijft "
+                "open, bewaakt en met zijn stop bij de broker. Sluit hem zo "
+                "nodig handmatig.", ticket, reason, fout, n,
+            )
+            return
+        wacht = SLUIT_BACKOFF[min(n, len(SLUIT_BACKOFF)) - 1]
+        staat["volgende"] = time.monotonic() + wacht
+        _LOGGER.error(
+            "Sluiten van %s (%s) niet uitgevoerd: %s. De positie blijft open "
+            "en bewaakt; nieuwe poging over %ds (%d/%d).", ticket, reason,
+            fout, wacht, n, SLUIT_MAX_POGINGEN,
+        )
+
+    def _sluiten_toegestaan(self, ticket: str) -> bool:
+        """Mag de exitlogica nu een sluitverzoek voor dit ticket sturen?
+
+        Niet als er al een verzoek loopt (bevestigd of onbekend): dat zou een
+        tweede verzoek op dezelfde positie zijn. Niet tijdens de wachttijd na
+        een weigering, en niet meer na de limiet.
+        """
+        if ticket in self._sluitverzoeken or ticket in self._sluit_onderweg:
+            return False
+        staat = self._sluit_pogingen.get(ticket)
+        if staat is None:
+            return True
+        if staat["opgegeven"]:
+            return False
+        return time.monotonic() >= staat["volgende"]
+
+    async def _bewaak_sluitingen(self) -> None:
+        """Lopende sluitverzoeken elke cyclus tegen de positielijst houden.
+
+        1.7.9: de volledige controle draait elke tiende cyclus; "sluiting niet
+        uitgevoerd" kwam daardoor pas na minuten. Dit gebruikt de positielijst
+        die deze cyclus al is opgehaald - geen extra verzoek bij de broker.
+        """
+        if not (self._sluitverzoeken or self._sluit_onderweg
+                or self._sluit_pogingen):
+            return
+        try:
+            live_lijst = await self._open_positions()
+        except VenueError as err:
+            _LOGGER.debug("Sluitingen niet na te kijken: %s", err)
+            return
+        live = {
+            str(getattr(p, "ticket", "")) for p in live_lijst
+            if not size_says_closed(getattr(p, "units", None))
+        }
+        # Weigeringen vergeten zodra de positie weg is.
+        self._sluit_pogingen = {
+            t: v for t, v in self._sluit_pogingen.items() if t in live
+        }
+        leeftijden = self._sluit_leeftijden()
+        for ticket in list(self._sluitverzoeken):
+            if ticket not in live:
+                del self._sluitverzoeken[ticket]
+                continue
+            if leeftijden[ticket] <= SLUIT_GENADE_SECONDEN:
+                continue
+            # Geboekt als gesloten, maar de broker toont hem nog: onbewaakt.
+            del self._sluitverzoeken[ticket]
+            melding = (
+                f"Positie {ticket} staat {leeftijden[ticket]:.0f}s na een "
+                "bevestigd sluitverzoek nog open bij de broker. De sluiting "
+                "is niet uitgevoerd; de positie staat niet meer in de "
+                "database en wordt door niemand bewaakt."
+            )
+            _LOGGER.error("Controle: %s", melding)
+            self.risk.halt("administratie en broker lopen uiteen: " + melding)
+            await self.notifier.alert(
+                "audit", "Gold Scalper: administratie klopt niet", melding,
+            )
+        nu = time.monotonic()
+        for ticket, info in list(self._sluit_onderweg.items()):
+            if ticket not in live:
+                # Weg bij de broker: de gewone afwikkeling van verdwenen
+                # posities boekt hem (met gemeten of als geschat gemarkeerde
+                # uitstapprijs).
+                del self._sluit_onderweg[ticket]
+                continue
+            if nu - info["sinds"] <= SLUIT_GENADE_SECONDEN:
+                continue
+            del self._sluit_onderweg[ticket]
+            self._registreer_weigering(
+                ticket, info["reden"],
+                f"onbevestigd en na {nu - info['sinds']:.0f}s nog open bij de "
+                "broker",
+            )
 
     def _paper_quote(self, quote: VenueQuote) -> PaperQuote:
         """Vertaal een venue-quote naar een paper-quote met de uitersten erbij.
@@ -1845,6 +1969,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # nergens in mee, want de bewijsfase kijkt naar gesloten trades.
         if self.mode.places_orders and quote.tradeable:
             await self._settle_vanished_positions(quote, now)
+            # 1.7.9: lopende sluitverzoeken elke cyclus nakijken.
+            await self._bewaak_sluitingen()
             # 1.7.3: verse schattingen binnen enkele minuten nog een paar keer
             # bij de broker navragen. Alleen opvragen en boeken.
             await self._herkans_voorlopige_afwikkelingen(now)
@@ -2563,6 +2689,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
             try:
                 if action.kind == "close":
+                    # 1.7.9: geen tweede verzoek op een lopende sluiting, en
+                    # na een weigering met wachttijd en limiet.
+                    if self.mode.places_orders and \
+                            not self._sluiten_toegestaan(ticket):
+                        continue
                     await self._close_position(position, action.reason[:60])
                 elif action.kind == "modify_stop" and self.mode.places_orders:
                     # Het doel meegeven: het PUT-endpoint vervangt beide
@@ -2587,15 +2718,23 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 elif action.kind == "partial_close":
                     units = (getattr(position, "units", 0) or 0) * action.close_fraction
                     if self.mode.places_orders and units > 0:
-                        await self.venue.close(ticket, units)
+                        deel = await self.venue.close(ticket, units)
                         self._positions_cache = None
                         # Vastleggen: anders wordt de winst wél genomen maar
                         # verschijnt hij nergens in je resultaten, en telt hij
                         # niet mee in de bewijsfase.
-                        await self._record_partial(
-                            ticket, units, action.reason,
-                            datetime.now(timezone.utc),
-                        )
+                        # 1.7.9: alleen wat de broker bevestigde.
+                        if getattr(deel, "success", False):
+                            await self._record_partial(
+                                ticket, units, action.reason,
+                                datetime.now(timezone.utc),
+                            )
+                        else:
+                            _LOGGER.error(
+                                "Deelsluiting van %s niet bevestigd: %s. Niet "
+                                "geboekt.", ticket,
+                                getattr(deel, "error", None) or "onbekend",
+                            )
                     self._partial_taken.add(ticket)
             except VenueError as err:
                 _LOGGER.error("Exitactie %s mislukte: %s", action.kind, err)

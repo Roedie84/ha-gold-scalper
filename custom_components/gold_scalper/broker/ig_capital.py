@@ -76,6 +76,12 @@ HISTORY_CHUNK_DAYS = 7
 #: wordt door de veiligheidslaag teruggezocht - nooit opnieuw verstuurd.
 CONFIRM_DELAYS = (0.0, 0.3, 0.7, 1.0, 1.5, 2.5)
 
+#: 1.7.9: wachttijden voor de bevestiging van een sluitverzoek. Eerst direct,
+#: dan herkansingen na 1, 3 en 10 seconden. Blijft het onbekend, dan wordt de
+#: sluiting niet geboekt maar als "onderweg" behandeld; de positielijst van de
+#: broker beslist daarna.
+CLOSE_CONFIRM_DELAYS = (0.0, 1.0, 3.0, 10.0)
+
 #: Alles daartussen: sessies, accountgegevens, historie.
 TIMEOUT = ClientTimeout(total=15, connect=5)
 
@@ -1192,6 +1198,12 @@ class IgStyleVenue(ExecutionVenue):
             headers_extra={"_method": "DELETE"},
             timeout=ORDER_TIMEOUT,
         )
+        return await self._confirm_close(payload, str(ticket), size)
+
+    async def _confirm_close(
+        self, payload: dict, ticket: str, size: float | None,
+    ) -> OrderResult:
+        """Standaard: een dealReference geldt als aangenomen. IG overschrijft."""
         reference = payload.get("dealReference")
         return OrderResult(success=bool(reference), ticket=ticket, units=size)
 
@@ -1771,6 +1783,54 @@ class IgVenue(IgStyleVenue):
                 f"Geen bevestiging voor {reference}. De order kan alsnog uitgevoerd "
                 "zijn; nieuwe orders wachten tot hij is teruggevonden."
             ),
+        )
+
+    async def _confirm_close(
+        self, payload: dict, ticket: str, size: float | None,
+    ) -> OrderResult:
+        """Een sluitverzoek pas als uitgevoerd melden na ACCEPTED (1.7.9).
+
+        Een dealReference betekent alleen dat IG het verzoek ontving. Of de
+        positie dicht is, staat in ``/confirms/{dealReference}``. Tot 1.7.9
+        werd op de referentie alleen al geboekt; een afgewezen sluiting stond
+        dan dicht in de database en open bij de broker.
+
+        * ACCEPTED: ``success``.
+        * REJECTED: niet gelukt, met de reden van IG.
+        * Niets te krijgen: ``unconfirmed`` - onbekend, niet mislukt.
+        """
+        reference = payload.get("dealReference")
+        if not reference:
+            return OrderResult(
+                success=False, ticket=ticket, units=size,
+                error="Geen dealReference ontvangen",
+            )
+        for delay in CLOSE_CONFIRM_DELAYS:
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                confirm = await self._request("GET", f"/confirms/{reference}")
+            except VenueError as err:
+                _LOGGER.debug("Sluitbevestiging %s nog niet: %s", reference, err)
+                continue
+            status = str((confirm or {}).get("dealStatus", "")).upper()
+            if status == "ACCEPTED":
+                level = _als_getal(confirm.get("level"))
+                return OrderResult(
+                    success=True, ticket=ticket, units=size,
+                    fill_price=level, client_ref=reference,
+                )
+            if status == "REJECTED":
+                return OrderResult(
+                    success=False, ticket=ticket, units=size,
+                    client_ref=reference,
+                    error=f"Sluiting afgewezen door IG: "
+                          f"{confirm.get('reason') or 'onbekende reden'}",
+                )
+        return OrderResult(
+            success=False, ticket=ticket, units=size, unconfirmed=True,
+            client_ref=reference,
+            error=f"Geen bevestiging van IG voor sluitverzoek {reference}.",
         )
 
     async def confirm_status(self, reference: str) -> tuple[str, str | None]:

@@ -1,5 +1,34 @@
 # Changelog — Gold Scalper
 
+## 1.7.9
+
+* **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,
+  standaardwaarden, positiegrootte en vingerafdruk zijn niet aangeraakt.
+* **Sluiting pas boeken na bevestiging door IG.** Een dealReference betekent
+  alleen dat IG het verzoek ontving. Na elk sluitverzoek wordt nu
+  `/confirms/{dealReference}` opgevraagd (direct, dan na 1, 3 en 10 s):
+  * **ACCEPTED**: de trade wordt als gesloten geboekt (zoals voorheen).
+  * **REJECTED**: niet geboekt; de positie blijft open en bewaakt, met een
+    ERROR die de reden van IG noemt. De exitlogica mag hetzelfde besluit
+    daarna opnieuw uitvoeren, met wachttijd (10, 30, 60, 120 s) en een
+    limiet van 5 pogingen. Daarna probeert de bot het niet meer
+    automatisch: de positie blijft open, bewaakt en met zijn stop bij de
+    broker; ERROR met het advies hem zo nodig handmatig te sluiten.
+  * **Geen bevestiging** (timeout, netwerk): niet geboekt, maar "onderweg".
+    Zolang dat zo is gaat er geen tweede sluitverzoek uit. Verdwijnt de
+    positie bij de broker, dan rekent de gewone afwikkeling van verdwenen
+    posities hem af (gemeten uitstapprijs, of gemarkeerd als geschat). Staat hij er na 90 s nog, dan telt dat als
+    een niet uitgevoerde sluiting (wachttijd en limiet zoals hierboven).
+  * Ook een deelsluiting wordt alleen geboekt na bevestiging.
+* **"Sluiting niet uitgevoerd" binnen 90 s.** Lopende sluitverzoeken worden
+  nu elke cyclus nagekeken tegen de positielijst die de cyclus al ophaalt -
+  geen extra verzoek bij IG, en de volledige controle draait niet vaker.
+  Staat een als gesloten geboekte positie na 90 s nog bij de broker, dan
+  volgt direct de noodstop (voorheen pas bij de volgende volledige
+  controle, tot ruim drie minuten later).
+* Zolang een sluiting loopt of geboekt is, stuurt de exitlogica geen tweede
+  sluitverzoek op dezelfde positie (dat kon in het gat van 1.7.8).
+
 ## 1.7.8
 
 * **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,

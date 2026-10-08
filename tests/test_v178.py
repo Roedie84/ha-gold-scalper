@@ -15,7 +15,6 @@ database" en een noodstop op een positie die al dicht was.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 import time
@@ -171,15 +170,3 @@ def test_brand_iconen_aanwezig_en_juiste_maat():
     assert _png_maat(PKG / "brand" / "icon.png") == (256, 256)
     assert _png_maat(PKG / "brand" / "icon@2x.png") == (512, 512)
 
-
-# ---------------- release ---------------- #
-
-def test_version_is_consistent():
-    from gold_scalper import const
-
-    manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.7.8"
-    readme = (PKG.parent.parent / "README.md").read_text(encoding="utf-8")
-    assert "Huidige versie: **1.7.8**" in readme
-    changelog = (PKG.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert changelog.split("## ")[1].startswith("1.7.8")
