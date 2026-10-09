@@ -474,6 +474,12 @@ class IgStyleVenue(ExecutionVenue):
         self._cst: str | None = None
         self._token: str | None = None
         self._account_id: str | None = None
+        #: 1.8.1: Lightstreamer-adres uit het sessieantwoord van IG. Alleen
+        #: voor de koersweergave op het dashboard; nooit voor beslissingen.
+        self._ls_endpoint: str | None = None
+        #: Telt elke geslaagde inlog, zodat de koersstroom ziet dat er
+        #: nieuwe tokens zijn zonder zelf een verzoek te doen.
+        self._sessie_generatie = 0
         self._lock = asyncio.Lock()
         #: Laatst bekende koers, om een gesloten markt te overbruggen zonder
         #: de integratie te laten falen.
@@ -542,6 +548,11 @@ class IgStyleVenue(ExecutionVenue):
                         "zonder die twee is geen enkel vervolgverzoek mogelijk."
                     )
                 self._account_id = self._extract_account_id(payload)
+                self._ls_endpoint = (
+                    payload.get("lightstreamerEndpoint")
+                    if isinstance(payload, dict) else None
+                )
+                self._sessie_generatie += 1
         except VenueError:
             raise
         except ClientError as err:
@@ -549,6 +560,25 @@ class IgStyleVenue(ExecutionVenue):
 
     def _extract_account_id(self, payload: dict) -> str | None:
         return payload.get("currentAccountId") or payload.get("accountId")
+
+    def streaming_credentials(self) -> dict | None:
+        """Gegevens voor de alleen-lezende koersstroom (1.8.1), of None.
+
+        Alleen IG levert een Lightstreamer-adres. Er wordt hier niets
+        opgevraagd: zonder bestaande sessie is het antwoord None en wacht de
+        stroom tot de gewone cyclus heeft ingelogd. Zo kost de stroom geen
+        enkel REST-verzoek. Wachtwoord volgens IG: ``CST-<cst>|XST-<xst>``,
+        gebruiker het account-ID.
+        """
+        if not (self._ls_endpoint and self._cst and self._token and self._account_id):
+            return None
+        return {
+            "endpoint": self._ls_endpoint,
+            "user": self._account_id,
+            "password": f"CST-{self._cst}|XST-{self._token}",
+            "epic": self.epic,
+            "generatie": self._sessie_generatie,
+        }
 
     def _close_path(self, ticket: str) -> str:
         """Pad voor het sluiten van een positie.

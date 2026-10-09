@@ -1,9 +1,12 @@
-// Gold Scalper - broker-dashboard (1.8.0).
+// Gold Scalper - broker-dashboard (1.8.0, live koers 1.8.1).
 //
 // Alleen weergave. Dit paneel plaatst, sluit of wijzigt niets: er zijn geen
-// handelsknoppen, en het enige verzoek dat het doet is een GET op
-// /api/gold_scalper/broker via hass.callApi (de frontend voegt zelf de sessie
-// toe; hier wordt geen token bewaard of in een URL gezet).
+// handelsknoppen. Het doet een GET op /api/gold_scalper/broker via
+// hass.callApi (de frontend voegt zelf de sessie toe; hier wordt geen token
+// bewaard of in een URL gezet) en abonneert zich, als dat kan, op de live
+// koers via de bestaande websocket van Home Assistant
+// (gold_scalper/broker_stream). Live bedragen zijn indicatief; het officiële
+// bedrag komt per cyclus van de broker.
 // Geen externe bronnen: geen CDN, geen bibliotheek, geen webfont. De grafiek
 // is zelf getekend op een canvas, de equitycurve in SVG.
 // Alle tekst van de server gaat door esc() voordat hij in de pagina komt.
@@ -12,6 +15,8 @@ const DATA_PATH = "gold_scalper/broker";
 const ELEMENT_NAME = "gold-scalper-broker-panel";
 const EXPECTED_API = 1;
 const POLL_MS = 5000;
+const STREAM_TYPE = "gold_scalper/broker_stream";
+const HERABONNEER_MS = 30000;
 const REPORT_URL = "/api/gold_scalper/report";
 const OVERVIEW_URL = "/api/gold_scalper/overview";
 
@@ -118,6 +123,10 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 .stip.ok { background: var(--groen); box-shadow: 0 0 8px rgba(52, 211, 153, .75); }
 .stip.let { background: var(--oranje); box-shadow: 0 0 8px rgba(251, 146, 60, .6); }
 .stip.gevaar { background: var(--rood); box-shadow: 0 0 8px rgba(251, 100, 118, .75); }
+.chip.live { color: var(--groen); border-color: rgba(52, 211, 153, .45); letter-spacing: .1em; font-weight: 800; }
+.stip.live { background: var(--groen); box-shadow: 0 0 8px rgba(52, 211, 153, .8); animation: gsb-puls 1.6s ease-in-out infinite; }
+@keyframes gsb-puls { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.8); } }
+.ind { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em; color: var(--groen); background: rgba(52,211,153,.1); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; white-space: nowrap; }
 .quote { display: flex; gap: 6px; }
 .qv { padding: 6px 12px; border-radius: 12px; background: var(--paneel2); border: 1px solid var(--rand); min-width: 104px; }
 .qv .lbl { font-size: 10px; }
@@ -381,6 +390,18 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._hover = null;
     this._timer = null;
     this._klok = null;
+    // live koers (1.8.1)
+    this._live = null;           // laatste tick
+    this._liveStatus = "uit";    // uit | verbinden | live | terugval
+    this._liveReden = null;
+    this._liveCandle = null;     // lopende candle uit de ticks
+    this._raf = null;
+    this._unsub = null;
+    this._subGen = 0;
+    this._subBezig = false;
+    this._herTimer = null;
+    this._streamNiet = false;    // server zei: niet beschikbaar (papier)
+    this._actief = false;
     this._root = this.attachShadow({ mode: "open" });
     this._bouw();
   }
@@ -402,6 +423,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
 
   _start() {
     if (!this._hass || this._timer) return;
+    this._actief = true;
+    this._abonneer();
     this._timer = setInterval(() => { if (!document.hidden) this._laad(); }, POLL_MS);
     this._klok = setInterval(() => this._tik(), 1000);
     if (!this._ro && window.ResizeObserver) {
@@ -417,6 +440,130 @@ class GoldScalperBrokerPanel extends HTMLElement {
   _stop() {
     clearInterval(this._timer); clearInterval(this._klok);
     this._timer = this._klok = null;
+    this._actief = false;
+    this._streamNiet = false;
+    this._afmelden();
+    clearTimeout(this._herTimer); this._herTimer = null;
+    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+  }
+
+  // ------------------------------------------------- live koers (1.8.1) -- //
+  async _abonneer() {
+    if (this._unsub || this._subBezig || this._streamNiet || !this._actief) return;
+    const conn = this._hass && this._hass.connection;
+    if (!conn || typeof conn.subscribeMessage !== "function") return;
+    this._subBezig = true;
+    const gen = ++this._subGen;
+    try {
+      const msg = { type: STREAM_TYPE };
+      if (this._data && this._data.entry) msg.entry = this._data.entry;
+      const unsub = await conn.subscribeMessage((m) => this._opStroom(m), msg);
+      if (gen !== this._subGen || !this._actief) { try { unsub(); } catch (_e) { /* al weg */ } return; }
+      this._unsub = unsub;
+    } catch (err) {
+      this._zetLive("uit", (err && err.message) || null);
+      if (err && err.code === "not_supported") this._streamNiet = true;
+      else this._planHerabonneer();
+    } finally { this._subBezig = false; }
+  }
+  _afmelden() {
+    this._subGen++;
+    const u = this._unsub;
+    this._unsub = null;
+    if (u) { try { const r = u(); if (r && r.catch) r.catch(() => {}); } catch (_e) { /* verbinding al dicht */ } }
+    this._live = null; this._liveCandle = null; this._liveStatus = "uit";
+  }
+  _planHerabonneer() {
+    clearTimeout(this._herTimer);
+    if (!this._actief) return;
+    this._herTimer = setTimeout(() => { this._herTimer = null; this._abonneer(); }, HERABONNEER_MS);
+  }
+  _opStroom(m) {
+    if (!m || !this._actief) return;
+    if (m.soort === "status") {
+      this._zetLive(m.status, m.reden);
+      if (m.status === "uit" && m.reden === "gestopt") { this._afmelden(); this._planHerabonneer(); }
+      return;
+    }
+    if (m.soort === "tick" && isNum(m.bied) && isNum(m.laat) && isNum(m.tijd)) {
+      this._live = m;
+      if (this._liveStatus !== "live") this._zetLive("live", null);
+      this._werkLiveCandleBij(m);
+      this._planLive();
+    }
+  }
+  _zetLive(status, reden) {
+    const was = this._liveStatus;
+    this._liveStatus = status || "uit";
+    this._liveReden = reden || null;
+    if (this._liveStatus !== "live") { this._live = null; this._liveCandle = null; }
+    this._renderLiveStatus();
+    if (was !== this._liveStatus) this._planLive();
+  }
+  _liveActief() { return this._liveStatus === "live" && !!this._live && !!this._data; }
+  _werkLiveCandleBij(t) {
+    const d = this._data;
+    if (!d || !isNum(t.mid)) return;
+    const base = d.instrument.tf_s || 60;
+    const b = Math.floor(t.tijd / base) * base;
+    let lc = this._liveCandle;
+    if (!lc || lc.t !== b) {
+      const c = d.candles, n = c ? c.t.length : 0;
+      if (n && b < c.t[n - 1]) return;   // ouder dan de data: negeren
+      lc = { t: b, o: t.mid, h: t.mid, l: t.mid, c: t.mid };
+      if (n && c.t[n - 1] === b) { lc.o = c.o[n - 1]; lc.h = c.h[n - 1]; lc.l = c.l[n - 1]; }
+      this._liveCandle = lc;
+    }
+    lc.h = Math.max(lc.h, t.mid); lc.l = Math.min(lc.l, t.mid); lc.c = t.mid;
+  }
+  _planLive() {
+    if (this._raf || !this._actief) return;
+    this._raf = requestAnimationFrame(() => { this._raf = null; this._renderLive(); });
+  }
+  _renderLive() {
+    const d = this._eff();
+    if (!d) return;
+    this._renderQuote(d);
+    this._renderStrip(d);
+    this._renderPositie(d);
+    this._renderMarkt(d);
+    this._renderPosities(d);
+    this._teken();
+  }
+  _renderLiveStatus() {
+    const el = this._q("#livestatus");
+    if (!el) return;
+    el.innerHTML = this._liveStatus === "live"
+      ? '<span class="chip live" title="Koers live via IG-streaming. Live bedragen zijn indicatief; het officiële bedrag komt per cyclus van de broker."><span class="stip live"></span>LIVE</span>'
+      : `<span class="chip neutraal" title="${esc(this._liveStatus === "verbinden" ? "Live koers wordt verbonden…" : this._liveReden || "Live koers niet beschikbaar")}"><span class="stip"></span>elke 5 s</span>`;
+  }
+  // Gegevens met de live koers erin verwerkt; zonder live: de poll-gegevens.
+  _eff() {
+    const d = this._data;
+    if (!d || !this._liveActief()) return d;
+    const t = this._live;
+    const k = { ...d.koers, bied: t.bied, laat: t.laat, mid: t.mid, spread: t.spread, tijd: t.tijd,
+      leeftijd_s: Math.max(0, Date.now() / 1000 - t.tijd), live: true };
+    if (d.koers.dag && isNum(t.mid) && isNum(d.koers.dag.ref) && d.koers.dag.ref) {
+      const dag = { ...d.koers.dag };
+      dag.verandering = t.mid - dag.ref;
+      dag.pct = ((t.mid - dag.ref) / dag.ref) * 100;
+      if (isNum(dag.hoog)) dag.hoog = Math.max(dag.hoog, t.mid);
+      if (isNum(dag.laag)) dag.laag = Math.min(dag.laag, t.mid);
+      k.dag = dag;
+    }
+    const iv = d.instrument.valuta, av = d.account.valuta, rate = d.instrument.omrekening;
+    // Zelfde richting als de backend: accountvaluta per eenheid instrumentvaluta.
+    const omzet = av && iv && av !== iv ? (isNum(rate) && rate > 0 ? rate : null) : 1;
+    const posities = (d.posities || []).map((p) => {
+      const koers = p.richting === "long" ? t.bied : t.laat;
+      if (!isNum(koers) || !isNum(p.instap) || !isNum(p.units)) return p;
+      const punten = p.richting === "long" ? koers - p.instap : p.instap - koers;
+      const pnl = punten * p.units;
+      return { ...p, koers, punten, pnl, pnl_account: omzet !== null ? pnl * omzet : null,
+        pnl_broker: p.pnl_account, live: true };
+    });
+    return { ...d, koers: k, posities };
   }
 
   async _laad() {
@@ -449,7 +596,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     <div class="merk"><div class="logo">${MERK_SVG}</div>
       <div><div class="merknaam">GOLD <b>SCALPER</b></div><div class="merksub" id="merksub">Broker-terminal</div></div></div>
     <div class="kop-mid" id="chips"></div>
-    <div class="kop-r"><div class="quote" id="quote"></div>
+    <div class="kop-r"><span id="livestatus"></span><div class="quote" id="quote"></div>
       <div class="klok"><div class="tijd" id="tijd">--:--</div><div class="datum" id="datum">&nbsp;</div></div></div>
   </header>
   <div class="meldingen" id="meldingen"></div>
@@ -518,7 +665,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
 
   // ----------------------------------------------------------- render -- //
   _render() {
-    const d = this._data;
+    const d = this._eff();
     const m = this._q("#meldingen");
     if (!d) {
       m.innerHTML = this._fout ? `<div class="melding let">${IC.alarm}<div><b>Nog geen gegevens</b><br><span>${esc(this._fout)}</span></div></div>` : "";
@@ -537,6 +684,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._renderStats(d);
     this._renderTrades(d);
     this._renderVoet(d);
+    this._renderLiveStatus();
     this._tik();
     this._teken();
   }
@@ -560,6 +708,10 @@ class GoldScalperBrokerPanel extends HTMLElement {
       geld + markt +
       `<span class="chip ${esc(st.toon)}"><span class="stip ${esc(st.toon)}"></span>${esc(st.label)}</span>` +
       handel + (st.toestand_label ? `<span class="chip">Toestand <b>${esc(st.toestand_label)}</b></span>` : "") + alarm;
+    this._renderQuote(d);
+  }
+
+  _renderQuote(d) {
     const k = d.koers;
     this._q("#quote").innerHTML =
       `<div class="qv"><div class="lbl">Bied</div><div class="px">${fmt(k.bied)}</div></div>` +
@@ -593,7 +745,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
     }
     this._q("#strip").innerHTML = [
       this._tegel("Equity", `${v}${fmt(a.equity)}`, `saldo ${v}${fmt(a.saldo)}`, "var(--goud)"),
-      this._tegel("Open P&L", `<span class="${toon(open)}">${fmtS(open)}</span><small>${esc(a.valuta || "")}</small>`, `${(d.posities || []).length} positie(s) open`, kl(open)),
+      this._tegel("Open P&L", `<span class="${toon(open)}">${fmtS(open)}</span><small>${esc(a.valuta || "")}</small>`,
+        `${(d.posities || []).length} positie(s) open${(d.posities || []).some((p) => p.live) ? ' <span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}`, kl(open)),
       this._tegel("Dag-P&L", `<span class="${toon(a.dag_pnl)}">${fmtS(a.dag_pnl)}</span><small>${esc(a.valuta || "")}</small>`, "equity t.o.v. dagstart", kl(a.dag_pnl)),
       this._tegel("Netto run", `<span class="${toon(a.netto)}">${fmtS(a.netto)}</span><small>${esc(a.stats_valuta)}</small>`, `bruto ${fmtS(a.bruto)} · ${d.stats.trades} trades`, kl(a.netto)),
       this._tegel("Kosten", `${sv}${fmt(a.kosten)}`, `${sv}${fmt(a.kosten_per_trade, 2)} per trade`, "var(--oranje)"),
@@ -650,7 +803,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
     const afstand = (x) => (isNum(x) && isNum(p.koers) ? fmtS(x - p.koers) : "—");
     el.innerHTML =
       `<div class="pk-kop"><span class="zijde ${p.richting}">${p.richting.toUpperCase()}</span><b class="num">${fmt(p.units)} oz</b><span class="ticket">${esc(p.ticket)}</span></div>` +
-      `<div><div class="pk-pnl ${toon(pnl)}">${fmtS(pnl)}<small>${esc(pv || "")}</small></div>` +
+      `<div><div class="pk-pnl ${toon(pnl)}">${fmtS(pnl)}<small>${esc(pv || "")}</small>${p.live ? '<span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}</div>` +
+      (p.live && isNum(p.pnl_broker) ? `<div class="pk-sub">broker (per cyclus): ${fmtS(p.pnl_broker)} ${esc(vl || "")}</div>` : "") +
       `<div class="pk-sub"><span class="${toon(p.punten)}">${fmtS(p.punten, 2)} pt</span> · instap ${fmt(p.instap)} → ${fmt(p.koers)}</div></div>` +
       slt +
       `<div class="kv drie"><div><span class="lbl">Stop-loss</span><b class="neg">${fmt(p.sl)}</b><div class="s">${afstand(p.sl)}</div></div>` +
@@ -707,7 +861,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
         `<div class="bereik"><div class="lijn"></div><div class="vul" style="left:0;width:${pos.toFixed(1)}%"></div><div class="nu" style="left:${pos.toFixed(1)}%"></div></div></div>`;
     }
     const leeft = isNum(k.leeftijd_s) ? `${fmt(k.leeftijd_s, 1)} s` : "—";
-    this._q("#m-r").innerHTML = st.koers_verouderd ? '<span class="chip let">koers verouderd</span>' : `<span class="chip"><span class="stip ok"></span>${esc(leeft)}</span>`;
+    this._q("#m-r").innerHTML = k.live ? '<span class="chip live"><span class="stip live"></span>live</span>'
+      : st.koers_verouderd ? '<span class="chip let">koers verouderd</span>' : `<span class="chip"><span class="stip ok"></span>${esc(leeft)}</span>`;
     const sig = st.signaal;
     this._q("#markt").innerHTML =
       `<div class="bl"><div class="bied"><div class="lbl">Bied</div><div class="px">${fmt(k.bied)}</div></div>` +
@@ -733,7 +888,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
         cel("Richting", `<span class="tag ${p.richting}">${p.richting.toUpperCase()}</span>`) +
         cel("Units", fmt(p.units), "r") + cel("Instap", fmt(p.instap), "r") +
         cel("Koers", fmt(p.koers), "r") + cel("SL", fmt(p.sl), "r neg") + cel("TP", fmt(p.tp), "r pos") +
-        cel("P&amp;L", `<b>${fmtS(pnl)}</b> <span class="dim">${esc(pv || "")}</span>`, `r ${toon(pnl)}`) +
+        cel("P&amp;L", `<b>${fmtS(pnl)}</b> <span class="dim">${esc(pv || "")}</span>${p.live ? '<span class="ind" title="live, indicatief">live</span>' : ""}`, `r ${toon(pnl)}`) +
         cel("Punten", fmtS(p.punten), `r ${toon(p.punten)}`) +
         cel("Duur", duur(this._nu() - p.geopend), "r", `op-duur-${i}`) +
         cel("Uitstap", esc(this._uitTekst(p)), "breed", `op-uit-${i}`) + "</tr>";
@@ -849,7 +1004,7 @@ ${tl}
   _renderVoet(d) {
     const geld = d.status.geld === "echt" ? '<span class="neg">Live — echt geld</span>'
       : d.status.geld === "demo" ? '<span class="demo">Demo — geen echt geld</span>' : '<span class="demo">Papierhandel — geen echt geld</span>';
-    this._q("#voet").innerHTML = `<span>Gold Scalper v${esc(d.versie)} · bronnen: broker (koers, posities, saldo), eigen database (trades, equity) · alleen weergave</span>` +
+    this._q("#voet").innerHTML = `<span>Gold Scalper v${esc(d.versie)} · bronnen: broker (koers, posities, saldo; koers live via IG-streaming als dat beschikbaar is), eigen database (trades, equity) · alleen weergave</span>` +
       `<span>${geld} · <a href="${REPORT_URL}" target="_blank" rel="noopener">Keuringsrapport</a> · <a href="${OVERVIEW_URL}" target="_blank" rel="noopener">Klassiek overzicht</a></span>`;
   }
 
@@ -879,25 +1034,35 @@ ${tl}
   }
 
   _aggregeer() {
-    const c = this._data && this._data.candles;
+    const d = this._eff();
+    const c = d && d.candles;
     if (!c || !c.t.length) return [];
-    const base = this._data.instrument.tf_s || 60;
+    const base = d.instrument.tf_s || 60;
     const tf = base * this._tfMul;
-    const uit = [];
-    for (let i = 0; i < c.t.length; i++) {
-      const b = Math.floor(c.t[i] / tf) * tf;
-      const l = uit[uit.length - 1];
-      if (l && l.t === b) { l.h = Math.max(l.h, c.h[i]); l.l = Math.min(l.l, c.l[i]); l.c = c.c[i]; }
-      else uit.push({ t: b, o: c.o[i], h: c.h[i], l: c.l[i], c: c.c[i] });
+    const basis = c.t.map((t, i) => ({ t, o: c.o[i], h: c.h[i], l: c.l[i], c: c.c[i] }));
+    const laatst = basis[basis.length - 1];
+    const lc = this._liveActief() ? this._liveCandle : null;
+    if (lc) {
+      // 1.8.1: de lopende candle uit de live ticks (high/low/close).
+      if (laatst.t === lc.t) { laatst.h = Math.max(laatst.h, lc.h); laatst.l = Math.min(laatst.l, lc.l); laatst.c = lc.c; }
+      else if (lc.t > laatst.t) basis.push({ ...lc });
+    } else {
+      // Laatste koers in de laatste candle verwerken, zoals een broker dat doet.
+      const mid = d.koers.mid;
+      if (isNum(mid) && d.status.markt_open !== false) { laatst.c = mid; laatst.h = Math.max(laatst.h, mid); laatst.l = Math.min(laatst.l, mid); }
     }
-    // Live koers in de laatste candle verwerken, zoals een broker dat doet.
-    const mid = this._data.koers.mid, l = uit[uit.length - 1];
-    if (l && isNum(mid) && this._data.status.markt_open !== false) { l.c = mid; l.h = Math.max(l.h, mid); l.l = Math.min(l.l, mid); }
+    const uit = [];
+    for (const k of basis) {
+      const b = Math.floor(k.t / tf) * tf;
+      const l = uit[uit.length - 1];
+      if (l && l.t === b) { l.h = Math.max(l.h, k.h); l.l = Math.min(l.l, k.l); l.c = k.c; }
+      else uit.push({ t: b, o: k.o, h: k.h, l: k.l, c: k.c });
+    }
     return uit;
   }
 
   _teken() {
-    const d = this._data, cv = this._cv, vak = this._vak;
+    const d = this._eff(), cv = this._cv, vak = this._vak;
     if (!cv || !vak) return;
     const W = vak.clientWidth, H = vak.clientHeight;
     if (!W || !H) return;
