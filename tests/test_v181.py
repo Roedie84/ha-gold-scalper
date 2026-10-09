@@ -41,8 +41,19 @@ class FakeTransport:
         self.sent = []
         self.closed = False
 
-    async def send(self, tekst):
-        self.sent.append(tekst)
+    # Zelfde interface als HttpStreamTransport (sinds 1.8.2).
+    async def create_session(self, params):
+        self.sent.append(S.build_request("create_session", params))
+
+    def bound(self, sessie, link):
+        self.sessie = sessie
+
+    async def control(self, params):
+        self.sent.append(S.build_request("control", params))
+        return None
+
+    async def rebind(self):
+        self.sent.append("bind_session")
 
     async def receive(self, timeout):
         await asyncio.sleep(0)
@@ -77,13 +88,12 @@ def test_version_is_consistent():
     from gold_scalper import const
 
     manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.8.1"
+    assert manifest["version"] == const.INTEGRATION_VERSION
     assert manifest["requirements"] == []          # eigen TLCP-client
     assert "websocket_api" in manifest["dependencies"]
     root = PKG.parent.parent
-    assert "Huidige versie: **1.8.1**" in (root / "README.md").read_text(encoding="utf-8")
-    eerste = (root / "CHANGELOG.md").read_text(encoding="utf-8").split("## ")[1]
-    assert eerste.startswith("1.8.1")
+    assert f"Huidige versie: **{const.INTEGRATION_VERSION}**" in (root / "README.md").read_text(encoding="utf-8")
+    eerste = (root / "CHANGELOG.md").read_text(encoding="utf-8").split("\n## 1.8.1\n")[1].split("\n## ")[0]
     laag = eerste.lower()
     assert "browser verversen" in laag and "paper" in laag and "demo" in laag
     assert "1.8.1" in (root / "DASHBOARD.md").read_text(encoding="utf-8")
@@ -107,11 +117,12 @@ def test_request_encoding():
     assert "+" not in sub
 
 
-def test_ws_url():
-    assert S.ws_url("https://demo-apd.marketdatasystems.com") == "wss://demo-apd.marketdatasystems.com/lightstreamer"
-    assert S.ws_url("https://x.y/") == "wss://x.y/lightstreamer"
-    assert S.ws_url("http://x.y") == "ws://x.y/lightstreamer"
-    assert S.LS_WS_SUBPROTOCOL == "TLCP-2.1.0.lightstreamer.com"
+def test_base_url():
+    assert S.base_url("https://demo-apd.marketdatasystems.com") == "https://demo-apd.marketdatasystems.com/lightstreamer"
+    assert S.base_url("https://x.y/") == "https://x.y/lightstreamer"
+    assert S.base_url("x.y") == "https://x.y/lightstreamer"
+    assert S.control_base("https://a.b/lightstreamer", "*") == "https://a.b/lightstreamer"
+    assert S.control_base("https://a.b/lightstreamer", "c.d") == "https://c.d/lightstreamer"
 
 
 def test_parse_message():
@@ -167,10 +178,9 @@ def test_handshake_and_updates():
     with pytest.raises(S.TlcpError) as err:
         asyncio.run(go())
     assert err.value.soort == "GESLOTEN"
-    assert tr.sent[0] == "wsok"
-    assert tr.sent[1].startswith("create_session\r\n")
-    assert tr.sent[2].startswith("control\r\n")      # pas na CONOK
-    assert len(tr.sent) == 3
+    assert tr.sent[0].startswith("create_session\r\n")
+    assert tr.sent[1].startswith("control\r\n")      # pas na CONOK
+    assert len(tr.sent) == 2
     assert live == [1]
     assert [t["bied"] for t in ticks] == [2650.1, 2650.2]
     assert ticks[1]["laat"] == 2650.4                  # ongewijzigd veld blijft
@@ -180,7 +190,7 @@ def test_control_waits_for_conok():
     tr = FakeTransport(["WSOK", None])
     with pytest.raises(S.TlcpError):
         asyncio.run(S.run_connection(tr, CREDS, lambda t: None, lambda: None))
-    assert len(tr.sent) == 2 and not any(s.startswith("control") for s in tr.sent)
+    assert len(tr.sent) == 1 and not any(s.startswith("control") for s in tr.sent)
 
 
 def test_conerr_auth_and_loop():
@@ -192,8 +202,11 @@ def test_conerr_auth_and_loop():
     with pytest.raises(S.TlcpError) as err:
         asyncio.run(S.run_connection(tr, CREDS, lambda t: None, lambda: None))
     assert not err.value.auth
-    tr = FakeTransport(HANDSHAKE + ["LOOP,0"])
-    assert asyncio.run(S.run_connection(tr, CREDS, lambda t: None, lambda: None)) == "loop"
+    tr = FakeTransport(HANDSHAKE + ["LOOP,0", "CONOK,S1a2b3,50000,5000,*", None])
+    with pytest.raises(S.TlcpError):
+        asyncio.run(S.run_connection(tr, CREDS, lambda t: None, lambda: None))
+    assert tr.sent.count("bind_session") == 1          # LOOP = opnieuw binden
+    assert sum(x.startswith("control") for x in tr.sent) == 1   # niet opnieuw abonneren
     tr = FakeTransport(["CONOK,S1,50000,5000,*", "REQERR,1,21,Bad item"])
     with pytest.raises(S.TlcpError) as err:
         asyncio.run(S.run_connection(tr, CREDS, lambda t: None, lambda: None))
@@ -276,7 +289,7 @@ def test_start_on_first_and_stop_after_last_subscriber(monkeypatch):
         return geopend
 
     geopend = asyncio.run(go())
-    assert geopend == ["wss://demo-apd.marketdatasystems.com/lightstreamer"]
+    assert geopend == ["https://demo-apd.marketdatasystems.com"]
     assert S.LS_LINGER_SECONDS == 0.05
 
 
@@ -504,9 +517,14 @@ def test_stream_never_feeds_decisions():
                            "_login(", "ClientSession("):
         assert verboden_woord not in code
     # Eén GET-achtig iets is er niet: alleen een websocket naar Lightstreamer.
-    assert "ws_connect" in code
-    for rest in ("session.get(", "session.post(", "session.request(", "session.delete("):
+    assert "create_session.txt" in code
+    # Alleen POSTs naar Lightstreamer (één plek), nooit naar de IG-REST-API.
+    for rest in ("session.get(", "session.request(", "session.delete(", "session.put("):
         assert rest not in code
+    assert code.count("session.post(") == 1
+    import re as _re
+    assert set(_re.findall(r"/(\w+)\.txt", code)) == {"create_session", "control", "bind_session"}
+    assert "gateway/deal" not in code
 
 
 def test_payload_carries_conversion_rate():
@@ -560,7 +578,7 @@ def test_create_session_only_known_parameters():
     params = S.create_session_request(CREDS).split("\r\n")[1]
     namen = {p.split("=", 1)[0] for p in params.split("&")}
     # Alleen parameters uit TLCP 2.1.0; geen adapterset (IG gebruikt DEFAULT).
-    assert namen == {"LS_cid", "LS_user", "LS_password", "LS_keepalive_millis"}
+    assert namen == {"LS_cid", "LS_user", "LS_password", "LS_keepalive_millis", "LS_polling"}
 
 
 def test_auth_codes():
@@ -605,16 +623,16 @@ def test_new_tokens_reconnect_without_warning(caplog):
     with caplog.at_level(logging.DEBUG, logger=S.__name__):
         geopend, t1, t2 = asyncio.run(go())
     assert len(geopend) == 2 and t1.closed
-    assert "CST-nieuw%7CXST-nieuw" in t2.sent[1]
+    assert "CST-nieuw%7CXST-nieuw" in t2.sent[0]
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
 
 def test_run_connection_returns_vernieuwd_only_when_live():
-    tr = FakeTransport(["WSOK", "CONOK,S1,50000,5000,*", "REQOK,1", "SUBOK,1,1,8", "PROBE"])
+    tr = FakeTransport(["CONOK,S1,50000,5000,*", "REQOK,1", "SUBOK,1,1,8", "PROBE"])
     uit = asyncio.run(S.run_connection(tr, CREDS, lambda t: None, lambda: None,
                                        verouderd=lambda: True))
     assert uit == "vernieuwd"
-    assert tr.sent[2].startswith("control")        # wel eerst geabonneerd
+    assert tr.sent[1].startswith("control")        # wel eerst geabonneerd
 
 
 def test_paper_ig_venue_refused_even_with_session():
@@ -654,49 +672,3 @@ def test_ws_command_registration(monkeypatch):
     conn = _Conn(admin=False)
     handler(_hass(), conn, {"id": 3, "type": cmd})
     assert conn.errors[0][1] == "unauthorized"
-
-
-def test_aiohttp_transport_against_local_tlcp_server():
-    """Echte websocket (lokaal): subprotocol, handshake en meerdere regels per frame."""
-    aiohttp = pytest.importorskip("aiohttp")
-    from aiohttp import web
-
-    ontvangen = []
-
-    async def handler(request):
-        ws = web.WebSocketResponse(protocols=(S.LS_WS_SUBPROTOCOL,))
-        await ws.prepare(request)
-        async for msg in ws:
-            ontvangen.append(msg.data)
-            if msg.data == "wsok":
-                await ws.send_str("WSOK\r\n")
-            elif msg.data.startswith("create_session"):
-                await ws.send_str("CONOK,S1,50000,5000,*\r\nSERVNAME,LS\r\n")
-            elif msg.data.startswith("control"):
-                await ws.send_str("REQOK,1\r\nSUBOK,1,1,8\r\n"
-                                  "U,1,1,2650.1|2650.4|12%3A00%3A01|1|0.1|2660|2640|TRADEABLE\r\n")
-                await ws.close()
-        return ws
-
-    async def go():
-        app = web.Application()
-        app.router.add_get("/lightstreamer", handler)
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, "127.0.0.1", 0)
-        await site.start()
-        poort = site._server.sockets[0].getsockname()[1]
-        ticks, live = [], []
-        async with aiohttp.ClientSession() as sessie:
-            tr = await S.AiohttpWsTransport.open(sessie, S.ws_url(f"http://127.0.0.1:{poort}"))
-            assert tr._ws.protocol == S.LS_WS_SUBPROTOCOL
-            with pytest.raises(S.TlcpError) as err:
-                await S.run_connection(tr, CREDS, ticks.append, lambda: live.append(1))
-            await tr.close()
-        await runner.cleanup()
-        return ticks, live, err.value
-
-    ticks, live, fout = asyncio.run(go())
-    assert fout.soort == "GESLOTEN"
-    assert live == [1] and ticks[0]["bied"] == 2650.1 and ticks[0]["broker_tijd"] == "12:00:01"
-    assert ontvangen[0] == "wsok" and ontvangen[1].startswith("create_session\r\n")

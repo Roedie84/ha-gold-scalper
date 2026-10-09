@@ -41,7 +41,7 @@ def stream_eligibility(coordinator) -> tuple[bool, str]:
 
 
 def _get_stream(hass: HomeAssistant, coordinator):
-    from .dashboard.stream import AiohttpWsTransport, PriceStream
+    from .dashboard.stream import HttpStreamTransport, PriceStream
 
     streams = hass.data.setdefault(STREAMS_KEY, {})
     entry_id = coordinator.entry.entry_id
@@ -54,8 +54,9 @@ def _get_stream(hass: HomeAssistant, coordinator):
     session = async_get_clientsession(hass)
     venue = coordinator.venue
 
-    async def _open(url: str):
-        return await AiohttpWsTransport.open(session, url)
+    async def _open(endpoint: str):
+        # 1.8.2: HTTP-streaming; IG sloot de websocket zonder antwoord.
+        return HttpStreamTransport(session, endpoint)
 
     def _taak(coro):
         return hass.async_create_background_task(

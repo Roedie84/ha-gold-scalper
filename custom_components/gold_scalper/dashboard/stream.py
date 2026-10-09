@@ -1,28 +1,38 @@
-"""Live koers voor het broker-dashboard via IG Lightstreamer (1.8.1).
+"""Live koers voor het broker-dashboard via IG Lightstreamer (1.8.1, 1.8.2).
 
 Alleen weergave. Deze module voedt niets in de handelslogica: geen import
 vanuit de coordinator of de strategie, geen schrijfacties, geen orders. De
 handel blijft op REST en op de bestaande cyclus. De stroom bestaat alleen
-zolang er een paneel kijkt en kost geen REST-verzoek: hij gebruikt de tokens
-van de sessie die de cyclus toch al heeft.
+zolang er een paneel kijkt en kost geen IG-REST-verzoek: hij gebruikt de
+tokens van de sessie die de cyclus toch al heeft.
 
-Protocol: een eigen, minimale TLCP-client (Lightstreamer TLCP-2.1.0) over een
-websocket van aiohttp, dat al in Home Assistant zit. Geen extra afhankelijkheid.
-Wat er gebruikt wordt, is klein:
+Protocol: een eigen, minimale TLCP-client (Lightstreamer TLCP-2.1.0) over
+**HTTP-streaming** met aiohttp, dat al in Home Assistant zit. Geen extra
+afhankelijkheid. (1.8.1 gebruikte een websocket; IG sloot die zonder
+antwoord, terwijl HTTP wel werkt. Daarom sinds 1.8.2 alleen HTTP.)
 
-* ``wsok`` en het antwoord ``WSOK`` (controle dat de websocket TLCP spreekt);
-* ``create_session`` met ``LS_user`` (account-ID) en ``LS_password``
-  (``CST-<cst>|XST-<xst>``), antwoord ``CONOK,<sessie>,<limiet>,<keepalive>,<link>``;
-* ``control`` met ``LS_op=add`` voor één item ``MARKET:<epic>`` in MERGE-modus,
-  antwoord ``REQOK`` en ``SUBOK``;
-* updates ``U,<sub>,<item>,<v1>|<v2>|...`` met de TLCP-codering: leeg =
-  ongewijzigd, ``#`` = null, ``$`` = lege tekst, ``^N`` = N velden ongewijzigd,
-  verder procent-gecodeerd;
-* ``PROBE`` (keepalive), ``LOOP`` (opnieuw verbinden), ``CONERR``, ``REQERR``,
-  ``ERROR`` en ``END`` (fout of einde).
+* ``POST /lightstreamer/create_session.txt?LS_protocol=TLCP-2.1.0`` met
+  ``LS_user`` (account-ID) en ``LS_password`` (``CST-<cst>|XST-<xst>``) als
+  formulier. Het antwoord is een stroom regels:
+  ``CONOK,<sessie>,<limiet>,<keepalive>,<control-link>``, daarna ``PROBE``,
+  ``SUBOK``, ``U``-regels enzovoort.
+* ``POST /lightstreamer/control.txt?LS_protocol=TLCP-2.1.0`` met
+  ``LS_session`` en ``LS_op=add`` voor één item ``MARKET:<epic>`` in
+  MERGE-modus; het antwoord (``REQOK`` of ``REQERR``) staat in de body van
+  dat verzoek, ``SUBOK`` komt op de stroom.
+* ``LOOP``: de stroom is op (inhoudslengte bereikt); verder met
+  ``POST /lightstreamer/bind_session.txt`` op dezelfde sessie. Het
+  abonnement blijft bestaan.
+* Updates ``U,<sub>,<item>,<v1>|<v2>|...`` met de TLCP-codering: leeg =
+  ongewijzigd, ``#`` = null, ``$`` = lege tekst, ``^N`` = N velden
+  ongewijzigd, verder procent-gecodeerd.
+* ``CONERR``, ``REQERR``, ``ERROR`` en ``END``: fout of einde.
 
-Zuiver Python plus asyncio en (optioneel) aiohttp: geen Home Assistant-imports,
-zodat de parser, de smoorklep en het start/stop-gedrag los te testen zijn.
+Wachtwoord en tokens komen nooit in een logregel: alleen serverregels en
+HTTP-statussen worden gelogd.
+
+Zuiver Python plus asyncio en (bij gebruik) aiohttp: geen Home
+Assistant-imports, zodat parser, smoorklep en start/stop los te testen zijn.
 """
 
 from __future__ import annotations
@@ -37,7 +47,6 @@ from urllib.parse import quote, unquote
 _LOGGER = logging.getLogger(__name__)
 
 LS_PROTOCOL = "TLCP-2.1.0"
-LS_WS_SUBPROTOCOL = f"{LS_PROTOCOL}.lightstreamer.com"
 #: Client-ID voor clients die niet van Lightstreamer zelf zijn, zoals de
 #: TLCP-specificatie hem noemt.
 LS_CID = "mgQkwtwdysogQz2BJ4Ji kOj2Bg"
@@ -57,11 +66,10 @@ LS_BACKOFF_SECONDS = (2, 5, 15, 30, 60, 120)
 #: Na een geweigerde inlog: wachten tot de cyclus nieuwe tokens heeft, maar
 #: minstens zo lang.
 LS_AUTH_WAIT_SECONDS = 120
-#: Hoe lang op CONOK of SUBOK gewacht wordt.
-LS_CONNECT_TIMEOUT = 15.0
-
 #: Na een geweigerde inlog met dezelfde tokens toch weer eens proberen.
 LS_AUTH_RETRY_SECONDS = 600
+#: Hoe lang op verbinding, CONOK of SUBOK gewacht wordt.
+LS_CONNECT_TIMEOUT = 15.0
 
 
 class TlcpError(Exception):
@@ -96,33 +104,40 @@ def encode_params(params: dict[str, Any]) -> str:
 
 
 def build_request(naam: str, params: dict[str, Any]) -> str:
-    """Eén TLCP-verzoek zoals het over een websocket gaat."""
+    """Leesbare vorm van een verzoek (voor tests en nepservers)."""
     return f"{naam}\r\n{encode_params(params)}"
 
 
-def ws_url(endpoint: str) -> str:
-    """``https://host`` wordt ``wss://host/lightstreamer``."""
+def base_url(endpoint: str) -> str:
+    """``https://host[/]`` wordt ``https://host/lightstreamer``."""
     e = str(endpoint).strip().rstrip("/")
-    if e.startswith("https://"):
-        e = "wss://" + e[len("https://"):]
-    elif e.startswith("http://"):
-        e = "ws://" + e[len("http://"):]
-    elif not e.startswith(("ws://", "wss://")):
-        e = "wss://" + e
-    return e + "/lightstreamer"
+    if not e.startswith(("https://", "http://")):
+        e = "https://" + e
+    if not e.endswith("/lightstreamer"):
+        e += "/lightstreamer"
+    return e
 
 
-def create_session_request(creds: dict) -> str:
-    return build_request("create_session", {
+def control_base(endpoint_base: str, link: str | None) -> str:
+    """Adres voor control/bind: zelfde server, of de control-link uit CONOK."""
+    if not link or link == "*":
+        return endpoint_base
+    schema = endpoint_base.split("://", 1)[0]
+    return f"{schema}://{link.strip().rstrip('/')}/lightstreamer"
+
+
+def create_session_params(creds: dict) -> dict[str, Any]:
+    return {
         "LS_cid": LS_CID,
         "LS_user": creds["user"],
         "LS_password": creds["password"],
         "LS_keepalive_millis": LS_KEEPALIVE_MS,
-    })
+        "LS_polling": "false",
+    }
 
 
-def subscribe_request(epic: str, req_id: int = 1, sub_id: int = 1) -> str:
-    return build_request("control", {
+def subscribe_params(epic: str, req_id: int = 1, sub_id: int = 1) -> dict[str, Any]:
+    return {
         "LS_reqId": req_id,
         "LS_op": "add",
         "LS_subId": sub_id,
@@ -130,7 +145,15 @@ def subscribe_request(epic: str, req_id: int = 1, sub_id: int = 1) -> str:
         "LS_group": f"MARKET:{epic}",
         "LS_schema": " ".join(LS_MARKET_FIELDS),
         "LS_snapshot": "true",
-    })
+    }
+
+
+def create_session_request(creds: dict) -> str:
+    return build_request("create_session", create_session_params(creds))
+
+
+def subscribe_request(epic: str, req_id: int = 1, sub_id: int = 1) -> str:
+    return build_request("control", subscribe_params(epic, req_id, sub_id))
 
 
 def parse_message(regel: str) -> tuple[str, list[str]]:
@@ -212,69 +235,147 @@ def tick_from_values(waarden: list[str | None], ontvangen: float) -> dict:
 
 # ----------------------------------------------------------- transport -- #
 
-class AiohttpWsTransport:
-    """Websocket via een bestaande aiohttp-sessie (die van Home Assistant)."""
+class HttpStreamTransport:
+    """TLCP over HTTP-streaming via een bestaande aiohttp-sessie (die van HA).
 
-    def __init__(self, ws) -> None:
-        self._ws = ws
-        self._buffer: list[str] = []
+    ``create_session`` en ``rebind`` openen een stroom-antwoord dat regel
+    voor regel gelezen wordt; ``control`` is een los, kort verzoek. Houdt de
+    gegevens voor de diagnose bij: HTTP-status en de eerste serverregel.
+    """
 
-    @classmethod
-    async def open(cls, session, url: str) -> AiohttpWsTransport:
-        ws = await asyncio.wait_for(
-            session.ws_connect(url, protocols=(LS_WS_SUBPROTOCOL,), autoping=True),
-            LS_CONNECT_TIMEOUT,
-        )
-        if getattr(ws, "protocol", None) != LS_WS_SUBPROTOCOL:
-            _LOGGER.debug("Koersstroom: server koos subprotocol %r",
-                          getattr(ws, "protocol", None))
-        return cls(ws)
+    naam = "http-streaming"
 
-    async def send(self, tekst: str) -> None:
-        await self._ws.send_str(tekst)
+    def __init__(self, session, endpoint: str) -> None:
+        self._session = session
+        self._base = base_url(endpoint)
+        self._control = self._base
+        self._resp = None
+        self._sessie: str | None = None
+        self.http_status: int | None = None
+        self.eerste_regel: str | None = None
 
-    async def receive(self, timeout: float) -> str | None:
-        """Eén regel, of None als de verbinding dicht is. TimeoutError bij stilte."""
+    @staticmethod
+    def _timeout():
         import aiohttp
 
-        while not self._buffer:
-            msg = await asyncio.wait_for(self._ws.receive(timeout), timeout + 1)
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                self._buffer.extend(r for r in msg.data.split("\r\n") if r)
-            elif msg.type == aiohttp.WSMsgType.BINARY:
-                tekst = msg.data.decode("utf-8", "replace")
-                self._buffer.extend(r for r in tekst.split("\r\n") if r)
-            elif msg.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSING,
-                              aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+        # Geen totale limiet: de stroom loopt lang. De stilte bewaakt
+        # run_connection zelf (keepalive).
+        return aiohttp.ClientTimeout(total=None, connect=LS_CONNECT_TIMEOUT,
+                                     sock_connect=LS_CONNECT_TIMEOUT, sock_read=None)
+
+    async def _post(self, url: str, params: dict[str, Any], *, stroom: bool):
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        resp = await asyncio.wait_for(
+            self._session.post(f"{url}?LS_protocol={LS_PROTOCOL}",
+                               data=encode_params(params), headers=headers,
+                               timeout=self._timeout()),
+            LS_CONNECT_TIMEOUT,
+        )
+        if stroom:
+            self.http_status = resp.status
+        if resp.status != 200:
+            try:
+                tekst = (await asyncio.wait_for(resp.text(), 5))[:200]
+            except Exception:  # noqa: BLE001
+                tekst = ""
+            resp.release()
+            regel = tekst.strip().splitlines()[0] if tekst.strip() else ""
+            if stroom and self.eerste_regel is None:
+                self.eerste_regel = regel or None
+            raise TlcpError("HTTP", str(resp.status), regel)
+        return resp
+
+    async def _sluit_stroom(self) -> None:
+        resp, self._resp = self._resp, None
+        if resp is not None:
+            try:
+                resp.close()
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Koersstroom: sluiten mislukte", exc_info=True)
+
+    async def create_session(self, params: dict[str, Any]) -> None:
+        self._resp = await self._post(f"{self._base}/create_session.txt", params, stroom=True)
+
+    def bound(self, sessie: str, link: str | None) -> None:
+        """CONOK ontvangen: sessie-ID en control-adres onthouden."""
+        self._sessie = sessie
+        self._control = control_base(self._base, link)
+
+    async def control(self, params: dict[str, Any]) -> str | None:
+        """Control-verzoek op de sessie; geeft de antwoordregel (REQOK/REQERR)."""
+        resp = await self._post(f"{self._control}/control.txt",
+                                {**params, "LS_session": self._sessie}, stroom=False)
+        try:
+            tekst = await asyncio.wait_for(resp.text(), LS_CONNECT_TIMEOUT)
+        finally:
+            resp.release()
+        regels = [r for r in tekst.splitlines() if r.strip()]
+        return regels[0] if regels else None
+
+    async def rebind(self) -> None:
+        """Na LOOP: nieuwe stroom op dezelfde sessie."""
+        await self._sluit_stroom()
+        self._resp = await self._post(
+            f"{self._control}/bind_session.txt",
+            {"LS_session": self._sessie, "LS_keepalive_millis": LS_KEEPALIVE_MS,
+             "LS_polling": "false"},
+            stroom=True,
+        )
+
+    async def receive(self, timeout: float) -> str | None:
+        """Eén regel, of None als de stroom op is. TimeoutError bij stilte."""
+        if self._resp is None:
+            return None
+        while True:
+            ruw = await asyncio.wait_for(self._resp.content.readline(), timeout)
+            if not ruw:
                 return None
-        return self._buffer.pop(0)
+            regel = ruw.decode("utf-8", "replace").rstrip("\r\n")
+            if not regel:
+                continue
+            if self.eerste_regel is None:
+                self.eerste_regel = regel[:200]
+            return regel
+
+    def diagnose(self) -> str:
+        delen = [f"transport {self.naam}"]
+        if self.http_status is not None:
+            delen.append(f"HTTP {self.http_status}")
+        delen.append(f"eerste serverregel: {self.eerste_regel!r}"
+                     if self.eerste_regel else "geen serverregel ontvangen")
+        return ", ".join(delen)
 
     async def close(self) -> None:
-        try:
-            await self._ws.close()
-        except Exception:  # noqa: BLE001
-            _LOGGER.debug("Koersstroom: sluiten mislukte", exc_info=True)
+        await self._sluit_stroom()
 
 
 # ------------------------------------------------------------ verbinding -- #
+
+def _fout_uit(soort: str, args: list[str]) -> TlcpError:
+    if soort == "REQERR":
+        return TlcpError(soort, args[1] if len(args) > 1 else "",
+                         unquote(args[2]) if len(args) > 2 else "")
+    return TlcpError(soort, args[0] if args else "",
+                     unquote(args[1]) if len(args) > 1 else "")
+
 
 async def run_connection(
     transport, creds: dict, on_tick: Callable[[dict], None],
     on_live: Callable[[], None], *, clock: Callable[[], float] = time.time,
     verouderd: Callable[[], bool] | None = None,
 ) -> str:
-    """Eén TLCP-sessie over een open transport, tot die eindigt.
+    """Eén TLCP-sessie over een transport, tot die eindigt.
 
-    Geeft ``"loop"`` terug als de server vraagt opnieuw te verbinden en
-    ``"vernieuwd"`` als de IG-sessie intussen nieuwe tokens heeft
-    (``verouderd()`` is waar; wordt bij elke serverregel bekeken, dus
-    minstens elke keepalive). Elke andere afloop is een uitzondering.
+    ``LOOP`` wordt binnen de sessie afgehandeld (``rebind``). Geeft
+    ``"vernieuwd"`` terug als de IG-sessie intussen nieuwe tokens heeft
+    (``verouderd()`` is waar; bekeken bij elke serverregel, dus minstens elke
+    keepalive). Elke andere afloop is een uitzondering.
     """
-    await transport.send("wsok")
-    await transport.send(create_session_request(creds))
+    await transport.create_session(create_session_params(creds))
     item = ItemState(len(LS_MARKET_FIELDS))
     wacht = LS_CONNECT_TIMEOUT
     live = False
+    geabonneerd = False
     while True:
         try:
             regel = await transport.receive(wacht)
@@ -282,6 +383,7 @@ async def run_connection(
             raise TlcpError("TIMEOUT", "", f"{wacht:.0f} s niets ontvangen") from err
         if regel is None:
             raise TlcpError("GESLOTEN", "", "verbinding verbroken door de server")
+        _LOGGER.debug("Koersstroom <- %s", regel[:200])
         if live and verouderd is not None and verouderd():
             return "vernieuwd"
         soort, args = parse_message(regel)
@@ -291,7 +393,15 @@ async def run_connection(
             except (IndexError, ValueError):
                 keepalive = LS_KEEPALIVE_MS / 1000.0
             wacht = max(LS_CONNECT_TIMEOUT, keepalive * 2 + 5)
-            await transport.send(subscribe_request(creds["epic"]))
+            transport.bound(args[0] if args else "", args[3] if len(args) > 3 else None)
+            if not geabonneerd:
+                geabonneerd = True
+                antwoord = await transport.control(subscribe_params(creds["epic"]))
+                if antwoord:
+                    _LOGGER.debug("Koersstroom control <- %s", antwoord[:200])
+                    a_soort, a_args = parse_message(antwoord)
+                    if a_soort in ("REQERR", "ERROR", "CONERR"):
+                        raise _fout_uit(a_soort, a_args)
         elif soort == "SUBOK":
             if not live:
                 live = True
@@ -301,15 +411,14 @@ async def run_connection(
                 waarden = item.apply(args[2])
                 on_tick(tick_from_values(waarden, clock()))
         elif soort == "LOOP":
-            return "loop"
-        elif soort in ("CONERR", "END", "ERROR"):
-            raise TlcpError(soort, args[0] if args else "", unquote(args[1]) if len(args) > 1 else "")
-        elif soort == "REQERR":
-            raise TlcpError(soort, args[1] if len(args) > 1 else "", unquote(args[2]) if len(args) > 2 else "")
+            await transport.rebind()
+            wacht = LS_CONNECT_TIMEOUT
+        elif soort in ("CONERR", "END", "ERROR", "REQERR"):
+            raise _fout_uit(soort, args)
         elif soort == "UNSUB":
             raise TlcpError(soort, "", "abonnement door de server beëindigd")
-        # WSOK, SERVNAME, CLIENTIP, CONS, PROBE, NOOP, SYNC, PROG, REQOK,
-        # CONF, MSGDONE, EOS, CS, OV: geen actie nodig.
+        # SERVNAME, CLIENTIP, CONS, PROBE, NOOP, SYNC, PROG, REQOK, CONF,
+        # MSGDONE, EOS, CS, OV: geen actie nodig.
 
 
 # --------------------------------------------------------------- beheer -- #
@@ -504,7 +613,7 @@ class PriceStream:
 
             try:
                 self.verbindingen += 1
-                transport = await self._open_transport(ws_url(creds["endpoint"]))
+                transport = await self._open_transport(creds["endpoint"])
                 uitkomst = await run_connection(
                     transport, creds, self._op_tick, self._bij_live,
                     clock=self._clock, verouderd=verouderd)
@@ -524,15 +633,18 @@ class PriceStream:
             if fout is None and uitkomst == "vernieuwd":
                 _LOGGER.debug("%s: koersstroom opnieuw met nieuwe IG-tokens", self._naam)
                 continue
-            if fout is None and uitkomst == "loop":
-                await asyncio.sleep(1)
-                continue
             tekst = (
                 f"{type(fout).__name__}: {fout}" if fout is not None
                 else "verbinding beëindigd"
             )
+            diagnose = getattr(transport, "diagnose", None)
+            if callable(diagnose):
+                try:
+                    tekst = f"{tekst}; {diagnose()}"
+                except Exception:  # noqa: BLE001
+                    pass
             self._waarschuw(tekst)
-            self._zet_status("terugval", tekst[:160])
+            self._zet_status("terugval", tekst[:200])
             wacht = LS_BACKOFF_SECONDS[min(pogingen, len(LS_BACKOFF_SECONDS) - 1)]
             if geweigerd is not None:
                 wacht = max(wacht, LS_AUTH_WAIT_SECONDS)

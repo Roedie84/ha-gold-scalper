@@ -1,5 +1,22 @@
 # Changelog — Gold Scalper
 
+## 1.8.2
+
+* **Geen strategiewijziging.** Alleen de live koers op het dashboard.
+* **Live koers via HTTP-streaming** in plaats van een websocket: IG sloot de
+  websocket zonder antwoord ("verbinding verbroken door de server"), terwijl
+  Lightstreamer over HTTP wel bereikbaar is. Nu `create_session.txt` als
+  stroom, `control.txt` voor het abonnement en `bind_session.txt` na LOOP
+  (TLCP-2.1.0). De websocket-route is verwijderd.
+* **Betere diagnose**: bij een fout één WARNING met transport, HTTP-status en
+  de eerste serverregel; elke serverregel op DEBUG. Wachtwoord en tokens
+  komen nooit in het logboek.
+* Nog steeds alleen met IG in demo- of live-modus, niet in paper; alleen
+  weergave, geen extra IG-REST-verzoek, geen nieuwe afhankelijkheid.
+* Het paneel zelf is niet gewijzigd: browser verversen is niet nodig (na de
+  update naar 1.8.1 wel eenmaal gedaan hebben).
+* Nieuw: `tests/test_v182.py` (lokale Lightstreamer-nepserver over HTTP).
+
 ## 1.8.1
 
 * **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,

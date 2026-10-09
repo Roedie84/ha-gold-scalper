@@ -48,14 +48,16 @@ Het klassieke overzicht en het keuringsrapport zijn onderaan gelinkt.
 * Optioneel `?entry=<entry_id>` bij meerdere configuraties.
 * "Clusters x van 30" is een richtgetal voor de weergave, geen poort.
 
-### Live koers via IG-streaming (1.8.1)
+### Live koers via IG-streaming (1.8.1, HTTP-streaming sinds 1.8.2)
 
 * Alleen met IG als broker in **demo- of live-modus**; in paper (of met een
   andere databron) blijft het dashboard op de 5-s-poll.
 * Het paneel abonneert zich via de bestaande websocket van Home Assistant op
   `gold_scalper/broker_stream` (alleen beheerders, geen schrijfacties). De
   integratie opent dan één alleen-lezende Lightstreamer-verbinding
-  (eigen minimale TLCP-2.1.0-client over aiohttp, geen extra afhankelijkheid)
+  (eigen minimale TLCP-2.1.0-client over aiohttp met HTTP-streaming:
+  `create_session.txt`, `control.txt`, `bind_session.txt` na LOOP; geen
+  extra afhankelijkheid. De websocket van 1.8.1 werd door IG gesloten)
   voor `MARKET:<epic>` (BID, OFFER, UPDATE_TIME, CHANGE, CHANGE_PCT, HIGH,
   LOW, MARKET_STATE).
 * Inloggegevens komen uit de bestaande IG-sessie van de cyclus
@@ -64,7 +66,8 @@ Het klassieke overzicht en het keuringsrapport zijn onderaan gelinkt.
   met de nieuwe tokens.
 * Start bij het eerste open paneel, stopt 60 s na het laatste, en bij
   unload/afsluiten. Hooguit 4 koersen per seconde naar het paneel.
-* Bij een fout: één WARNING, status "elke 5 s" (grijs) in de kopbalk,
+* Bij een fout: één WARNING met transport, HTTP-status en eerste
+  serverregel (nooit tokens), status "elke 5 s" (grijs) in de kopbalk,
   opnieuw proberen met oplopende wachttijd (2 s tot 2 min).
 * Het paneel toont LIVE (groen) met bied/laat, de lopende candle en
   prijslijn, en open P&L per positie en in de account-strip, gemarkeerd
