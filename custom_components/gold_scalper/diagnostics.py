@@ -111,7 +111,13 @@ async def async_get_config_entry_diagnostics(
                 coordinator.starting_balance, coordinator.opening_equity,
                 coordinator.current_equity,
             ),
-            "daily_loss_base": "equity van de broker bij de start van de handelsdag",
+            "daily_loss_base": (
+                "verlies vanaf de equity bij de start van de handelsdag, als "
+                "percentage van de kleinste van die equity en de startbalans"
+            ),
+            "daily_loss_risicobasis": coordinator.risk.dagbasis(
+                coordinator.starting_balance
+            ),
             "drawdown_basis": (
                 "account_equity" if coordinator.account_drawdown
                 else "trade_sequence_on_configured_balance"

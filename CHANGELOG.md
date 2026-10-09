@@ -1,5 +1,39 @@
 # Changelog — Gold Scalper
 
+## 1.9.4
+
+* **Geen strategiewijziging.** Alleen de risicoremmen (daglimiet en
+  vermogensvloer); signalen, ordergrootte en exits zijn niet aangeraakt.
+* **Daglimiet en vermogensvloer rekenen over de startbalans.** Op de IG-demo
+  staat ~10 miljoen, terwijl de ingestelde startbalans 10.000 is. Beide
+  remmen rekenden over de equity van het account en gingen daardoor
+  feitelijk nooit af: de daglimiet van 10% lag op ~1 miljoen verlies, de
+  vloer van 50% op ~5 miljoen.
+  * Daglimiet: het dagverlies telt nu als percentage van de *kleinste* van
+    dagstartsaldo en startbalans. Op de demo: 10% van 10.000 = **1.000**
+    verlies per dag.
+  * Vermogensvloer: naast de vloer op de ingestelde balans en die op de
+    opening van de run nu een **verliesvloer**: vanaf de equity bij de start
+    van de run mag hooguit (100 − 50)% van de kleinste van startbalans en die
+    equity verloren gaan. Op de demo: **maximaal 5.000 verlies per run**
+    (vloer = opening − 5.000).
+  * Op een echt account rond de startbalans verandert er niets: de strengste
+    vloer wint nog steeds (bijv. startbalans 10.000, opening 7.266: vloer
+    blijft 5.000). Een saldo onder de startbalans versoepelt niets.
+* **Saldosprong: geen noodstop.** Staat de saldosprongbewaker aan (een
+  onverklaarde sprong in het saldo, bijv. een reset van het demosaldo), dan
+  leidt een vloer- of daglimietoverschrijding niet tot een noodstop met
+  handmatig hervatten, maar tot een weigering van nieuwe posities
+  ("saldosprong: … niet betrouwbaar te toetsen") tot de sprong verklaard is.
+* Vermogensvloer-sensor toont `verliesvloer` en `max_verlies_run`; de
+  toegepaste vloer kan nu ook `verliesvloer` zijn. Het brokerpaneel toont
+  het dagverlies als percentage van de daglimiet (zelfde basis als de rem)
+  en de vloermeter rekent over de verliesruimte van de run.
+* README noemde nog versie 1.9.1; bijgewerkt.
+* Tests: `test_lab_services_57` faalde wisselend onder `pytest -n auto`
+  (gedeelde module-fixture over meerdere workers); die module draait nu op
+  één worker (xdist `loadgroup`).
+
 ## 1.9.3
 
 * Versieconstante bijgewerkt (1.9.2 meldde zich intern nog als 1.9.1); een

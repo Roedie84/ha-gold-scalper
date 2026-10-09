@@ -133,7 +133,12 @@ def test_the_floor_is_never_lowered():
 def test_a_higher_opening_raises_the_floor():
     rm = RiskManager(RiskLimits(equity_floor_pct=50.0), 10000.0, now=NU)
     v = rm.floor_breakdown(10000.0, 14000.0)
-    assert v["effective_equity_floor"] == 7000.0 and v["applied"] == "run_floor"
+    # 1.9.4: de run-vloer (7.000) ligt nog steeds boven de ingestelde
+    # (5.000), maar de verliesvloer is strenger: vanaf 14.000 mag hooguit
+    # 50% van de startbalans (5.000) verloren gaan, dus 9.000. Strengste wint.
+    assert v["run_floor"] == 7000.0 and v["run_floor"] > v["configured_floor"]
+    assert v["effective_equity_floor"] == 9000.0
+    assert v["applied"] == "verliesvloer"
 
 
 def test_a_missing_opening_keeps_todays_floor():

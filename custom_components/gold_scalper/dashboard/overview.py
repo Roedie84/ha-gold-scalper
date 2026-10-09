@@ -160,7 +160,12 @@ def _meetkwaliteit(data: dict) -> str:
             f"ruimte {huidig - b['effective_equity_floor']:.2f}"
             if huidig is not None else "ruimte onbekend"
         )
-        welke = "ingestelde balans" if b.get("applied") == "configured_floor" else "opening van de run"
+        welke = {
+            "configured_floor": "ingestelde balans",
+            "run_floor": "opening van de run",
+            # 1.9.4
+            "verliesvloer": "maximaal verlies vanaf de opening van de run",
+        }.get(b.get("applied"), "opening van de run")
         kaarten.append(_card(
             "Vermogensvloer",
             f"{b['effective_equity_floor']:.2f} {b.get('account_currency') or ''}",

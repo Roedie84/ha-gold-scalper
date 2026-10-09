@@ -218,3 +218,32 @@ def vaste_klok(monkeypatch):
 
     monkeypatch.setattr(sim, "datetime", Vast)
     return VASTE_KLOK
+
+
+
+def pytest_configure(config):
+    """Bij ``-n auto`` (xdist) de groepsverdeling gebruiken.
+
+    Sommige modules (``test_lab_services_57``) delen een fixture per module en
+    bouwen voort op eerdere tests in dezelfde module. Met de standaard
+    verdeling over workers kwamen die op verschillende workers terecht en
+    faalden ze wisselend. Met ``loadgroup`` blijven tests met dezelfde
+    ``xdist_group`` op één worker; de rest wordt verdeeld zoals voorheen.
+
+    De workers lezen de opdrachtregel opnieuw en zien de aanpassing van de
+    controller niet; daarom gaat de keuze mee via ``workerinput``.
+    """
+    werker = getattr(config, "workerinput", None)
+    if werker is not None:
+        if werker.get("gs_loadgroup"):
+            config.option.loadgroup = True
+        return
+    if getattr(config.option, "dist", "no") == "load":
+        config.option.dist = "loadgroup"
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_configure_node(node):
+    node.workerinput["gs_loadgroup"] = (
+        node.config.getoption("dist", "no") == "loadgroup"
+    )

@@ -171,7 +171,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **1.9.1** (zie `CHANGELOG.md`).
+Huidige versie: **1.9.4** (zie `CHANGELOG.md`).
 
 Het domein blijft `gold_scalper`: bestaande entiteiten, databases en
 instellingen werken ongewijzigd door.

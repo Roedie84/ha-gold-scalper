@@ -755,14 +755,17 @@ class GoldScalperBrokerPanel extends HTMLElement {
     const kl = (x) => (x > 0 ? "var(--groen)" : x < 0 ? "var(--rood)" : null);
     let vloer = "";
     if (isNum(a.vloer) && isNum(a.equity) && a.equity > 0) {
-      const pct = Math.max(0, Math.min(100, (a.vloer_afstand / a.equity) * 100));
+      // 1.9.4: over de verliesruimte van de run; op de demo (~10 mln) is de
+      // afstand tot de vloer anders altijd ~0% van de equity.
+      const noemer = isNum(a.vloer_budget) && a.vloer_budget > 0 ? a.vloer_budget : a.equity;
+      const pct = Math.max(0, Math.min(100, (a.vloer_afstand / noemer) * 100));
       vloer = `<div class="meter"><b style="width:${pct.toFixed(1)}%"></b></div>`;
     }
     this._q("#strip").innerHTML = [
       this._tegel("Equity", `${v}${fmt(a.equity)}`, `saldo ${v}${fmt(a.saldo)}`, "var(--goud)"),
       this._tegel("Open P&L", `<span class="${toon(open)}">${fmtS(open)}</span><small>${esc(a.valuta || "")}</small>`,
         `${(d.posities || []).length} positie(s) open${(d.posities || []).some((p) => p.live) ? ' <span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}`, kl(open)),
-      this._tegel("Dag-P&L", `<span class="${toon(a.dag_pnl)}">${fmtS(a.dag_pnl)}</span><small>${esc(a.valuta || "")}</small>`, "equity t.o.v. dagstart", kl(a.dag_pnl)),
+      this._tegel("Dag-P&L", `<span class="${toon(a.dag_pnl)}">${fmtS(a.dag_pnl)}</span><small>${esc(a.valuta || "")}</small>`, (isNum(a.dag_verlies_pct) && isNum(a.daglimiet_pct) ? `verlies ${fmt(Math.max(0, a.dag_verlies_pct), 2)}% van daglimiet ${fmt(a.daglimiet_pct, 0)}% (${v}${fmt(a.daglimiet)})` : "equity t.o.v. dagstart"), kl(a.dag_pnl)),
       this._tegel("Netto run", `<span class="${toon(a.netto)}">${fmtS(a.netto)}</span><small>${esc(a.stats_valuta)}</small>`, `bruto ${fmtS(a.bruto)} · ${d.stats.trades} trades`, kl(a.netto)),
       this._tegel("Kosten", `${sv}${fmt(a.kosten)}`, `${sv}${fmt(a.kosten_per_trade, 2)} per trade`, "var(--oranje)"),
       this._tegel("Vermogensvloer", `${v}${fmt(a.vloer)}`, `afstand ${v}${fmt(a.vloer_afstand)}`, "var(--blauw)", vloer),

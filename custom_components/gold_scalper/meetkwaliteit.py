@@ -76,6 +76,9 @@ SPECS: tuple[dict, ...] = (
             "toegepast": _floor(d).get("applied"),
             "vloer_ingestelde_balans": _floor(d).get("configured_floor"),
             "vloer_opening_run": _floor(d).get("run_floor"),
+            # 1.9.4
+            "verliesvloer": _floor(d).get("verliesvloer"),
+            "max_verlies_run": _floor(d).get("max_verlies_run"),
             "opening_equity": _floor(d).get("opening_equity_account"),
             "huidige_equity": _floor(d).get("current_equity_account"),
             "ruimte_tot_vloer": (

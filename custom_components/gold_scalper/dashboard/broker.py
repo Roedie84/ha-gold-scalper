@@ -390,6 +390,24 @@ def build_payload(
     equity_nu = _num(data.get("equity"))
     vloer = _num(balances.get("effective_equity_floor"))
     dag_start = _num((data.get("risk") or {}).get("day_start_balance"))
+    # 1.9.4: daglimiet over dezelfde basis als RiskManager.can_open (de
+    # kleinste van dagstart en startbalans), op het slechtste van saldo en
+    # equity. Zo laten dashboard en noodrem hetzelfde percentage zien.
+    risico = data.get("risk") or {}
+    dag_basis = _num(risico.get("risicobasis"))
+    saldo_nu = _num(data.get("balance"))
+    slechtste = (
+        min(x for x in (equity_nu, saldo_nu) if x is not None)
+        if equity_nu is not None or saldo_nu is not None else None
+    )
+    dag_verlies_pct = (
+        _num((dag_start - slechtste) / dag_basis * 100.0, 2)
+        if dag_start and dag_basis and slechtste is not None else None
+    )
+    vloer_budget = (
+        _num(balances.get("opening_equity_account") - vloer, 2)
+        if vloer is not None and balances.get("opening_equity_account") else None
+    )
 
     lat = (data.get("latency") or {}).get("total") or {}
     exits = data.get("exit_stats") or {}
@@ -463,7 +481,14 @@ def build_payload(
                 _num(equity_nu - dag_start, 2)
                 if equity_nu is not None and dag_start else None
             ),
+            "dag_verlies_pct": dag_verlies_pct,
+            "daglimiet_pct": _num(risico.get("max_daily_loss_pct"), 2),
+            "daglimiet": _num(risico.get("daglimiet_bedrag"), 2),
             "vloer": vloer,
+            # 1.9.4: totale verliesruimte van de run (opening min vloer); de
+            # meter in het paneel rekent hierover in plaats van over de equity.
+            "vloer_budget": vloer_budget,
+            "vloer_toegepast": balances.get("applied"),
             "vloer_afstand": (
                 _num(equity_nu - vloer, 2) if equity_nu is not None and vloer is not None else None
             ),

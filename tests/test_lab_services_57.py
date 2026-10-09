@@ -25,6 +25,9 @@ from gold_scalper.experiment_lab.wf_runner import WalkForwardRunner  # noqa: E40
 from gold_scalper.lab_actions import ACTION_FIELDS, LabActions  # noqa: E402
 from vaste_bars import vaste_bars  # noqa: E402
 
+# Bouwt voort op een gedeelde module-fixture: samen op één xdist-worker.
+pytestmark = pytest.mark.xdist_group("lab_services_57")
+
 PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalper"
 TEST_METRIEKEN = {"net_pnl", "gross_pnl", "expectancy", "profit_factor", "win_rate",
                   "maximum_drawdown", "max_drawdown", "trades", "trade_count", "average_trade"}
