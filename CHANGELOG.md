@@ -1,5 +1,24 @@
 # Changelog — Gold Scalper
 
+## 1.7.10
+
+* **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,
+  standaardwaarden, positiegrootte en vingerafdruk zijn niet aangeraakt.
+  Bij onenigheid tussen broker en rooster wint nog steeds 'gesloten'.
+* **Klokrand is geen roosterafwijking** (leerronde 9 oktober). Elke nacht
+  stond twee keer "De broker meldt de markt gesloten terwijl het rooster hem
+  open zegt ... vrijwel altijd een feestdag" in het logboek, om 22:59:59 en
+  om 23:59:59:
+  * 23:59:59,06: het rooster rekende de pauze tot en met 23:59:59, maar
+    vergeleek met microseconden - daardoor was het rooster al 'open'. Het
+    rooster rekent nu in hele seconden.
+  * 22:59:59: onze klok liep een fractie achter op de sluiting van de
+    broker. Binnen 15 s van een opening of sluiting volgens het rooster
+    (`bij_roostergrens`) gaat zo'n verschil nu als DEBUG in het logboek in
+    plaats van als WARNING. Een echte afwijking midden in de sessie blijft
+    een waarschuwing.
+* Nieuw: `tests/test_release_1710.py`.
+
 ## 1.7.9
 
 * **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,

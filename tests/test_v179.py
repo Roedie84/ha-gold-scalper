@@ -239,20 +239,3 @@ def test_bewaking_zit_in_de_cyclus():
     bron = Path(coord_mod.__file__).read_text(encoding="utf-8")
     i = bron.index("await self._settle_vanished_positions(quote, now)\n")
     assert "await self._bewaak_sluitingen()" in bron[i:i + 300]
-
-
-# ---------------- release ---------------- #
-
-PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalper"
-
-
-def test_version_is_consistent():
-    from gold_scalper import const
-
-    manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.7.9"
-    readme = (PKG.parent.parent / "README.md").read_text(encoding="utf-8")
-    assert "Huidige versie: **1.7.9**" in readme
-    changelog = (PKG.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert changelog.split("## ")[1].startswith("1.7.9")
-

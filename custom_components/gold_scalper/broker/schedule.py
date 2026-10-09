@@ -24,12 +24,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 _LOGGER = logging.getLogger(__name__)
 
 MARKET_TZ = ZoneInfo("Europe/Amsterdam")
+
+#: Zo dicht bij een opening of sluiting is een verschil tussen broker en
+#: rooster een klokrand, geen afwijking om te melden (1.7.10).
+ROOSTERGRENS_MARGE_S = 15
 
 
 @dataclass(slots=True)
@@ -86,7 +90,10 @@ def is_open(session: Session, moment: datetime | None = None) -> tuple[bool, str
     """Zou de markt volgens het rooster open moeten zijn?"""
     moment = (moment or datetime.now(timezone.utc)).astimezone(MARKET_TZ)
     weekday = moment.weekday()
-    clock = moment.time()
+    # 1.7.10: hele seconden. De pauze loopt tot en met 23:59:59; om
+    # 23:59:59,06 zei het rooster 'open' terwijl de broker (terecht) nog
+    # dicht was - elke nacht een valse waarschuwing (leerronde 9 oktober).
+    clock = moment.time().replace(microsecond=0)
 
     if session.daily_break:
         start, end = session.daily_break
@@ -111,6 +118,24 @@ def is_open(session: Session, moment: datetime | None = None) -> tuple[bool, str
     if weekday == session.closes_weekday:
         return (clock < session.closes_at), "weekendsessie"
     return False, "buiten de weekendsessie"
+
+
+def bij_roostergrens(
+    session: Session, moment: datetime | None = None, marge_s: float = ROOSTERGRENS_MARGE_S
+) -> bool:
+    """Ligt `moment` binnen `marge_s` seconden van een opening of sluiting
+    volgens het rooster (1.7.10)?
+
+    Op de grens zelf lopen onze klok en die van de broker een fractie uiteen:
+    om 22:59:59 meldde de broker al gesloten. Dat is geen feestdag en geen
+    verouderd rooster, alleen een klokrand. Bedoeld om de melding dan stil te
+    houden; wat er gehandeld mag worden verandert niet.
+    """
+    moment = moment or datetime.now(timezone.utc)
+    marge = timedelta(seconds=marge_s)
+    voor, _ = is_open(session, moment - marge)
+    na, _ = is_open(session, moment + marge)
+    return voor != na
 
 
 def minutes_until_close(

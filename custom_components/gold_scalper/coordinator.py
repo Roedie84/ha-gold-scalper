@@ -41,7 +41,7 @@ from .broker.reconcile_audit import SLUIT_GENADE_SECONDEN, compare_positions
 SLUIT_MAX_POGINGEN = 5
 SLUIT_BACKOFF = (10, 30, 60, 120)
 from .broker.schedule import (
-    SPOT_GOLD, ClosureObservation, cross_check, minutes_until_close,
+    SPOT_GOLD, ClosureObservation, bij_roostergrens, cross_check, minutes_until_close,
 )
 from .broker.exits import ExitConfig, ExitManager
 from .broker.ig_capital import CapitalVenue, IgVenue
@@ -2055,9 +2055,17 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 # melding stond 903 keer in het logboek over drieënhalf uur -
                 # dezelfde tekst, elke twintig seconden. Zo'n stortvloed maakt
                 # het logboek onbruikbaar voor de meldingen die er wél toe doen.
+                #
+                # 1.7.10: binnen 15 s van een roostergrens is het een klokrand
+                # (broker al/nog dicht), geen feestdag: dan DEBUG in plaats
+                # van WARNING. Wat er gehandeld mag worden verandert niet.
                 if note != self._last_schedule_note:
-                    _LOGGER.warning("Handelstijden: %s", note)
                     self._last_schedule_note = note
+                    melden = (
+                        _LOGGER.debug if bij_roostergrens(SPOT_GOLD, now)
+                        else _LOGGER.warning
+                    )
+                    melden("Handelstijden: %s", note)
             elif self._last_schedule_note is not None:
                 _LOGGER.info(
                     "Handelstijden: broker en rooster zijn het weer eens."

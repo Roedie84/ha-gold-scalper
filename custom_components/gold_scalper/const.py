@@ -203,7 +203,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "1.7.9"
+INTEGRATION_VERSION: Final = "1.7.10"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
