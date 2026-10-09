@@ -1,5 +1,11 @@
 # Changelog — Gold Scalper
 
+## 1.9.3
+
+* Versieconstante bijgewerkt (1.9.2 meldde zich intern nog als 1.9.1); een
+  test bewaakt nu dat manifest en constante gelijk zijn. Verder gelijk aan
+  1.9.2.
+
 ## 1.9.2
 
 * **Geen strategiewijziging.** Alleen de berekening van schaduwtrades.

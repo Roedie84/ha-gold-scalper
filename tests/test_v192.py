@@ -71,3 +71,12 @@ def test_oude_schaduwtrades_vervallen_eenmalig(tmp_path):
     db.connect()
     assert sorted(r["status"] for r in db.schaduw_trades(1)) == [
         "gesloten", "vervallen", "vervallen"]
+
+
+def test_versieconstante_gelijk_aan_manifest():
+    import json
+    from pathlib import Path
+    basis = Path(__file__).parent.parent / "custom_components" / "gold_scalper"
+    manifest = json.loads((basis / "manifest.json").read_text())
+    tekst = (basis / "const.py").read_text()
+    assert f'INTEGRATION_VERSION: Final = "{manifest["version"]}"' in tekst
