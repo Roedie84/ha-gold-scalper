@@ -180,3 +180,14 @@ laatste ronde: 09-10 07:40, gemeten t/m 09-10 07:45
 - Noodstop sinds 1.7.9: 0×. Geen release (tussenronde). Geen knoppen, geen instellingen.
 
 laatste ronde: 09-10 11:40, gemeten t/m 09-10 11:45
+
+## 09-10 15:40 · tussenronde
+- Geïnstalleerd: **1.9.4** (1.9.2 schaduwtrades op echte ordergrootte, 1.9.4 daglimiet/vermogensvloer over de startbalans; chatsessies). HA-herstarts 12:10, 12:24, 12:39, 12:50, 13:53, 14:42 (lifecycle sluit netjes af). Demo, handel aan; geen knoppen gebruikt.
+- Run 101 t/m 15:44: **40 trades / 3 clusters**, netto −58,57, bruto +7,41, kosten 65,98 (1,65/trade); PF 0,43, winst 35 %, t −2,13; alle 40 in regime `tijdstop`. Sinds 11:45: 33 trades (cluster 2: 30 trades 13:00-14:49, cluster 3: 3), netto −37,96 = bruto +17,70 − kosten 55,66 (1,69/trade). H-GS-7 onveranderd: bruto ≈ 0,5/trade tegen kosten ≈ 1,7/trade.
+- Cluster 2 bevat 75 % van de trades; met meerdere posities per richting groeien clusters (30 trades in 109 min). Bij ~3 clusters/dag duurt een t-toets op ~18 clusters ≈ 6 handelsdagen. L-GS-007 (tijdblokken) wordt belangrijker.
+- Schaduwtrades (1.9.2): 7 (allemaal reden `cooldown`), netto −32,27, PF 0,14, 4 clusters — n veel te klein.
+- **Sluitreden onbekend 2/40 (5 %)** (was 0/7 om 11:40; run 100 1,9 %), bij 6 herstarts in 3 uur. H-GS-9 (nieuw): onbekend-aandeel hangt aan herstarts; toetsen op een dag zonder installaties. Afstemming `in_orde`. Kosten gemeten 90 %.
+- Latency p99 980 ms, p50 194 (n=2000, venster met herstarts → geen schone H-GS-8-toets); staart signal→bookkeeping 323, exits→signal 270, candles→exits 266.
+- Noodstop 0×. Geen release (tussenronde).
+
+laatste ronde: 09-10 15:40, gemeten t/m 09-10 15:45

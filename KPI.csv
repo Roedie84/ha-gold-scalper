@@ -158,3 +158,9 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-09 11:40,TUSSEN,gs_sluitreden_onbekend_pct,0,7,"run 101"
 2026-10-09 11:40,TUSSEN,gs_kosten_gemeten_pct,71.4,7,"5 gemeten / 2 berekend (recent, zo ontworpen)"
 2026-10-09 11:40,TUSSEN,gs_afstemming_correctie_usd,8.61,1,"11:26 uitstap 4194.89 -> 4199.83 bij IG; -9.82 -> -1.21 bijgewerkt"
+2026-10-09 15:40,TUSSEN,gs_run101_trades,40,3,"netto -58.57, bruto +7.41, kosten 65.98 (1.65/trade); PF 0.426; winst 35%; t -2.128; alles tijdstop"
+2026-10-09 15:40,TUSSEN,gs_sinds_vorige_netto_usd,-37.96,33,"11:45-15:44: bruto +17.70, kosten 55.66 (1.69/trade)"
+2026-10-09 15:40,TUSSEN,gs_schaduw_trades,7,4,"netto -32.27, PF 0.143, allemaal cooldown"
+2026-10-09 15:40,TUSSEN,gs_sluitreden_onbekend_pct,5.0,40,"2/40; 6 herstarts 12:10-14:42 (H-GS-9)"
+2026-10-09 15:40,TUSSEN,gs_kosten_gemeten_pct,90.0,40,
+2026-10-09 15:40,TUSSEN,gs_latency_p99_ms,980.5,2000,"p50 194; venster met herstarts"
