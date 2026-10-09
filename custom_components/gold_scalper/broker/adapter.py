@@ -123,6 +123,10 @@ class OrderResult:
     #: zijn. Wie dit als "niet geplaatst" behandelt, stuurt de volgende cyclus
     #: een tweede order - zo ontstonden op 30-09 twaalf onbewaakte posities.
     unconfirmed: bool = False
+    #: 1.9.0: deals die de broker bij deze order (deels) sloot in plaats van
+    #: een aparte positie te openen - verrekening ("netting"). Leeg of None:
+    #: niets verrekend. Zie strategy/posities.py.
+    verrekend: list | None = None
     #: Ons eigen ordernummer, waarmee de positie bij de broker terug te
     #: vinden is.
     client_ref: str | None = None

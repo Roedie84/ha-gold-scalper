@@ -206,11 +206,62 @@ CREATE TABLE IF NOT EXISTS run_annotations (
     boundary   TEXT,
     created_at TEXT NOT NULL
 );
+
+-- 1.9.0: schaduwtrades. Geldige signalen die niet werden uitgevoerd
+-- (positielimiet, cooldown, marge ...), gesimuleerd met dezelfde instap, stop,
+-- doel en uitstapregels. Bewust een eigen tabel: ze tellen nergens mee in het
+-- echte resultaat, de bewijsfase of de live-poort.
+CREATE TABLE IF NOT EXISTS schaduw_trades (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id            INTEGER,
+    richting          INTEGER NOT NULL CHECK (richting IN (1, -1)),
+    open_time         TEXT NOT NULL,
+    open_price        REAL NOT NULL,
+    open_mid          REAL NOT NULL,
+    open_spread       REAL NOT NULL,
+    units             REAL NOT NULL,
+    stop_loss         REAL,
+    take_profit       REAL,
+    reden             TEXT NOT NULL,
+    reden_tekst       TEXT,
+    score             REAL,
+    status            TEXT NOT NULL DEFAULT 'open',
+    close_time        TEXT,
+    close_price       REAL,
+    close_mid         REAL,
+    close_reason      TEXT,
+    bruto             REAL,
+    kosten            REAL,
+    netto             REAL,
+    mfe               REAL,
+    mae               REAL,
+    laatst_bijgewerkt TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_schaduw_run ON schaduw_trades(run_id, status);
 """
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _meerdere_posities_toegestaan(config_json) -> bool:
+    """Stond deze run meerdere posities tegelijk toe (1.9.0 en later)?"""
+    try:
+        config = json.loads(config_json or "{}")
+    except (TypeError, ValueError):
+        return False
+    risico = (config or {}).get("risk") or {}
+    return risico.get("max_positions_per_richting") is not None
+
+
+#: Kolommen van schaduw_trades in de volgorde van SchaduwTrade.
+SCHADUW_KOLOMMEN = (
+    "run_id", "richting", "open_time", "open_price", "open_mid", "open_spread",
+    "units", "stop_loss", "take_profit", "reden", "reden_tekst", "score",
+    "status", "close_time", "close_price", "close_mid", "close_reason",
+    "bruto", "kosten", "netto", "mfe", "mae", "laatst_bijgewerkt",
+)
 
 
 @dataclass(slots=True)
@@ -291,6 +342,10 @@ class Trade:
     entry_cci: float | None = None
     regime: str | None = None
     open_reason: str | None = None
+    #: 1.9.0: aantal andere open posities (beide richtingen, onbevestigde
+    #: orders inbegrepen) op het moment van instap. Alleen statistiek: om
+    #: later te toetsen of stapelen iets toevoegt. None = van vóór 1.9.0.
+    gelijktijdig_open: int | None = None
     #: Ticketnummer bij de broker. Tekst, niet numeriek: IG gebruikt sleutels
     #: als 'DIAAAAYCJETQ7A8'.
     broker_ticket: str | None = None
@@ -406,6 +461,11 @@ class TradeDatabase:
         if "exit_regime" not in trade_columns:
             self._conn.execute("ALTER TABLE trades ADD COLUMN exit_regime TEXT")
             _LOGGER.info("Database bijgewerkt: kolom 'exit_regime' toegevoegd")
+        if "gelijktijdig_open" not in trade_columns:
+            self._conn.execute(
+                "ALTER TABLE trades ADD COLUMN gelijktijdig_open INTEGER"
+            )
+            _LOGGER.info("Database bijgewerkt: kolom 'gelijktijdig_open' toegevoegd")
         self._backfill_exit_regime()
         self._migrate_close_reasons()
         self._conn.commit()
@@ -921,7 +981,11 @@ class TradeDatabase:
         trade; dat is een bovengrens voor de fix, geen exact tijdstip.
         """
         gemarkeerd = 0
-        for run in self.conn.execute("SELECT id FROM runs").fetchall():
+        for run in self.conn.execute("SELECT id, config_json FROM runs").fetchall():
+            # 1.9.0: runs met een limiet per richting staan meerdere posities
+            # tegelijk toe; overlap is daar opzet, geen fout.
+            if _meerdere_posities_toegestaan(run["config_json"]):
+                continue
             trades = self.conn.execute(
                 "SELECT open_time, close_time FROM trades WHERE run_id=? "
                 "AND close_time IS NOT NULL AND broker_ticket NOT LIKE '%-deel' "
@@ -946,6 +1010,35 @@ class TradeDatabase:
             ):
                 gemarkeerd += 1
         return gemarkeerd
+
+    # -- schaduwtrades (1.9.0) --------------------------------------------- #
+
+    def bewaar_schaduw(self, trade) -> int:
+        """Nieuw of bijwerken. Raakt de tabel ``trades`` nooit aan."""
+        waarden = [getattr(trade, k) for k in SCHADUW_KOLOMMEN]
+        if getattr(trade, "id", None) is None:
+            cur = self.conn.execute(
+                f"INSERT INTO schaduw_trades ({', '.join(SCHADUW_KOLOMMEN)}) "
+                f"VALUES ({', '.join('?' for _ in SCHADUW_KOLOMMEN)})", waarden,
+            )
+            trade.id = int(cur.lastrowid)
+        else:
+            self.conn.execute(
+                f"UPDATE schaduw_trades SET "
+                f"{', '.join(f'{k}=?' for k in SCHADUW_KOLOMMEN)} WHERE id=?",
+                (*waarden, trade.id),
+            )
+        self.conn.commit()
+        return trade.id
+
+    def schaduw_trades(self, run_id: int, status: str | None = None) -> list[dict]:
+        query = "SELECT * FROM schaduw_trades WHERE run_id=?"
+        params: list = [run_id]
+        if status:
+            query += " AND status=?"
+            params.append(status)
+        query += " ORDER BY open_time, id"
+        return [dict(r) for r in self.conn.execute(query, params).fetchall()]
 
     def ledger_costs(self, run_id: int) -> dict:
         """Kosten van de gesloten trades van een run, uit het ledger.

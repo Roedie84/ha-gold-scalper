@@ -39,6 +39,11 @@ van maanden handelen.
 * Stop en doel staan **bij de broker**, dus ook actief als Home Assistant uitvalt
 * Break-even, trailing stop en een tijdslimiet
 * Circuit breakers: dagverlies, verliesreeks, vermogensvloer
+* Sinds 1.9.0: tot **3 posities per richting** (instelbaar 1..3), long en
+  short tegelijk; elke positie op haar eigen, ongewijzigde grootte. Kosten en
+  risico per signaal kunnen daardoor tot 3× oplopen. Minimale spreiding:
+  een latere candle én ≥ 0,3 × ATR prijsverschil t.o.v. elke open positie in
+  die richting; hooguit één nieuwe positie per cyclus. Zie `CHANGELOG.md`.
 
 ### Meten
 
@@ -54,6 +59,11 @@ Dit is waar het werk in zit.
 * **Consistentietoets** over meerdere periodes
 * **Barsarchief** dat herstarts overleeft, zodat hypothesen op historie te
   toetsen zijn in plaats van over weken
+* **Schaduwtrades** (1.9.0): geldige signalen die niet werden uitgevoerd
+  (limiet, cooldown, marge …) worden gesimuleerd met dezelfde instap, stop,
+  doel en uitstapregels, in een eigen tabel. Ze tellen nergens mee in het
+  echte resultaat of de bewijsfase (sensor *Schaduwtrades*, paneel op het
+  dashboard)
 
 ### De poort naar echt geld
 
@@ -161,7 +171,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **1.8.2** (zie `CHANGELOG.md`).
+Huidige versie: **1.9.0** (zie `CHANGELOG.md`).
 
 Het domein blijft `gold_scalper`: bestaande entiteiten, databases en
 instellingen werken ongewijzigd door.

@@ -263,13 +263,38 @@ SENSORS: tuple[ScalperSensor, ...] = (
         attrs_fn=lambda d: {
             "positions": [
                 {
+                    # 1.9.0: per ticket, zodat meerdere posities uit elkaar
+                    # te houden zijn.
+                    "ticket": str(getattr(p, "ticket", None) or getattr(p, "id", "") or ""),
                     "side": p.side,
                     "units": getattr(p, "units", None) or getattr(p, "volume", None),
                     "open_price": p.open_price,
                     "stop_loss": getattr(p, "stop_loss", None),
+                    "take_profit": getattr(p, "take_profit", None),
                 }
                 for p in (d.get("open_positions") or [])
-            ]
+            ],
+            # 1.9.0: telling per richting en de limiet.
+            "long": (d.get("posities_per_richting") or {}).get("long"),
+            "short": (d.get("posities_per_richting") or {}).get("short"),
+            "limiet_per_richting": (d.get("posities_per_richting") or {}).get("limiet"),
+            "netting_gedetecteerd": d.get("netting"),
+        },
+    ),
+    ScalperSensor(
+        # 1.9.0: gesimuleerde trades van geldige signalen die niet werden
+        # uitgevoerd. Telt nergens mee in het echte resultaat.
+        key="schaduw_trades", name="Schaduwtrades", icon="mdi:ghost-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda d: (d.get("schaduw") or {}).get("trades"),
+        attrs_fn=lambda d: {
+            k: (d.get("schaduw") or {}).get(k)
+            for k in (
+                "open", "vervallen", "winst", "verlies", "winst_pct",
+                "profit_factor", "netto", "bruto", "kosten", "verwachting",
+                "clusters", "t_statistiek", "t_basis", "per_reden",
+                "per_sluitreden", "let_op",
+            )
         },
     ),
     ScalperSensor(

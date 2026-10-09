@@ -118,6 +118,7 @@
           "risk_based_sizing": "Grootte uit risico berekenen (i.p.v. vaste ounces)",
           "risk_per_trade_pct": "Risico per trade in % van het vermogen",
           "scale_with_confidence": "Meer inzetten bij een sterker signaal",
+          "max_positions_per_richting": "Maximaal posities per richting (long en short elk; elke positie volle grootte)",
           "pyramid_enabled": "Bijkopen bij bevestiging (pyramiden)",
           "pyramid_trigger_atr": "Bijkopen vanaf winst in ATR",
           "pyramid_max_additions": "Maximaal aantal toevoegingen",

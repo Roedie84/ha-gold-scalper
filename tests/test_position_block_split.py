@@ -148,12 +148,15 @@ def test_cooldown_does_not_mask_the_split(market):
 
 
 def test_coordinator_passes_the_side():
-    """Zonder de richting valt er niets uit te splitsen."""
+    """Zonder de richting valt er niets uit te splitsen.
+
+    1.9.0: de coordinator geeft de telling per richting mee in plaats van de
+    richting van de eerste positie; de limiet geldt per richting."""
     from pathlib import Path
     source = (Path(__file__).resolve().parent.parent / "custom_components"
               / "gold_scalper" / "coordinator.py").read_text(encoding="utf-8")
-    assert 'getattr(first, "side", "buy")' in source
-    assert "self._last_entry_ts, side," in source
+    assert "per_richting = tel_per_richting(open_positions, pending)" in source
+    assert "self._last_entry_ts, 0, per_richting," in source
 
 
 def test_unknown_direction_is_not_guessed(market):

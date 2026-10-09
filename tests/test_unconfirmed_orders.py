@@ -294,7 +294,8 @@ def _coordinator_met(venue_cls, tmp_path, monkeypatch, respecteer_telling):
             return VenueQuote(bid=self.price - half, ask=self.price + half,
                               time=_nu(), tradeable=True)
 
-    def altijd(candles, bid, ask, cfg, uur, open_count, sinds, kant):
+    def altijd(candles, bid, ask, cfg, uur, open_count, sinds, kant, *_rest):
+        # 1.9.0: de coordinator geeft ook de telling per richting mee.
         if respecteer_telling and open_count:
             return _Signaal(should_trade=False, reject_reason="max_positions")
         return _Signaal()

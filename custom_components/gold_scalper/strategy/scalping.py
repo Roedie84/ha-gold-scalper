@@ -84,8 +84,17 @@ class ScalpConfig:
     max_hold_seconds: int = 300
     #: Positiegrootte in lots.
     volume: float = 0.01
-    #: Maximaal aantal gelijktijdige posities.
+    #: Maximaal aantal gelijktijdige posities (oude telling, totaal over
+    #: beide richtingen). Geldt alleen als ``evaluate`` géén telling per
+    #: richting krijgt; de coordinator geeft die sinds 1.9.0 altijd mee.
     max_positions: int = 1
+    #: 1.9.0: maximaal aantal open posities per richting (long en short elk).
+    #:
+    #: Besluit van de eigenaar (09-10-2026): meer posities mogen open om
+    #: sneller data te verzamelen, long en short mogen naast elkaar bestaan.
+    #: Elke positie houdt haar eigen grootte; het risico per signaal kan
+    #: daardoor tot dit veelvoud oplopen.
+    max_positions_per_richting: int = 3
     #: Minimale afstand tussen twee entries, in seconden.
     cooldown_seconds: int = 60
     #: Beperk de handel tot een vast tijdvenster.
@@ -175,6 +184,11 @@ class ScalpSignal:
     expected_move: float = 0.0
     expected_cost: float = 0.0
     components: dict[str, float] = field(default_factory=dict)
+    #: 1.9.0: het signaal komt door alle signaalfilters (spread, volatiliteit,
+    #: drempel, kostenpoort). Een geldig signaal dat niet wordt uitgevoerd -
+    #: positielimiet, cooldown, marge - is een kandidaat voor een
+    #: schaduwtrade; instap, stop en doel staan er dan gewoon in.
+    geldig: bool = False
 
 
 def _micro_trend(close: list[float]) -> tuple[float, str]:
@@ -281,6 +295,15 @@ def evaluate(
     #: veranderde - en dat verschil bepaalt of je vastzit in iets waarvan je
     #: systeem het tegenovergestelde denkt.
     open_position_side: int = 0,
+    #: 1.9.0: aantal open posities per richting, ``{1: longs, -1: shorts}``.
+    #:
+    #: Wordt dit meegegeven, dan geldt de limiet per richting
+    #: (``max_positions_per_richting``) in plaats van het totaal: een
+    #: tegengesteld signaal blokkeert niets meer en sluit ook niets. De
+    #: positielimiet en de cooldown worden dan pas ná de signaalberekening
+    #: getoetst, zodat een geblokkeerd maar geldig signaal zijn instap, stop
+    #: en doel behoudt (voor de schaduwtrades).
+    open_per_richting: dict[int, int] | None = None,
 ) -> ScalpSignal:
     """Beoordeel of er nu een scalp te maken is.
 
@@ -323,7 +346,13 @@ def evaluate(
                 f"Uur {hour_utc}:00 UTC valt buiten het venster {start}:00-{end}:00",
             )
 
-    if open_position_count >= cfg.max_positions:
+    per_richting = open_per_richting is not None
+    if per_richting:
+        # De limiet hangt nu af van de richting, en die is pas na de
+        # berekening bekend. De cooldown ook pas daarna toetsen: dan blijft
+        # een geldig signaal herkenbaar als schaduwkandidaat.
+        position_blocked = False
+    elif open_position_count >= cfg.max_positions:
         # Bewust hier niet meteen weigeren, maar dat onthouden en de score toch
         # berekenen. Anders zie je in de signaaltrechter alleen "positielimiet"
         # en niet óf de strategie ondertussen van richting veranderde. Dat
@@ -334,7 +363,8 @@ def evaluate(
     else:
         position_blocked = False
 
-    if not position_blocked and seconds_since_last_entry < cfg.cooldown_seconds:
+    if (not per_richting and not position_blocked
+            and seconds_since_last_entry < cfg.cooldown_seconds):
         return reject(
             "cooldown",
             f"Nog {cfg.cooldown_seconds - seconds_since_last_entry:.0f}s cooldown",
@@ -585,12 +615,13 @@ def evaluate(
             if candidate < stop:
                 stop = candidate
 
-    return ScalpSignal(
+    signaal = ScalpSignal(
         direction=direction,
         score=score,
         confidence=confidence,
         should_trade=True,
         reject_reason=None,
+        geldig=True,
         reason=(
             f"{'Long' if direction == 1 else 'Short'} bij score {score:+.3f}. "
             f"{trend_note}; {stretch_note}; {mom_note}; {vol_note}"
@@ -603,3 +634,26 @@ def evaluate(
         expected_cost=expected_cost,
         components=components,
     )
+    if not per_richting:
+        return signaal
+
+    # 1.9.0: de limiet per richting en de cooldown, ná de berekening. Het
+    # signaal blijft geldig (instap, stop en doel staan erin), maar wordt
+    # niet uitgevoerd.
+    kant = "long" if direction == 1 else "short"
+    open_hier = int((open_per_richting or {}).get(direction, 0) or 0)
+    if open_hier >= cfg.max_positions_per_richting:
+        signaal.should_trade = False
+        signaal.reject_reason = "max_positions_zelfde_richting"
+        signaal.reason = (
+            f"Limiet bereikt: {open_hier} van {cfg.max_positions_per_richting} "
+            f"posities {kant} open; signaal {score:+.3f} wordt niet uitgevoerd."
+        )
+    elif seconds_since_last_entry < cfg.cooldown_seconds:
+        signaal.should_trade = False
+        signaal.reject_reason = "cooldown"
+        signaal.reason = (
+            f"Nog {cfg.cooldown_seconds - seconds_since_last_entry:.0f}s "
+            f"cooldown; signaal {kant} {score:+.3f} wordt niet uitgevoerd."
+        )
+    return signaal

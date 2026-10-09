@@ -165,7 +165,7 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 
 /* raster */
 .raster { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "grafiek" "positie" "markt" "posities" "equity" "stats" "trades"; }
+  grid-template-areas: "grafiek" "positie" "markt" "posities" "equity" "stats" "trades" "schaduw"; }
 .paneel {
   min-width: 0; border-radius: var(--r);
   background: linear-gradient(180deg, var(--paneel), var(--paneel2));
@@ -176,6 +176,9 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 }
 .p-grafiek { grid-area: grafiek; } .p-positie { grid-area: positie; } .p-markt { grid-area: markt; }
 .p-posities { grid-area: posities; } .p-equity { grid-area: equity; } .p-stats { grid-area: stats; } .p-trades { grid-area: trades; }
+.p-schaduw { grid-area: schaduw; border-style: dashed; }
+.p-schaduw .ph h2 { color: var(--tekst2); }
+.schaduw-noot { margin: 0 16px 10px; font-size: 12px; color: var(--tekst2); }
 .ph { display: flex; align-items: center; gap: 9px; padding: 14px 16px 10px; color: var(--tekst2); min-width: 0; flex-wrap: wrap; }
 .ph h2 { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--tekst); }
 .ph .ic { color: var(--goud); }
@@ -290,7 +293,7 @@ footer .demo { color: var(--goud); font-weight: 700; }
 @container (min-width: 720px) {
   .strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .raster { grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas: "grafiek grafiek" "positie markt" "posities posities" "equity equity" "stats stats" "trades trades"; }
+    grid-template-areas: "grafiek grafiek" "positie markt" "posities posities" "equity equity" "stats stats" "trades trades" "schaduw schaduw"; }
 }
 @container (min-width: 1180px) {
   .strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
@@ -300,7 +303,8 @@ footer .demo { color: var(--goud); font-weight: 700; }
       "grafiek grafiek grafiek grafiek grafiek grafiek grafiek grafiek markt markt markt markt"
       "posities posities posities posities posities posities posities posities posities posities posities posities"
       "equity equity equity equity equity equity equity stats stats stats stats stats"
-      "trades trades trades trades trades trades trades stats stats stats stats stats"; }
+      "trades trades trades trades trades trades trades stats stats stats stats stats"
+      "schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw"; }
   .p-stats { align-self: start; }
 }
 @container (max-width: 719px) {
@@ -626,6 +630,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     <div class="paneel p-equity"><div class="ph">${IC.curve}<h2>Equity &amp; drawdown</h2><div class="ph-r" id="eq-r"></div></div><div class="eqvak" id="equity"></div></div>
     <div class="paneel p-stats"><div class="ph">${IC.sigma}<h2>Onderzoek &amp; statistiek</h2><div class="ph-r" id="st-r"></div></div><div class="pb" id="stats"></div></div>
     <div class="paneel p-trades"><div class="ph">${IC.klok}<h2>Recente trades</h2><div class="ph-r" id="tr-r"></div></div><div class="tabel" id="trades"></div></div>
+    <div class="paneel p-schaduw"><div class="ph">${IC.sigma}<h2>Schaduwtrades (gesimuleerd)</h2><div class="ph-r" id="sh-r"></div></div><div class="schaduw-noot">Geldige signalen die niet werden uitgevoerd (limiet, cooldown, marge …), gesimuleerd met dezelfde instap, stop, doel en uitstapregels. Telt níet mee in het resultaat of de bewijsfase.</div><div class="pb" id="schaduw"></div></div>
   </section>
   <footer id="voet"></footer>
 </div></div>`;
@@ -688,6 +693,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._renderEquity(d);
     this._renderStats(d);
     this._renderTrades(d);
+    this._renderSchaduw(d);
     this._renderVoet(d);
     this._renderLiveStatus();
     this._tik();
@@ -785,7 +791,9 @@ class GoldScalperBrokerPanel extends HTMLElement {
     const p = (d.posities || [])[0];
     const vl = d.account.valuta;
     const el = this._q("#positie");
-    this._q("#pk-r").innerHTML = (d.posities || []).length > 1 ? `<span class="chip">${d.posities.length} open</span>` : "";
+    const tel = d.posities_telling;
+    this._q("#pk-r").innerHTML = (d.posities || []).length > 1
+      ? `<span class="chip" title="Open posities per richting${tel && tel.limiet ? `; maximaal ${tel.limiet} per richting` : ""}">${d.posities.length} open${tel ? ` · ${tel.long} long / ${tel.short} short` : ""}</span>` : "";
     if (!p) {
       const sig = d.status.signaal;
       el.innerHTML = `<div class="notitie"><b>Geen open positie.</b><br>${esc(d.status.detail || "")}</div>` +
@@ -883,7 +891,10 @@ class GoldScalperBrokerPanel extends HTMLElement {
 
   _renderPosities(d) {
     const ps = d.posities || [];
-    this._q("#op-r").innerHTML = `<span class="chip">${ps.length}</span>`;
+    const tel = d.posities_telling;
+    this._q("#op-r").innerHTML = `<span class="chip">${ps.length}</span>` +
+      (tel && tel.limiet ? `<span class="chip" title="Maximaal ${tel.limiet} posities per richting">${tel.long} long · ${tel.short} short / max ${tel.limiet}</span>` : "") +
+      (d.netting ? '<span class="chip gevaar" title="De broker verrekende tegengestelde posities; hedgen staat uit">netting</span>' : "");
     if (!ps.length) { this._q("#posities").innerHTML = '<div class="leeg">Geen open posities.</div>'; return; }
     const vl = d.account.valuta, iv = d.instrument.valuta;
     const rijen = ps.map((p, i) => {
@@ -1004,6 +1015,27 @@ ${tl}
         cel("Duur", duur(t.duur_s), "r") + "</tr>";
     }).join("");
     this._q("#trades").innerHTML = `<table class="trades-t"><thead><tr><th>Gesloten</th><th>Richting</th><th class="r">Units</th><th class="r">Instap</th><th class="r">Uitstap</th><th class="r">P&amp;L ${esc(d.instrument.valuta)}</th><th>Sluitreden</th><th class="r">Kosten · bron</th><th class="r">Duur</th></tr></thead><tbody>${rijen}</tbody></table>`;
+  }
+
+  _renderSchaduw(d) {
+    const s = d.schaduw;
+    const el = this._q("#schaduw");
+    if (!el) return;
+    if (!s) { el.innerHTML = '<div class="leeg">Geen schaduwgegevens (oudere versie van de integratie).</div>'; this._q("#sh-r").innerHTML = ""; return; }
+    const sv = val(s.valuta);
+    this._q("#sh-r").innerHTML = `<span class="chip neutraal">${fmt(s.trades, 0)} gesloten</span>` +
+      (s.open ? `<span class="chip">${fmt(s.open, 0)} open</span>` : "") +
+      (s.vervallen ? `<span class="chip neutraal" title="Niet eerlijk te volgen door een gat in de koersdata; telt niet mee">${fmt(s.vervallen, 0)} vervallen</span>` : "");
+    if (!s.trades && !s.open) { el.innerHTML = '<div class="leeg">Nog geen schaduwtrades.</div>'; return; }
+    const LBL = { positielimiet: "positielimiet", cooldown: "cooldown", marge: "marge", vloer: "vloer", netting: "netting", risico: "risicolimiet", handel_uit: "handel uit", levenscyclus: "levenscyclus", onbevestigde_order: "onbevestigde order", wisselkoers: "wisselkoers", per_cyclus: "1 per cyclus" };
+    const redenen = Object.entries(s.per_reden || {}).sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `<span class="chip neutraal">${esc(LBL[k] || k)} <b>${fmt(v, 0)}</b></span>`).join("");
+    el.innerHTML = `<div class="kv drie">` +
+      `<div><span class="lbl">Winst%</span><b>${isNum(s.winst_pct) ? fmt(s.winst_pct, 1) + "%" : "—"}</b><div class="s">${fmt(s.trades, 0)} schaduwtrades</div></div>` +
+      `<div><span class="lbl">Profit factor</span><b class="${isNum(s.pf) ? (s.pf >= 1 ? "pos" : "neg") : ""}">${fmt(s.pf, 2)}</b><div class="s">na geschatte kosten</div></div>` +
+      `<div><span class="lbl">Netto (geschat)</span><b class="${toon(s.netto)}">${sv}${fmtS(s.netto)}</b><div class="s">kosten ${sv}${fmt(s.kosten)} · ${fmtS(s.verwachting)} per trade</div></div>` +
+      `<div><span class="lbl">t-statistiek (clusters)</span><b class="${toon(s.t)}">${fmtS(s.t)}</b><div class="s">${fmt(s.clusters, 0)} clusters</div></div>` +
+      `</div>` + (redenen ? `<div><div class="lbl" style="margin-bottom:7px">Waarom niet uitgevoerd</div><div class="checks">${redenen}</div></div>` : "");
   }
 
   _renderVoet(d) {

@@ -28,6 +28,17 @@ Indeling (desktop raster, telefoon één kolom, geen horizontale scroll):
    maximale-duuraftelling; bied/laat, dagbereik, spread, ATR, signaal.
 5. Open posities, equity en drawdown, recente trades (laatste 20, met
    sluitreden en kostenbron gemeten/berekend), onderzoek en statistiek.
+6. Sinds 1.9.0: **Schaduwtrades (gesimuleerd)**, een apart gestippeld paneel
+   onderaan: aantal, winst%, profit factor, netto na geschatte kosten,
+   t-statistiek op clusters en waarom de signalen niet werden uitgevoerd.
+   Telt níet mee in het resultaat, de statistiek of de bewijsfase.
+
+Meerdere posities (1.9.0): de tabel *Open posities* toont elke positie per
+ticket met eigen P&L (live, indicatief) en tijdstopaftelling; de grafiek
+tekent instap-, stop- en doellijnen per positie. De kop toont de telling
+"x long · y short / max n" en een rode chip *netting* als de broker
+tegengestelde posities verrekende. Het paneel *Open positie* toont de eerste
+positie en het aantal open per richting.
 
 Alleen weergave: geen knoppen die handelen, sluiten of iets aan- of
 uitzetten. Bediening blijft via de entiteiten en acties van de integratie.
@@ -42,6 +53,10 @@ Het klassieke overzicht en het keuringsrapport zijn onderaan gelinkt.
   `alarm`, `candles` (hooguit 720), `posities`, `account`, `equity`
   (hooguit 400 punten, gelijkmatig over de run), `trades` (laatste 20),
   `markers` (trades binnen het candlevenster), `stats` en `sleutel`.
+  Sinds 1.9.0 daarnaast `posities_telling` (`long`, `short`, `limiet`),
+  `netting` (null of de gedetecteerde verrekening) en `schaduw` (aantal,
+  open, vervallen, winst%, pf, netto, kosten, verwachting, clusters, t,
+  per reden). Alleen toegevoegd, niets hernoemd; daarom blijft `api: 1`.
 * Per coordinatorcyclus één keer gebouwd. Het paneel vraagt elke 5 s met
   `?since=<sleutel>`; zolang er geen nieuwe cyclus was is het antwoord
   `{"ongewijzigd": true}`. Bij een verborgen tabblad vraagt het niets.

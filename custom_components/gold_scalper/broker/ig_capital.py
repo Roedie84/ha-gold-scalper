@@ -42,6 +42,7 @@ from datetime import datetime, timedelta, timezone
 from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from ..analysis.signals import Candles
+from ..strategy.posities import netting_uit_bevestiging
 from .adapter import (
     AccountSnapshot,
     ExecutionVenue,
@@ -1789,6 +1790,17 @@ class IgVenue(IgStyleVenue):
             status = str(confirm.get("dealStatus", "")).upper()
             if status == "ACCEPTED":
                 level = confirm.get("level")
+                # 1.9.0: met forceOpen hoort IG een aparte positie te openen.
+                # Meldt de bevestiging een bestaande deal als (deels)
+                # gesloten, dan is er verrekend - doorgeven, niet verzwijgen.
+                verrekend = netting_uit_bevestiging(confirm.get("affectedDeals"))
+                if verrekend:
+                    _LOGGER.error(
+                        "IG verrekende de order met bestaande positie(s) %s "
+                        "(affectedDeals: %s) ondanks forceOpen. Er is geen "
+                        "aparte positie geopend.", ", ".join(verrekend),
+                        confirm.get("affectedDeals"),
+                    )
                 return OrderResult(
                     success=True,
                     ticket=str(confirm.get("dealId") or reference),
@@ -1796,6 +1808,7 @@ class IgVenue(IgStyleVenue):
                     requested_price=requested,
                     units=float(confirm.get("size") or 0) or None,
                     latency_ms=round(latency, 2),
+                    verrekend=verrekend or None,
                 )
             if status == "REJECTED":
                 return OrderResult(

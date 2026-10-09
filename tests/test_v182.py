@@ -240,10 +240,13 @@ def test_no_websocket_left_and_version():
     assert "ws_connect" not in code and "AiohttpWsTransport" not in code
     assert "HttpStreamTransport" in (PKG / "broker_stream.py").read_text(encoding="utf-8")
     manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.8.2"
+    assert manifest["version"] == const.INTEGRATION_VERSION  # 1.9.0: niet meer vastgepind
     assert manifest["requirements"] == []
     root = PKG.parent.parent
-    assert "Huidige versie: **1.8.2**" in (root / "README.md").read_text(encoding="utf-8")
-    eerste = (root / "CHANGELOG.md").read_text(encoding="utf-8").split("## ")[1]
-    assert eerste.startswith("1.8.2")
+    assert f"Huidige versie: **{const.INTEGRATION_VERSION}**" in (
+        root / "README.md").read_text(encoding="utf-8")
+    eerste = next(
+        d for d in (root / "CHANGELOG.md").read_text(encoding="utf-8").split("## ")
+        if d.startswith("1.8.2")
+    )
     assert "http-streaming" in eerste.lower() and "browser verversen" in eerste.lower()

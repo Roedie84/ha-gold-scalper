@@ -450,6 +450,11 @@ def build_payload(
         "alarm": _alarmen(data, code),
         "candles": candles,
         "posities": _position_rows(data, db["open"], exit_cfg, quote),
+        # 1.9.0: telling per richting en de limiet; netting als hij optrad.
+        "posities_telling": _telling(data),
+        "netting": data.get("netting"),
+        # 1.9.0: schaduwtrades - gesimuleerd, telt nergens mee.
+        "schaduw": _schaduw(data.get("schaduw"), conversion.get("instrument") or "USD"),
         "account": {
             "valuta": account_valuta,
             "equity": equity_nu,
@@ -509,6 +514,36 @@ def build_payload(
             "poort": (data.get("gate") or {}).get("checks") or {},
             "run": stats.get("run_id"),
         },
+    }
+
+
+def _telling(data: dict) -> dict:
+    pr = data.get("posities_per_richting") or {}
+    posities = data.get("open_positions") or []
+    if not pr:
+        long_ = sum(1 for p in posities if getattr(p, "side", "buy") == "buy")
+        pr = {"long": long_, "short": len(posities) - long_, "limiet": None}
+    return {"long": pr.get("long", 0), "short": pr.get("short", 0),
+            "limiet": pr.get("limiet")}
+
+
+def _schaduw(stats: dict | None, valuta: str) -> dict:
+    """Compact model voor het paneel 'Schaduwtrades (gesimuleerd)'."""
+    s = stats or {}
+    return {
+        "trades": s.get("trades") or 0,
+        "open": s.get("open") or 0,
+        "vervallen": s.get("vervallen") or 0,
+        "winst_pct": _num(s.get("winst_pct"), 1),
+        "pf": _num(s.get("profit_factor"), 2),
+        "netto": _num(s.get("netto"), 2),
+        "kosten": _num(s.get("kosten"), 2),
+        "verwachting": _num(s.get("verwachting"), 2),
+        "clusters": s.get("clusters") or 0,
+        "t": _num(s.get("t_statistiek"), 2),
+        "t_basis": s.get("t_basis"),
+        "per_reden": s.get("per_reden") or {},
+        "valuta": valuta,
     }
 
 

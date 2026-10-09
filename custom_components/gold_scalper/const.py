@@ -27,6 +27,11 @@ CONF_SCALE_WITH_CONFIDENCE: Final = "scale_with_confidence"
 
 #: Pyramiden: bijkopen bij bevestiging, nooit bij tegenslag.
 CONF_PYRAMID_ENABLED: Final = "pyramid_enabled"
+#: 1.9.0: maximaal aantal open posities per richting (1..3). Long en short
+#: mogen naast elkaar bestaan.
+CONF_MAX_POSITIONS_PER_RICHTING: Final = "max_positions_per_richting"
+DEFAULT_MAX_POSITIONS_PER_RICHTING: Final = 3
+MAX_POSITIONS_PER_RICHTING_GRENS: Final = 3
 CONF_PYRAMID_TRIGGER_ATR: Final = "pyramid_trigger_atr"
 CONF_PYRAMID_MAX_ADDITIONS: Final = "pyramid_max_additions"
 CONF_MAX_UNITS: Final = "max_units"
@@ -203,7 +208,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "1.8.2"
+INTEGRATION_VERSION: Final = "1.9.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
@@ -215,7 +220,11 @@ INTEGRATION_VERSION: Final = "1.8.2"
 #: 2  5.3.2-5.3.3: posities zichtbaar, verplaatste stops teruggeschreven.
 #: 3  5.4.0: één handelsdag, kosten uit het ledger, sluitredenen op bewijs,
 #:    geen nieuwe positie zonder bruikbare wisselkoers.
-EXECUTION_SEMANTICS_VERSION: Final = 3
+#: 4  1.9.0: tot ``max_positions_per_richting`` posities per richting, long
+#:    en short naast elkaar (hedge); een tegengesteld signaal sluit niets.
+#:    Trades die tegelijk openstaan zijn geen onafhankelijke waarnemingen;
+#:    de clustertoets voegt ze samen. Start daarom een nieuwe run.
+EXECUTION_SEMANTICS_VERSION: Final = 4
 
 
 #: Uitstapregime van een trade (1.7.6). Alleen voor de statistiek: het zit

@@ -29,7 +29,9 @@ from .const import (
     CONF_ACCOUNT_ID, CONF_ASSUMED_SPREAD, CONF_BUILD_FROM_QUOTES,
     CONF_NOTIFY_CRITICAL, CONF_NOTIFY_HOURLY, CONF_NOTIFY_SERVICE,
     CONF_CLOSE_BUFFER_MINUTES, CONF_USE_SCHEDULE,
-    CONF_NOTIFY_SKIP_QUIET, CONF_PYRAMID_ENABLED, CONF_PYRAMID_MAX_ADDITIONS,
+    CONF_NOTIFY_SKIP_QUIET, CONF_MAX_POSITIONS_PER_RICHTING,
+    DEFAULT_MAX_POSITIONS_PER_RICHTING,
+    CONF_PYRAMID_ENABLED, CONF_PYRAMID_MAX_ADDITIONS,
     CONF_PYRAMID_TRIGGER_ATR, CONF_RISK_BASED_SIZING, CONF_RISK_PER_TRADE_PCT,
     CONF_SCALE_WITH_CONFIDENCE, CONF_STOP_LOSS_ATR, CONF_STOP_LOSS_USD,
     CONF_TAKE_PROFIT_ATR, CONF_TAKE_PROFIT_USD, NOTIFY_NONE,
@@ -717,6 +719,17 @@ class GoldScalperOptionsFlow(OptionsFlow):
                 CONF_RISK_PER_TRADE_PCT,
                 default=default(CONF_RISK_PER_TRADE_PCT, 0.5),
             ): _number(0.05, 3.0, 0.05, "%", slider=True),
+            # 1.9.0: posities per richting (long en short elk). Besluit van de
+            # eigenaar: meer posities voor sneller data. Elke positie houdt
+            # haar eigen grootte, dus kosten en risico per signaal kunnen tot
+            # dit veelvoud oplopen.
+            vol.Required(
+                CONF_MAX_POSITIONS_PER_RICHTING,
+                default=default(
+                    CONF_MAX_POSITIONS_PER_RICHTING,
+                    DEFAULT_MAX_POSITIONS_PER_RICHTING,
+                ),
+            ): _number(1, 3, 1, slider=True),  # MAX_POSITIONS_PER_RICHTING_GRENS
             # Pyramiden: bijkopen bij bevestiging. Zie pyramid.py voor waarom
             # dit het spiegelbeeld van middelen is en niet een variant erop.
             vol.Required(

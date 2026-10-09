@@ -1,5 +1,83 @@
 # Changelog — Gold Scalper
 
+## 1.9.0
+
+**Besluit van de eigenaar (Ruud, 09-10-2026, 07:59)**, na uitleg van de
+nadelen: *"meer posities mogen worden geopend, dit om sneller data te
+vergaren … long en short mag gelijktijdig ook meerdere"*. Gekozen: maximaal
+3 posities per richting (dus hooguit 3 long + 3 short = 6 tegelijk), elke
+positie op haar huidige grootte (geen verdeling van het risico), en
+schaduwtrades. Dit vervangt de eerdere regels "max 1 positie / geen
+pyramiding / strategie niet wijzigen tot 30 clusters" **alleen voor dit
+punt**. Al het andere blijft gelijk: niets richting live (alleen demo/paper),
+vloer, daglimiet, noodstop, dead man's switch, tijdstop, SL/TP-logica en
+signaallogica.
+
+> **Waarschuwing.** Elke positie houdt haar volle grootte. Bij drie
+> posities in dezelfde richting zijn kosten (spread, slippage) en risico
+> van één marktbeweging tot **3×** zo groot als voorheen; met long en short
+> tegelijk betaal je bovendien kosten aan beide kanten.
+
+* **Nieuwe optie** *Maximaal posities per richting*
+  (`max_positions_per_richting`, 1..3, standaard 3) in de opties. Een
+  signaal opent een positie als er in die richting minder dan de limiet
+  open staan (onbevestigde orders tellen mee). Long en short mogen naast
+  elkaar bestaan; een tegengesteld signaal sluit niets. Totaalvangnet in de
+  risicobewaking: 2 × de limiet.
+* **Minimale spreiding.** Een extra positie in dezelfde richting alleen in
+  een **latere candle** dan de laatste open positie in die richting **én**
+  met een instapprijs die **≥ 0,3 × ATR** verschilt van elke open positie in
+  die richting (0,3 × ATR is de dode zone van de tijdstop). Daarnaast
+  hooguit **één nieuwe positie per cyclus** en de bestaande cooldown.
+* **Marge en vloer.** Een extra positie wordt geweigerd als de geschatte
+  marge (5% van de nominale waarde) niet in 90% van de door de broker
+  gemelde vrije marge past, of als de equity onder de vloer zou komen
+  wanneer alle open stops plus de nieuwe stop geraakt worden.
+* **Netting.** IG opent met `forceOpen: true` een aparte positie. Meldt de
+  orderbevestiging toch een bestaande deal als (deels) gesloten
+  (`affectedDeals`), of verdwijnt/krimpt een tegengestelde positie bij het
+  openen (positielijst vlak na de order, alleen bij hedgen), dan: ERROR in
+  het logboek, melding, attribuut `netting_gedetecteerd`, en hedgen staat
+  uit tot een herstart. Geen stille verrekening.
+* **Per positie.** Tijdstop, maximale duur, trailing, sluiten na
+  bevestiging (1.7.9), sluitverzoek-genadetermijn (1.7.8), afstemming en
+  opstartcontrole werkten al per ticket; nu getest met meerdere
+  gelijktijdige posities in beide richtingen.
+* **Statistiek.** Clusterdefinitie ongewijzigd: trades gesorteerd op
+  opening, een trade die opent vóór of binnen 10 minuten na het laatste
+  sluitmoment hoort bij hetzelfde cluster. Gelijktijdig open trades vallen
+  daardoor altijd in één cluster en tellen niet als onafhankelijk. Nieuw
+  veld per trade `gelijktijdig_open` (aantal andere open posities bij
+  instap) om later te toetsen of stapelen iets toevoegt.
+* **Nieuwe run.** De uitvoeringsversie gaat van 3 naar **4**. Die zit in de
+  vingerafdruk en geldt als structureel, dus 1.9.0 start bij de eerste
+  herstart een **nieuwe bewijsfase**; de run krijgt de aantekening
+  `meerdere_posities`. Het aantal per richting zit ook in de vingerafdruk
+  (`positielimiet`): wie het later wijzigt, start weer een nieuwe run. De
+  markering "methodologisch gemengd" (overlap = fout) slaat runs met een
+  limiet per richting over, want daar is overlap opzet.
+* **Schaduwtrades.** Elk geldig signaal (door alle signaalfilters) dat niet
+  wordt uitgevoerd vanwege positielimiet, cooldown, marge, vloer, netting,
+  een risicolimiet (daglimiet, noodstop, pauze, tradelimiet,
+  spreadvangnet), handel uit, levenscyclus, een onbevestigde order, de
+  wisselkoers of "al één per cyclus", wordt gesimuleerd: instap op laat/bied
+  van dat moment (incl. spread), dezelfde stop en doel, stop/doel getoetst
+  op de bar-uitersten zoals de papersimulatie (beide geraakt = stop),
+  tijdstop, maximale duur, trailing en break-even via dezelfde exitregels.
+  Kosten: spread in de prijzen plus geschatte slippage per zijde en
+  commissie. Niet: signaalfilters, markt dicht, verouderde koers,
+  sluitingsbuffer en de spreidingsregel (een kopie). Ontdubbeling: per
+  richting hooguit één per candle, met dezelfde 0,3 × ATR-spreiding. Een
+  schaduwtrade die > 5 minuten niet bijgewerkt kon worden, vervalt en telt
+  niet mee. Geen extra brokerverzoeken. Eigen tabel `schaduw_trades`; telt
+  nergens mee in het echte resultaat, de bewijsfase of de live-poort.
+* **Sensor** *Schaduwtrades* (aantal; attributen winst%, PF, netto, kosten,
+  t-statistiek op clusters, per reden). Sensor *Open posities* toont nu
+  ticket, doel, aantal long/short, de limiet en eventuele netting.
+* **Broker-dashboard**: telling per richting, netting-chip en paneel
+  "Schaduwtrades (gesimuleerd)". Na de update eenmaal de browser verversen.
+* Nieuw: `tests/test_v190.py`.
+
 ## 1.8.2
 
 * **Geen strategiewijziging.** Alleen de live koers op het dashboard.

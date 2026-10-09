@@ -254,7 +254,7 @@ def build_overview(
     reason_rows = ""
     leesbaar = {
         "max_positions_tegengesteld": "positie open, signaal tegengesteld",
-        "max_positions_zelfde_richting": "positie open, zelfde richting",
+        "max_positions_zelfde_richting": "limiet zelfde richting bereikt",
         "max_positions_geen_signaal": "positie open, geen signaal",
         "score_below_threshold": "signaal te zwak",
         "spread_too_wide": "spread te breed",

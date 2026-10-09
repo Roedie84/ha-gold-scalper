@@ -75,6 +75,14 @@ def build_status(d: dict) -> tuple[str, str]:
 
     positions = len(d.get("open_positions") or [])
     if positions:
+        # 1.9.0: uitgesplitst naar richting, met de limiet erbij.
+        pr = d.get("posities_per_richting") or {}
+        if pr.get("limiet"):
+            return "positie_open", (
+                f"{positions} positie(s) open ({pr.get('long', 0)} long, "
+                f"{pr.get('short', 0)} short; maximaal {pr['limiet']} per "
+                "richting); exits worden per positie bewaakt."
+            )
         return "positie_open", f"{positions} positie(s) open; exits worden bewaakt."
 
     reason = d.get("reject_reason")
@@ -92,7 +100,7 @@ def build_status(d: dict) -> tuple[str, str]:
                 "omgedraaid; omkeren kost een volledige round trip."
             ),
             "max_positions_zelfde_richting": (
-                "Er loopt al een positie in dezelfde richting."
+                "De limiet van posities in deze richting is bereikt."
             ),
             "max_positions_geen_signaal": (
                 "Er loopt een positie en er is geen nieuw signaal."
