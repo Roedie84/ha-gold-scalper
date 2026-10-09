@@ -105,6 +105,7 @@ from .strategy.posities import (
     marge_en_vloer_ok, netting_uit_posities, richting_van, spreiding_ok,
     tel_per_richting,
 )
+from .strategy.tijdstopvarianten import VariantenBoek, VariantTrade
 from .strategy.schaduw import (
     SCHADUW_REDENEN, SchaduwBoek, SchaduwKosten, SchaduwTrade,
 )
@@ -517,6 +518,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             bar_seconden=BAR_SECONDS.get(self.timeframe, 60),
         )
         self._schaduw_stats: dict = self.schaduw.statistiek()
+        #: 1.9.5: tijdstopvarianten (L-GS-008). Alleen meting: leest de
+        #: configuratie van ``self.exits`` en kopieert die; wijzigt niets.
+        self.varianten = VariantenBoek(
+            exits=self.exits,
+            kosten=SchaduwKosten(
+                slippage=self.strategy_cfg.expected_slippage,
+                commissie_per_lot=self.strategy_cfg.commission_per_lot_per_side,
+            ),
+        )
+        self._varianten_stats: dict = self.varianten.statistiek()
+        self._varianten_vuil = False
+        self._varianten_teller = 0
         #: Aantal gesloten trades bij de laatste poortberekening. De poort
         #: herberekenen is duur (meerdere queries), dus dat gebeurt alleen als
         #: er werkelijk iets veranderd is.
@@ -785,6 +798,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # instap, beginstand van het uurbericht), en wat bewaard was.
         await self._herstel_uit_run()
         await self._laad_schaduw()
+        await self._laad_varianten()
 
         # Historie opwarmen. Zonder dit begint elke herstart met een blinde
         # periode van 60 candles - bij 1m een heel uur.
@@ -1719,6 +1733,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         await self._record_opening_equity()
         # 1.9.0: schaduwtrades horen bij een run.
         await self._laad_schaduw()
+        # 1.9.5: tijdstopvarianten ook.
+        await self._laad_varianten()
         _LOGGER.warning(
             "Nieuwe bewijsfase gestart (run %s), de vorige (%s) is afgesloten. "
             "Reden: %s. Eerdere runs blijven bewaard en staan onderaan het "
@@ -2101,6 +2117,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 1.9.0: schaduwtrades met dezelfde koers en bars; geen extra
             # verzoek bij de broker.
             await self._werk_schaduw_bij(quote, now)
+            # 1.9.5: tijdstopvarianten, idem. Alleen meting.
+            await self._werk_varianten_bij(quote, now)
 
         # De wisselkoers elke cyclus verversen - met een pauze van vijf minuten
         # - en niet pas bij een handelssignaal. Eerst werd hij alleen vlak vóór
@@ -2386,6 +2404,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 self.account_drawdown or None,
             )
 
+        # 1.9.5: statistiek van de tijdstopvarianten.
+        await self._ververs_varianten_stats()
+
         # Elke cyclus bewaren, niet alleen bij afsluiten: een noodstop die
         # halverwege afgaat mag niet verloren gaan als HA daarna hardhandig
         # stopt.
@@ -2445,6 +2466,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             },
             "netting": self.netting,
             "schaduw": self._schaduw_stats,
+            # 1.9.5: tijdstopvarianten (gesimuleerd, alleen meting).
+            "tijdstopvarianten": self._varianten_stats,
             "stats": stats,
             "gate": self.gate,
             "risk": self.risk.as_dict(),
@@ -2978,6 +3001,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 await self._controleer_netting(
                     result, richting, voor, tegengesteld,
                 )
+                # 1.9.5: tijdstopvarianten van deze positie (alleen meting).
+                await self._open_varianten(
+                    str(result.ticket) if result.ticket else None, side,
+                    result.fill_price or entry_price, quote,
+                    result.units or units, signal, now,
+                )
             elif self.paper:
                 trade = self.paper.open_position(
                     side, units / CONTRACT_SIZE, self._paper_quote(quote),
@@ -2986,6 +3015,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 )
                 trade.gelijktijdig_open = gelijktijdig_open
                 await self.hass.async_add_executor_job(self.db.update_trade, trade)
+                # 1.9.5: tijdstopvarianten van deze positie (alleen meting).
+                await self._open_varianten(
+                    f"id:{trade.id}" if getattr(trade, "id", None) else None,
+                    side, trade.open_price, quote,
+                    (trade.volume or 0) * CONTRACT_SIZE, signal, now,
+                )
             self.risk.record_open()
             self._last_entry_ts = now.timestamp()
             self._geopend_in_cyclus += 1
@@ -3189,6 +3224,144 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             else:
                 self.schaduw.vervallen += 1
         self._schaduw_stats = self.schaduw.statistiek()
+
+    # -- 1.9.5: tijdstopvarianten (L-GS-008, alleen meting) ----------------- #
+    #
+    # Niets hieronder raakt het echte exitbeheer, de orders of de echte
+    # administratie: eigen tabel, eigen ExitManagers op een kopie van de
+    # configuratie. Elke fout wordt gevangen en gelogd; de handel loopt door.
+
+    async def _open_varianten(
+        self, ref: str | None, side: str, open_price, quote: VenueQuote,
+        units, signal, now: datetime,
+    ) -> None:
+        """Vier tijdstopvarianten voor een zojuist geopende echte positie."""
+        if self.db is None or not ref:
+            return
+        self.varianten.exits = self.exits
+        try:
+            nieuw = self.varianten.openen(
+                run_id=self.run_id, trade_ref=ref, side=side,
+                open_price=float(open_price), open_mid=quote.mid,
+                spread=quote.spread, units=float(units or 0.0),
+                stop_loss=signal.stop_loss, take_profit=signal.take_profit,
+                nu=now,
+            )
+            if nieuw:
+                await self.hass.async_add_executor_job(
+                    self.db.bewaar_varianten, nieuw
+                )
+                self._varianten_vuil = True
+        except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
+            _LOGGER.debug("Tijdstopvarianten niet geopend: %s", err)
+
+    def _uitersten_voor_varianten(self, quote: VenueQuote):
+        """Uitersten van de bars die déze cyclus afsloten, en hun begin.
+
+        Geen nieuwe bar: geen uitersten (alleen de actuele koers), zodat een
+        al getoetste candle niet cyclus na cyclus opnieuw telt.
+        """
+        if not self._new_bars_this_cycle or self._candles is None \
+                or not self._candles.high:
+            return None, None, None
+        bars = max(1, min(self._new_bars_this_cycle, len(self._candles.high)))
+        pq = self._paper_quote(quote)
+        try:
+            ts = float(self._candles.timestamp[-bars])
+            if ts > 1e11:           # milliseconden
+                ts /= 1000.0
+            vanaf = datetime.fromtimestamp(ts, tz=timezone.utc)
+        except (IndexError, TypeError, ValueError, OverflowError):
+            return None, None, None
+        return pq.high, pq.low, vanaf
+
+    async def _werk_varianten_bij(self, quote: VenueQuote, now: datetime) -> None:
+        """Open varianten een cyclus verder, op de koers die er al is."""
+        if not self.varianten.open_trades or self.db is None or self.koers_verouderd:
+            return
+        # Alleen een verwijzing: de configuratie wordt gelezen, nooit gewijzigd.
+        self.varianten.exits = self.exits
+        try:
+            atr = self.state.atr.value or 0.0
+            if atr <= 0:
+                return
+            hoog, laag, vanaf = self._uitersten_voor_varianten(quote)
+            voor = len(self.varianten.gesloten) + self.varianten.vervallen
+            gewijzigd = self.varianten.bijwerken(
+                bid=quote.bid, ask=quote.ask, hoog=hoog, laag=laag, atr=atr,
+                nu=now, uitersten_vanaf=vanaf,
+            )
+            if gewijzigd:
+                await self.hass.async_add_executor_job(
+                    self.db.bewaar_varianten, gewijzigd
+                )
+            if len(self.varianten.gesloten) + self.varianten.vervallen != voor:
+                self._varianten_vuil = True
+        except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
+            _LOGGER.debug("Tijdstopvarianten niet bijgewerkt: %s", err)
+
+    async def _ververs_varianten_stats(self, forceer: bool = False) -> None:
+        """Na een gesloten variant, en elke 30 cycli (latere correcties van
+        echte afrekeningen meenemen)."""
+        self._varianten_teller += 1
+        if not (forceer or self._varianten_vuil or self._varianten_teller >= 30):
+            return
+        self._varianten_teller = 0
+        self._varianten_vuil = False
+        if self.db is None or self.run_id is None:
+            return
+        if not self.varianten.gesloten and not forceer:
+            self._varianten_stats = self.varianten.statistiek()
+            return
+        try:
+            echte = await self.hass.async_add_executor_job(
+                self.db.echte_uitkomsten, self.run_id
+            )
+            self._varianten_stats = self.varianten.statistiek(echte)
+        except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
+            _LOGGER.debug("Statistiek tijdstopvarianten mislukt: %s", err)
+
+    async def _laad_varianten(self) -> None:
+        """Varianten van de actieve run uit de eigen tabel.
+
+        Open varianten van een vórige run (nieuwe bewijsfase) vervallen.
+        Open varianten van deze run lopen door; was het gat sinds hun laatste
+        bijwerking te groot (herstart), dan vervallen ze bij de volgende
+        cyclus vanzelf, zoals schaduwtrades.
+        """
+        try:
+            oud = [t for t in self.varianten.open_trades if t.run_id != self.run_id]
+            if oud and self.db is not None:
+                for t in oud:
+                    self.varianten.open_trades.remove(t)
+                    t.status = "vervallen"
+                    t.close_reason = "nieuwe run"
+                    t.close_time = datetime.now(timezone.utc).isoformat(
+                        timespec="seconds")
+                await self.hass.async_add_executor_job(
+                    self.db.bewaar_varianten, oud
+                )
+            self.varianten.open_trades = []
+            self.varianten.gesloten = []
+            self.varianten.vervallen = 0
+            if self.db is None or self.run_id is None:
+                self._varianten_stats = self.varianten.statistiek()
+                return
+            rijen = await self.hass.async_add_executor_job(
+                self.db.tijdstop_varianten, self.run_id
+            )
+            velden = set(VariantTrade.__dataclass_fields__)
+            for rij in rijen:
+                t = VariantTrade(**{k: v for k, v in rij.items() if k in velden})
+                if t.status == "open":
+                    self.varianten.open_trades.append(t)
+                elif t.status == "gesloten":
+                    self.varianten.gesloten.append(t)
+                else:
+                    self.varianten.vervallen += 1
+            await self._ververs_varianten_stats(forceer=True)
+        except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
+            _LOGGER.debug("Tijdstopvarianten niet geladen: %s", err)
 
     async def async_reconcile(self, dagen: float = 3.0) -> dict:
         """Leg de gesloten trades van de laatste dagen naast de broker.

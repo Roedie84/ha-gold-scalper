@@ -64,6 +64,11 @@ Dit is waar het werk in zit.
   doel en uitstapregels, in een eigen tabel. Ze tellen nergens mee in het
   echte resultaat of de bewijsfase (sensor *Schaduwtrades*, paneel op het
   dashboard)
+* **Tijdstopvarianten** (1.9.5, alleen meting): elke echte trade wordt
+  nagespeeld met tijdstop 240, 480, 720 s en zonder tijdstop (verder
+  identiek), met een gepaarde toets per uurblok tegen 240 s (sensor
+  *Tijdstopvarianten*). Het echte exitbeheer verandert niet. Daarnaast een
+  toets per uurblok naast de clusters (`per_tijdblok` op de sensor *Oordeel*)
 
 ### De poort naar echt geld
 
@@ -171,7 +176,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **1.9.4** (zie `CHANGELOG.md`).
+Huidige versie: **1.9.5** (zie `CHANGELOG.md`).
 
 Het domein blijft `gold_scalper`: bestaande entiteiten, databases en
 instellingen werken ongewijzigd door.

@@ -45,10 +45,27 @@ T0 = datetime(2026, 10, 7, 10, 0, tzinfo=timezone.utc)   # woensdag, markt open
 # Strategie: limiet per richting                                          #
 # ======================================================================= #
 
+class _VasteKlok(datetime):
+    """1.9.5: de simulator rekent zijn candles vanaf 'nu'; op een vast moment
+    zijn deze tests niet meer afhankelijk van het tijdstip waarop ze draaien
+    (op 09-10 15:xx UTC was de spread daar te breed voor de ATR)."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return T0 if tz is not None else T0.replace(tzinfo=None)
+
+
 @pytest.fixture(scope="module")
 def market():
-    venue = SimulatorVenue(seed=20260825)
-    candles = asyncio.run(venue.candles("XAU_USD", "5m", 900))
+    import gold_scalper.broker.simulator as sim
+
+    echt = sim.datetime
+    sim.datetime = _VasteKlok
+    try:
+        venue = SimulatorVenue(seed=20260825)
+        candles = asyncio.run(venue.candles("XAU_USD", "5m", 900))
+    finally:
+        sim.datetime = echt
     w = slice(300, 700)
     return Candles(candles.timestamp[w], candles.open[w], candles.high[w],
                    candles.low[w], candles.close[w], candles.volume[w])

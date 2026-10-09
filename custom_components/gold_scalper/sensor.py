@@ -224,6 +224,9 @@ SENSORS: tuple[ScalperSensor, ...] = (
             # 1.7.6: alleen ter informatie; het oordeel zelf gaat over de
             # hele run.
             "per_exitregime": _stats(d).get("per_exitregime"),
+            # 1.9.5 (L-GS-007): toets per uurblok naast de clusters; alleen
+            # ter informatie.
+            "per_tijdblok": _stats(d).get("per_tijdblok"),
         },
     ),
     ScalperSensor(
@@ -294,6 +297,21 @@ SENSORS: tuple[ScalperSensor, ...] = (
                 "profit_factor", "netto", "bruto", "kosten", "verwachting",
                 "clusters", "t_statistiek", "t_basis", "per_reden",
                 "per_sluitreden", "let_op",
+            )
+        },
+    ),
+    ScalperSensor(
+        # 1.9.5 (L-GS-008): elke echte trade nagespeeld met tijdstop 240, 480,
+        # 720 s en zonder. Alleen meting. Waarde: aantal geëvalueerde
+        # uurblokken; oordeel vanaf 20.
+        key="tijdstopvarianten", name="Tijdstopvarianten", icon="mdi:timer-cog-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda d: (d.get("tijdstopvarianten") or {}).get("blokken"),
+        attrs_fn=lambda d: {
+            k: (d.get("tijdstopvarianten") or {}).get(k)
+            for k in (
+                "oordeel", "volledige_trades", "open", "vervallen",
+                "per_variant", "gepaard_tegen_240", "overeenkomst", "let_op",
             )
         },
     ),

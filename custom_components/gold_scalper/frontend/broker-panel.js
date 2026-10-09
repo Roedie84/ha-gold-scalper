@@ -634,7 +634,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     <div class="paneel p-equity"><div class="ph">${IC.curve}<h2>Equity &amp; drawdown</h2><div class="ph-r" id="eq-r"></div></div><div class="eqvak" id="equity"></div></div>
     <div class="paneel p-stats"><div class="ph">${IC.sigma}<h2>Onderzoek &amp; statistiek</h2><div class="ph-r" id="st-r"></div></div><div class="pb" id="stats"></div></div>
     <div class="paneel p-trades"><div class="ph">${IC.klok}<h2>Recente trades</h2><div class="ph-r" id="tr-r"></div></div><div class="tabel" id="trades"></div></div>
-    <div class="paneel p-schaduw"><div class="ph">${IC.sigma}<h2>Schaduwtrades (gesimuleerd)</h2><div class="ph-r" id="sh-r"></div></div><div class="schaduw-noot">Geldige signalen die niet werden uitgevoerd (limiet, cooldown, marge …), gesimuleerd met dezelfde instap, stop, doel en uitstapregels. Telt níet mee in het resultaat of de bewijsfase.</div><div class="pb" id="schaduw"></div></div>
+    <div class="paneel p-schaduw"><div class="ph">${IC.sigma}<h2>Schaduwtrades (gesimuleerd)</h2><div class="ph-r" id="sh-r"></div></div><div class="schaduw-noot">Geldige signalen die niet werden uitgevoerd (limiet, cooldown, marge …), gesimuleerd met dezelfde instap, stop, doel en uitstapregels. Telt níet mee in het resultaat of de bewijsfase.</div><div class="pb" id="schaduw"></div><div class="pb" id="varianten"></div></div>
   </section>
   <footer id="voet"></footer>
 </div></div>`;
@@ -698,6 +698,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._renderStats(d);
     this._renderTrades(d);
     this._renderSchaduw(d);
+    this._renderVarianten(d);
     this._renderVoet(d);
     this._renderLiveStatus();
     this._tik();
@@ -1043,6 +1044,25 @@ ${tl}
       `<div><span class="lbl">Netto (geschat)</span><b class="${toon(s.netto)}">${sv}${fmtS(s.netto)}</b><div class="s">kosten ${sv}${fmt(s.kosten)} · ${fmtS(s.verwachting)} per trade</div></div>` +
       `<div><span class="lbl">t-statistiek (clusters)</span><b class="${toon(s.t)}">${fmtS(s.t)}</b><div class="s">${fmt(s.clusters, 0)} clusters</div></div>` +
       `</div>` + (redenen ? `<div><div class="lbl" style="margin-bottom:7px">Waarom niet uitgevoerd</div><div class="checks">${redenen}</div></div>` : "");
+  }
+
+  // 1.9.5: tijdstopvarianten (alleen meting).
+  _renderVarianten(d) {
+    const v = d.varianten;
+    const el = this._q("#varianten");
+    if (!el) return;
+    if (!v || !(v.rijen || []).some((r) => r.trades) && !v.open) { el.innerHTML = ""; return; }
+    const NAAM = { "240": "240 s (huidig)", "480": "480 s", "720": "720 s", geen_tijdstop: "geen tijdstop" };
+    const rijen = (v.rijen || []).map((r) => `<tr><td>${esc(NAAM[r.variant] || r.variant)}</td>` +
+      `<td class="r">${fmt(r.trades, 0)}</td><td class="r ${toon(r.netto)}">${fmtS(r.netto)}</td>` +
+      `<td class="r">${fmtS(r.per_trade)}</td><td class="r">${isNum(r.winst_pct) ? fmt(r.winst_pct, 1) + "%" : "—"}</td>` +
+      `<td class="r">${fmt(r.pf, 2)}</td><td class="r">${isNum(r.doel_pct) ? fmt(r.doel_pct, 1) + "%" : "—"}</td>` +
+      `<td class="r">${isNum(r.tijdstop_pct) ? fmt(r.tijdstop_pct, 1) + "%" : "—"}</td><td class="r">${fmt(r.duur_s, 0)}</td>` +
+      `<td class="r ${toon(r.verschil_blok)}">${r.variant === "240" ? "—" : fmtS(r.verschil_blok)}</td>` +
+      `<td class="r">${r.variant === "240" ? "—" : fmtS(r.t_blok)}</td></tr>`).join("");
+    el.innerHTML = `<div class="lbl" style="margin-bottom:7px">Tijdstopvarianten (elke echte trade nagespeeld; alleen meting) · ${fmt(v.blokken, 0)} uurblokken · overeenkomst 240-variant ${isNum(v.overeenkomst_pct) ? fmt(v.overeenkomst_pct, 1) + "%" : "—"} (n=${fmt(v.vergeleken, 0)})</div>` +
+      `<table class="trades-t"><thead><tr><th>Variant</th><th class="r">Trades</th><th class="r">Netto</th><th class="r">Per trade</th><th class="r">Winst%</th><th class="r">PF</th><th class="r">Doel</th><th class="r">Tijdstop</th><th class="r">Duur s</th><th class="r">Δ/blok vs 240</th><th class="r">t (blokken)</th></tr></thead><tbody>${rijen}</tbody></table>` +
+      `<div class="schaduw-noot" style="margin:8px 0 0">${esc(v.oordeel || "")}</div>`;
   }
 
   _renderVoet(d) {

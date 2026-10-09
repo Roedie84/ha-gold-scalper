@@ -473,6 +473,8 @@ def build_payload(
         "netting": data.get("netting"),
         # 1.9.0: schaduwtrades - gesimuleerd, telt nergens mee.
         "schaduw": _schaduw(data.get("schaduw"), conversion.get("instrument") or "USD"),
+        # 1.9.5: tijdstopvarianten - gesimuleerd, alleen meting.
+        "varianten": _varianten(data.get("tijdstopvarianten")),
         "account": {
             "valuta": account_valuta,
             "equity": equity_nu,
@@ -569,6 +571,38 @@ def _schaduw(stats: dict | None, valuta: str) -> dict:
         "t_basis": s.get("t_basis"),
         "per_reden": s.get("per_reden") or {},
         "valuta": valuta,
+    }
+
+
+def _varianten(stats: dict | None) -> dict | None:
+    """Compact model voor de tabel 'Tijdstopvarianten' (1.9.5)."""
+    if not stats:
+        return None
+    gepaard = stats.get("gepaard_tegen_240") or {}
+    rijen = []
+    for naam, v in (stats.get("per_variant") or {}).items():
+        g = gepaard.get(naam) or {}
+        rijen.append({
+            "variant": naam,
+            "trades": v.get("trades") or 0,
+            "netto": _num(v.get("netto"), 2),
+            "per_trade": _num(v.get("netto_per_trade"), 2),
+            "winst_pct": _num(v.get("winst_pct"), 1),
+            "pf": _num(v.get("profit_factor"), 2),
+            "doel_pct": _num(v.get("doel_pct"), 1),
+            "tijdstop_pct": _num(v.get("tijdstop_pct"), 1),
+            "duur_s": _num(v.get("gem_duur_s"), 0),
+            "verschil_blok": _num(g.get("verschil_per_blok"), 2),
+            "t_blok": _num(g.get("t_blokken"), 2),
+        })
+    ov = stats.get("overeenkomst") or {}
+    return {
+        "blokken": stats.get("blokken") or 0,
+        "open": stats.get("open") or 0,
+        "oordeel": stats.get("oordeel"),
+        "overeenkomst_pct": _num(ov.get("overeenkomst_pct"), 1),
+        "vergeleken": ov.get("vergeleken") or 0,
+        "rijen": rijen,
     }
 
 

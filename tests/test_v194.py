@@ -168,6 +168,7 @@ def test_versie_194():
     from gold_scalper import const
 
     manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.9.4"
+    # 1.9.5: niet meer vast op 1.9.4; de nieuwste versie bewaakt test_v195.
+    assert manifest["version"] == const.INTEGRATION_VERSION
     changelog = (PKG.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert changelog.split("\n## ")[1].startswith("1.9.4")
+    assert "\n## 1.9.4\n" in changelog

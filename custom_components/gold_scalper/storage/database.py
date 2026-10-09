@@ -238,6 +238,39 @@ CREATE TABLE IF NOT EXISTS schaduw_trades (
     laatst_bijgewerkt TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_schaduw_run ON schaduw_trades(run_id, status);
+
+-- 1.9.5: tijdstopvarianten (L-GS-008). Elke echte trade nagespeeld met een
+-- andere tijdstop (240/480/720 s en zonder). Alleen meting: eigen tabel,
+-- telt nergens mee in het echte resultaat, de bewijsfase of de live-poort.
+CREATE TABLE IF NOT EXISTS tijdstop_varianten (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id            INTEGER,
+    trade_ref         TEXT NOT NULL,
+    variant           TEXT NOT NULL,
+    richting          INTEGER NOT NULL CHECK (richting IN (1, -1)),
+    open_time         TEXT NOT NULL,
+    open_price        REAL NOT NULL,
+    open_mid          REAL NOT NULL,
+    open_spread       REAL NOT NULL,
+    units             REAL NOT NULL,
+    stop_loss         REAL,
+    take_profit       REAL,
+    time_stop_seconds INTEGER,
+    max_hold_seconds  INTEGER,
+    status            TEXT NOT NULL DEFAULT 'open',
+    close_time        TEXT,
+    close_price       REAL,
+    close_mid         REAL,
+    close_reason      TEXT,
+    bruto             REAL,
+    kosten            REAL,
+    netto             REAL,
+    mfe               REAL,
+    mae               REAL,
+    laatst_bijgewerkt TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_varianten_run ON tijdstop_varianten(run_id, status);
+CREATE INDEX IF NOT EXISTS idx_varianten_ref ON tijdstop_varianten(trade_ref);
 """
 
 
@@ -1065,6 +1098,68 @@ class TradeDatabase:
             params.append(status)
         query += " ORDER BY open_time, id"
         return [dict(r) for r in self.conn.execute(query, params).fetchall()]
+
+    # -- tijdstopvarianten (1.9.5) ----------------------------------------- #
+
+    def bewaar_variant(self, variant) -> int:
+        """Nieuw of bijwerken. Raakt de tabel ``trades`` nooit aan."""
+        from ..strategy.tijdstopvarianten import VARIANT_KOLOMMEN
+
+        waarden = [getattr(variant, k) for k in VARIANT_KOLOMMEN]
+        if getattr(variant, "id", None) is None:
+            cur = self.conn.execute(
+                f"INSERT INTO tijdstop_varianten ({', '.join(VARIANT_KOLOMMEN)}) "
+                f"VALUES ({', '.join('?' for _ in VARIANT_KOLOMMEN)})", waarden,
+            )
+            variant.id = int(cur.lastrowid)
+        else:
+            self.conn.execute(
+                f"UPDATE tijdstop_varianten SET "
+                f"{', '.join(f'{k}=?' for k in VARIANT_KOLOMMEN)} WHERE id=?",
+                (*waarden, variant.id),
+            )
+        self.conn.commit()
+        return variant.id
+
+    def bewaar_varianten(self, varianten) -> None:
+        for v in varianten:
+            self.bewaar_variant(v)
+
+    def tijdstop_varianten(self, run_id: int, status: str | None = None) -> list[dict]:
+        query = "SELECT * FROM tijdstop_varianten WHERE run_id=?"
+        params: list = [run_id]
+        if status:
+            query += " AND status=?"
+            params.append(status)
+        query += " ORDER BY open_time, id"
+        return [dict(r) for r in self.conn.execute(query, params).fetchall()]
+
+    def echte_uitkomsten(self, run_id: int) -> dict:
+        """Gesloten echte trades van een run, op ticket en op ``id:<id>``.
+
+        Voor de overeenkomst van de 240-variant met de echte trade (1.9.5):
+        de effectieve sluitreden (afgeleid, anders oorspronkelijk) en het
+        netto resultaat in USD.
+        """
+        from types import SimpleNamespace
+
+        from ..learning.exit_stats import effective_reason
+
+        rijen = self.conn.execute(
+            "SELECT id, broker_ticket, close_reason, original_close_reason, "
+            "reconciled_close_reason, net_pnl FROM trades "
+            "WHERE run_id=? AND close_time IS NOT NULL", (run_id,),
+        ).fetchall()
+        uit: dict = {}
+        for r in rijen:
+            ns = SimpleNamespace(
+                close_reason=effective_reason(SimpleNamespace(**dict(r))),
+                net_pnl=r["net_pnl"],
+            )
+            uit[f"id:{r['id']}"] = ns
+            if r["broker_ticket"]:
+                uit[str(r["broker_ticket"])] = ns
+        return uit
 
     def ledger_costs(self, run_id: int) -> dict:
         """Kosten van de gesloten trades van een run, uit het ledger.

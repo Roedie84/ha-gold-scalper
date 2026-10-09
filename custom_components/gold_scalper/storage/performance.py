@@ -206,6 +206,144 @@ def per_exitregime(trades: Sequence[Trade]) -> dict:
     return uit
 
 
+#: 1.9.5 (L-GS-007): lengte van een tijdblok in minuten.
+BLOK_MINUTEN = 60
+#: Een cluster dat langer duurt is een waarschuwing: dan meet de clusterteller
+#: niet meer wat hij moet meten (één cluster slokt een hele sessie op).
+CLUSTER_WAARSCHUWING_MINUTEN = 120.0
+#: Hoeveel blokken de sensor per stuk toont.
+BLOK_LIJST_MAX = 24
+
+
+def blok_sleutel(moment) -> str | None:
+    """Het uurblok (UTC) waarin dit moment valt, als "2026-10-09T13" (1.9.5)."""
+    m = _tijd(moment) if not isinstance(moment, datetime) else (
+        moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    )
+    if m is None:
+        return None
+    return m.astimezone(timezone.utc).strftime("%Y-%m-%dT%H")
+
+
+def lag1(reeks: Sequence[float]) -> float | None:
+    """Lag-1-autocorrelatie van een reeks (in volgorde). None onder 3 waarden."""
+    n = len(reeks)
+    if n < 3:
+        return None
+    gem = sum(reeks) / n
+    noemer = sum((x - gem) ** 2 for x in reeks)
+    if noemer <= 0:
+        return None
+    teller = sum((reeks[i] - gem) * (reeks[i + 1] - gem) for i in range(n - 1))
+    return round(teller / noemer, 3)
+
+
+def blok_toets(reeks: Sequence[float]) -> dict:
+    """n, gemiddelde, t (gemiddelde / standaardfout) en lag-1 van een reeks."""
+    n = len(reeks)
+    return {
+        "n": n,
+        "gemiddeld": round(sum(reeks) / n, 4) if n else None,
+        "t": round(_t(list(reeks)), 3) if n > 1 else None,
+        "lag1": lag1(list(reeks)),
+    }
+
+
+def _blokreeks(trades: Sequence[Trade]) -> dict[str, dict]:
+    blokken: dict[str, dict] = {}
+    for t in trades:
+        if t.net_pnl is None:
+            continue
+        blok = blok_sleutel(t.open_time)
+        if blok is None:
+            continue
+        b = blokken.setdefault(blok, {"trades": 0, "netto": 0.0, "bruto": 0.0})
+        b["trades"] += 1
+        b["netto"] += t.net_pnl
+        b["bruto"] += t.gross_pnl or 0.0
+    return {k: blokken[k] for k in sorted(blokken)}
+
+
+def _bloksamenvatting(blokken: dict[str, dict]) -> dict:
+    netto = [b["netto"] for b in blokken.values()]
+    bruto = [b["bruto"] for b in blokken.values()]
+    tn, tb = blok_toets(netto), blok_toets(bruto)
+    return {
+        "blokken": tn["n"],
+        "trades": sum(b["trades"] for b in blokken.values()),
+        "netto_usd": round(sum(netto), 2),
+        "netto_per_blok": tn["gemiddeld"],
+        "t_netto": tn["t"],
+        "lag1_netto": tn["lag1"],
+        "bruto_usd": round(sum(bruto), 2),
+        "bruto_per_blok": tb["gemiddeld"],
+        "t_bruto": tb["t"],
+        "lag1_bruto": tb["lag1"],
+    }
+
+
+def per_tijdblok(trades: Sequence[Trade], details: Sequence[dict] | None = None) -> dict:
+    """L-GS-007 (1.9.5): netto en bruto per vast blok van 60 minuten.
+
+    Een blok is het uur (UTC) waarin een trade opende. Per blok de som van
+    netto en bruto; t over de blokken (gemiddelde / standaardfout) en de
+    lag-1-autocorrelatie, want opeenvolgende blokken zijn niet volledig
+    onafhankelijk. Ook per exitregime en per handelssessie (van het blok).
+    Een toetsbare n die meegroeit met de handelsuren, naast de clusters.
+
+    Alleen ter informatie: de cluster-t, het oordeel en de poort gebruiken
+    dit niet.
+    """
+    from ..session_rules import session_of
+
+    gesloten = [t for t in trades if t.net_pnl is not None]
+    blokken = _blokreeks(gesloten)
+    uit = _bloksamenvatting(blokken)
+    uit["blok_minuten"] = BLOK_MINUTEN
+
+    regimes: dict[str, list[Trade]] = {}
+    for t in gesloten:
+        regimes.setdefault(getattr(t, "exit_regime", None) or "onbekend", []).append(t)
+    uit["per_exitregime"] = {
+        r: _bloksamenvatting(_blokreeks(regimes[r])) for r in sorted(regimes)
+    }
+
+    sessies: dict[str, dict[str, dict]] = {}
+    for blok, b in blokken.items():
+        try:
+            begin = datetime.strptime(blok, "%Y-%m-%dT%H").replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        sessies.setdefault(session_of(begin), {})[blok] = b
+    uit["per_sessie"] = {
+        s: _bloksamenvatting(sessies[s]) for s in sorted(sessies)
+    }
+
+    if details is None:
+        details = cluster_details(gesloten)
+    lang = [
+        d for d in details
+        if d.get("duur_min") is not None
+        and d["duur_min"] > CLUSTER_WAARSCHUWING_MINUTEN
+    ]
+    uit["cluster_langer_dan_120_min"] = bool(lang)
+    uit["clusters_langer_dan_120_min"] = len(lang)
+    uit["langste_cluster_min"] = max(
+        (d["duur_min"] for d in details if d.get("duur_min") is not None),
+        default=None,
+    )
+    uit["laatste_blokken"] = [
+        {"blok": k, "trades": b["trades"], "netto": round(b["netto"], 2),
+         "bruto": round(b["bruto"], 2)}
+        for k, b in list(blokken.items())[-BLOK_LIJST_MAX:]
+    ]
+    uit["toelichting"] = (
+        "Blok = uur (UTC) van opening; t over blokken met lag-1 erbij. "
+        "Alleen ter informatie: oordeel en poort blijven op de clusters."
+    )
+    return uit
+
+
 def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict:
     """Bereken alle prestatiemetrieken over een reeks gesloten trades."""
     closed = [t for t in trades if t.net_pnl is not None]
@@ -537,6 +675,8 @@ def compute_for_run(
     stats["cost_projection"] = cost_projection(trades)
     # 1.7.6: na het oordeel, en er niet in gebruikt.
     stats["per_exitregime"] = per_exitregime(trades)
+    # 1.9.5 (L-GS-007): na het oordeel, en er niet in gebruikt.
+    stats["per_tijdblok"] = per_tijdblok(trades)
 
     from ..learning.postmortem import analyse_losses
     # Bewust een andere sleutel dan "losses": dat veld bevat het *aantal*

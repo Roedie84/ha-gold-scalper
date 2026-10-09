@@ -1,5 +1,50 @@
 # Changelog — Gold Scalper
 
+## 1.9.5
+
+* **Geen strategiewijziging, alleen meting.** Instappen, uitstappen,
+  ordergrootte, risico en de configuratie van het echte exitbeheer zijn niet
+  aangeraakt; de tijdstop blijft 240 s.
+* **Tijdstopvarianten (L-GS-008).** Elke echte positie (demo/broker en
+  papier) wordt nagespeeld met vier varianten: tijdstop **240 s** (spiegel van
+  de huidige instelling, om de simulatie tegen de echte uitkomst te toetsen),
+  **480 s**, **720 s** en **geen tijdstop**, allemaal met de ingestelde
+  maximale positieduur (900 s). Verder identiek: zelfde instapprijs (de
+  werkelijke fill als die bekend is, anders de instapkoers), grootte,
+  beginstop, doel, trailing en break-even. Elke variant heeft een eigen
+  kopie van de exitconfiguratie; de echte wordt nooit gewijzigd.
+  * Gesimuleerd met dezelfde regels als de schaduwtrades (de stap is nu
+    gedeelde code): stop en doel tegen de uitersten van de bars, beide geraakt
+    telt de stop, afrekenen op bied (long) of laat (short), slippage en
+    commissie als bij schaduwtrades. Verfijning: alleen uitersten van bars die
+    die cyclus afsloten en ná de instap begonnen.
+  * Een variant loopt door nadat de echte trade sloot, tot zijn eigen
+    uitstap. Geen extra verzoeken bij de broker.
+  * Eigen tabel `tijdstop_varianten` (gekoppeld aan ticket, run en variant).
+    Na een herstart worden open varianten herladen; een gat in de koersdata
+    van meer dan 300 s of een nieuwe run geeft de status *vervallen*.
+  * Nieuwe sensor **Tijdstopvarianten**: waarde = aantal geëvalueerde
+    uurblokken; attributen per variant (trades, netto, bruto, kosten,
+    netto/trade, winst%, PF, doel%/stop%/tijdstop%, gemiddelde duur), het
+    gepaarde verschil tegen 240 s per trade en per uurblok (t over blokken,
+    lag-1-autocorrelatie, aantal blokken), de overeenkomst van de
+    240-variant met de echte trade (zelfde sluitreden en |verschil netto| <
+    0,50 USD) en een oordeel: "te weinig blokken" tot 20 uurblokken, daarna
+    de beste variant met t ≥ 2 of "geen duidelijk verschil". De beslissing
+    blijft bij Ruud.
+  * Brokerpaneel: tabel onder de schaduwtrades.
+* **Toets per uurblok (L-GS-007).** In de prestatiecijfers een extra blok
+  `per_tijdblok` (attribuut op de sensor *Oordeel*): netto en bruto per blok
+  van 60 minuten (uur van opening, UTC) met t over blokken en lag-1, per
+  exitregime en per handelssessie, plus de waarschuwing
+  `cluster_langer_dan_120_min`. Cluster-t, oordeel en live-poort blijven
+  ongewijzigd.
+* Tests: `tests/test_v195.py`. Vijf tests in `test_v190.py` hingen af van
+  het tijdstip waarop ze draaiden (de simulator rekent vanaf "nu"); hun
+  marktdata staat nu op een vast moment.
+* Bijwerken via HACS en herstarten, bij voorkeur zonder open positie. Daarna
+  eenmaal de browser verversen (nieuwe paneelcode).
+
 ## 1.9.4
 
 * **Geen strategiewijziging.** Alleen de risicoremmen (daglimiet en

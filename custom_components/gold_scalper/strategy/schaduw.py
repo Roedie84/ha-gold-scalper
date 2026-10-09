@@ -134,6 +134,98 @@ class SchaduwKosten:
     commissie_per_lot: float = 0.0
 
 
+def sluit_trade(t, prijs: float, mid: float, nu: datetime, reden: str,
+                kosten: SchaduwKosten) -> None:
+    """Sluit een gesimuleerde trade af op ``prijs`` (1.9.5: gedeeld).
+
+    Netto: uitstap min instap (beide inclusief spread), min geschatte
+    slippage per zijde en commissie. Bruto: mid op mid.
+    """
+    r = t.richting
+    lots = t.units / CONTRACT_SIZE
+    commissie = 2 * kosten.commissie_per_lot * lots
+    slippage = 2 * kosten.slippage * t.units
+    t.close_time = _iso(nu)
+    t.close_price = round(prijs, 3)
+    t.close_mid = round(mid, 3)
+    t.close_reason = reden
+    t.bruto = round((mid - t.open_mid) * r * t.units, 4)
+    t.netto = round((prijs - t.open_price) * r * t.units - slippage - commissie, 4)
+    t.kosten = round(t.bruto - t.netto, 4)
+    t.status = "gesloten"
+    t.laatst_bijgewerkt = _iso(nu)
+
+
+def sluitcode(reden: str | None) -> str:
+    """Reden van het exitbeheer als korte code: max_duur, tijdstop of exit."""
+    reden = reden or ""
+    if "maximale positieduur" in reden:
+        return "max_duur"
+    if "dode zone" in reden or "binnen" in reden:
+        return "tijdstop"
+    return "exit"
+
+
+def stap_trade(t, exits: ExitManager, kosten: SchaduwKosten, *, bid: float,
+               ask: float, hoog: float | None, laag: float | None, atr: float,
+               nu: datetime, rondreis_kosten: float) -> str:
+    """Eén gesimuleerde trade één cyclus verder (1.9.5: gedeeld).
+
+    Geeft ``"vervallen"``, ``"gesloten"`` of ``"open"`` terug; de trade zelf
+    wordt bijgewerkt. Dezelfde regels voor schaduwtrades en
+    tijdstopvarianten:
+
+    * na meer dan ``MAX_GAT_SECONDEN`` zonder bijwerking: vervallen;
+    * stop en doel tegen de uitersten (bied voor een long, laat voor een
+      short); beide geraakt telt de stop; afgerekend op het niveau;
+    * daarna de ``ExitManager`` (tijdstop, maximale duur, trailing,
+      break-even), afgerekend op bied (long) of laat (short).
+    """
+    half = (ask - bid) / 2.0
+    mid = (bid + ask) / 2.0
+    laagste_bied = bid if laag is None else min(bid, laag - half)
+    hoogste_laat = ask if hoog is None else max(ask, hoog + half)
+    hoogste_bied = bid if hoog is None else max(bid, hoog - half)
+    laagste_laat = ask if laag is None else min(ask, laag + half)
+    vorige = _tijd(t.laatst_bijgewerkt) or _tijd(t.open_time)
+    if vorige is not None and (nu - vorige).total_seconds() > MAX_GAT_SECONDEN:
+        t.status = "vervallen"
+        t.close_reason = "niet te volgen (gat in de koersdata)"
+        t.close_time = _iso(nu)
+        return "vervallen"
+    long = t.richting == 1
+    slechtst = laagste_bied if long else hoogste_laat
+    best = hoogste_bied if long else laagste_laat
+    t.mfe = max(t.mfe, (best - t.open_price) * t.richting)
+    t.mae = min(t.mae, (slechtst - t.open_price) * t.richting)
+    stop_geraakt = t.stop_loss is not None and (
+        slechtst <= t.stop_loss if long else slechtst >= t.stop_loss)
+    doel_geraakt = t.take_profit is not None and (
+        best >= t.take_profit if long else best <= t.take_profit)
+    if stop_geraakt or doel_geraakt:
+        niveau = t.stop_loss if stop_geraakt else t.take_profit
+        niveau_mid = niveau + half if long else niveau - half
+        sluit_trade(t, niveau, niveau_mid, nu,
+                    "stop_loss" if stop_geraakt else "take_profit", kosten)
+        return "gesloten"
+    actie = exits.evaluate(
+        side=t.side, volume=t.units, open_price=t.open_price,
+        current_stop=t.stop_loss, bid=bid, ask=ask, atr=atr,
+        opened_at=_tijd(t.open_time) or nu, now=nu,
+        round_trip_cost_per_oz=rondreis_kosten,
+    )
+    t.laatst_bijgewerkt = _iso(nu)
+    if actie.kind == "close":
+        prijs = bid if long else ask
+        sluit_trade(t, prijs, mid, nu, sluitcode(actie.reason or "exit"), kosten)
+        return "gesloten"
+    if actie.kind == "modify_stop" and actie.new_stop is not None:
+        t.stop_loss = actie.new_stop
+    # Gedeeltelijk sluiten staat standaard uit en wordt hier niet
+    # nagebootst: een gesimuleerde trade loopt dan als geheel door.
+    return "open"
+
+
 @dataclass
 class SchaduwBoek:
     """Open en gesloten schaduwtrades van één run, in het geheugen.
@@ -211,19 +303,7 @@ class SchaduwBoek:
 
     def _sluit(self, t: SchaduwTrade, prijs: float, mid: float, spread_uit: float,
                nu: datetime, reden: str) -> None:
-        r = t.richting
-        lots = t.units / CONTRACT_SIZE
-        commissie = 2 * self.kosten.commissie_per_lot * lots
-        slippage = 2 * self.kosten.slippage * t.units
-        t.close_time = _iso(nu)
-        t.close_price = round(prijs, 3)
-        t.close_mid = round(mid, 3)
-        t.close_reason = reden
-        t.bruto = round((mid - t.open_mid) * r * t.units, 4)
-        t.netto = round((prijs - t.open_price) * r * t.units - slippage - commissie, 4)
-        t.kosten = round(t.bruto - t.netto, 4)
-        t.status = "gesloten"
-        t.laatst_bijgewerkt = _iso(nu)
+        sluit_trade(t, prijs, mid, nu, reden, self.kosten)
 
     def bijwerken(self, *, bid: float, ask: float, hoog: float | None,
                   laag: float | None, atr: float, nu: datetime) -> list[SchaduwTrade]:
@@ -233,63 +313,18 @@ class SchaduwBoek:
         vorige cyclus, zoals de papersimulatie ze krijgt.
         """
         gewijzigd: list[SchaduwTrade] = []
-        half = (ask - bid) / 2.0
-        mid = (bid + ask) / 2.0
-        laagste_bied = bid if laag is None else min(bid, laag - half)
-        hoogste_laat = ask if hoog is None else max(ask, hoog + half)
-        hoogste_bied = bid if hoog is None else max(bid, hoog - half)
-        laagste_laat = ask if laag is None else min(ask, laag + half)
+        rondreis = (ask - bid) + 2 * self.kosten.slippage
         for t in list(self.open_trades):
-            vorige = _tijd(t.laatst_bijgewerkt) or _tijd(t.open_time)
-            if vorige is not None and (nu - vorige).total_seconds() > MAX_GAT_SECONDEN:
-                t.status = "vervallen"
-                t.close_reason = "niet te volgen (gat in de koersdata)"
-                t.close_time = _iso(nu)
+            uitkomst = stap_trade(
+                t, self.exits, self.kosten, bid=bid, ask=ask, hoog=hoog,
+                laag=laag, atr=atr, nu=nu, rondreis_kosten=rondreis,
+            )
+            if uitkomst == "vervallen":
                 self.open_trades.remove(t)
                 self.vervallen += 1
-                gewijzigd.append(t)
-                continue
-            long = t.richting == 1
-            slechtst = laagste_bied if long else hoogste_laat
-            best = hoogste_bied if long else laagste_laat
-            t.mfe = max(t.mfe, (best - t.open_price) * t.richting)
-            t.mae = min(t.mae, (slechtst - t.open_price) * t.richting)
-            stop_geraakt = t.stop_loss is not None and (
-                slechtst <= t.stop_loss if long else slechtst >= t.stop_loss)
-            doel_geraakt = t.take_profit is not None and (
-                best >= t.take_profit if long else best <= t.take_profit)
-            if stop_geraakt or doel_geraakt:
-                niveau = t.stop_loss if stop_geraakt else t.take_profit
-                niveau_mid = niveau + half if long else niveau - half
-                self._sluit(t, niveau, niveau_mid, ask - bid, nu,
-                            "stop_loss" if stop_geraakt else "take_profit")
+            elif uitkomst == "gesloten":
                 self.open_trades.remove(t)
                 self.gesloten.append(t)
-                gewijzigd.append(t)
-                continue
-            actie = self.exits.evaluate(
-                side=t.side, volume=t.units, open_price=t.open_price,
-                current_stop=t.stop_loss, bid=bid, ask=ask, atr=atr,
-                opened_at=_tijd(t.open_time) or nu, now=nu,
-                round_trip_cost_per_oz=(ask - bid) + 2 * self.kosten.slippage,
-            )
-            t.laatst_bijgewerkt = _iso(nu)
-            if actie.kind == "close":
-                prijs = bid if long else ask
-                reden = actie.reason or "exit"
-                if "maximale positieduur" in reden:
-                    code = "max_duur"
-                elif "dode zone" in reden or "binnen" in reden:
-                    code = "tijdstop"
-                else:
-                    code = "exit"
-                self._sluit(t, prijs, mid, ask - bid, nu, code)
-                self.open_trades.remove(t)
-                self.gesloten.append(t)
-            elif actie.kind == "modify_stop" and actie.new_stop is not None:
-                t.stop_loss = actie.new_stop
-            # Gedeeltelijk sluiten staat standaard uit en wordt hier niet
-            # nagebootst: een schaduwtrade loopt dan als geheel door.
             gewijzigd.append(t)
         return gewijzigd
 
