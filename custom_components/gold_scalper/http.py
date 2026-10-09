@@ -20,23 +20,43 @@ Géén API-tokens, géén account-ID, géén inloggegevens - die komen in de
 rapportgenerator niet voor. Wie meeleest ziet dus wat je strategie deed, niet
 hoe hij bij je geld komt. Vind je dat alsnog te veel, dan zet je het paneel uit
 met ``show_panel: false`` in de opties.
+
+1.8.0: de zijbalk-ingang toont nu het broker-dashboard, een eigen webcomponent
+(``frontend/broker-panel.js``). Dat haalt zijn gegevens via ``hass.callApi``
+bij ``/api/gold_scalper/broker``; díe route vraagt wél authenticatie en
+beheerdersrecht, want een webcomponent stuurt de sessie van de frontend mee.
+Het overzicht en het rapport hierboven blijven ongewijzigd bereikbaar.
 """
 
 from __future__ import annotations
 
 import logging
 
+import hashlib
+import time
+from pathlib import Path
+
 from aiohttp import web
-from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.http import HomeAssistantView, StaticPathConfig
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import DOMAIN, INTEGRATION_VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
 OVERVIEW_URL = "/api/gold_scalper/overview"
 REPORT_URL = "/api/gold_scalper/report"
 PANEL_URL_PATH = "gold-scalper"
+
+#: 1.8.0: broker-dashboard. Eigen webcomponent op dezelfde zijbalk-ingang.
+BROKER_DATA_URL = "/api/gold_scalper/broker"
+BROKER_STATIC_URL = "/gold_scalper_static/broker-panel.js"
+BROKER_WEBCOMPONENT = "gold-scalper-broker-panel"
+BROKER_JS_FILE = Path(__file__).resolve().parent / "frontend" / "broker-panel.js"
+#: Hoe lang een gebouwd model hooguit hergebruikt wordt als de coordinator
+#: geen nieuwe cyclus heeft gedraaid. Binnen een cyclus verandert er niets.
+BROKER_CACHE_MAX_SECONDS = 60
+_GEEN_CACHE = {"Cache-Control": "no-store, must-revalidate"}
 
 #: Hoe vaak het rapport zichzelf ververst, in seconden.
 #:
@@ -209,6 +229,117 @@ class GoldScalperReportView(HomeAssistantView):
         )
 
 
+def broker_frontend_version(js_file: Path = BROKER_JS_FILE) -> str:
+    """Integratieversie plus inhoudshash: elke wijziging geeft een nieuwe URL."""
+    inhoud = Path(js_file).read_bytes()
+    return f"{INTEGRATION_VERSION}-{hashlib.sha256(inhoud).hexdigest()[:12]}"
+
+
+class GoldScalperBrokerView(HomeAssistantView):
+    """Alleen-lezend JSON-model voor het broker-dashboard (1.8.0).
+
+    Geauthenticeerd (``requires_auth``) en alleen voor beheerders, net als het
+    paneel zelf. Geen schrijfacties: alleen ``GET``, en de database gaat open
+    met ``mode=ro``.
+
+    Efficiënt: het model wordt per coordinatorcyclus één keer gebouwd en
+    daarna hergebruikt. Met ``?since=<sleutel>`` antwoordt de route met
+    ``{"ongewijzigd": true}`` zolang er geen nieuwe cyclus was, zodat een
+    paneel dat elke paar seconden vraagt vrijwel niets kost.
+    """
+
+    url = BROKER_DATA_URL
+    name = "api:gold_scalper:broker"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+        self._cache: dict[str, dict] = {}
+        self._teller = 0
+
+    async def get(self, request: web.Request) -> web.Response:
+        user = request.get("hass_user")
+        if user is None:
+            return web.json_response({"error": "unauthorized"}, status=401, headers=_GEEN_CACHE)
+        if not getattr(user, "is_admin", False):
+            return web.json_response({"error": "forbidden"}, status=403, headers=_GEEN_CACHE)
+
+        coordinator = _pick_coordinator(self._hass, request.query.get("entry"))
+        if coordinator is None:
+            return web.json_response(
+                {"error": "no_entry"}, status=503, headers=_GEEN_CACHE)
+        if not coordinator.data:
+            return web.json_response(
+                {"error": "starting"}, status=503, headers=_GEEN_CACHE)
+
+        entry_id = coordinator.entry.entry_id
+        cache = self._cache.get(entry_id)
+        if (cache is None or cache["data"] is not coordinator.data
+                or time.monotonic() - cache["gebouwd"] > BROKER_CACHE_MAX_SECONDS):
+            payload = await self._bouw(coordinator)
+            self._teller += 1
+            payload["sleutel"] = f"{self._teller}"
+            payload["entry"] = entry_id
+            cache = {"data": coordinator.data, "payload": payload,
+                     "gebouwd": time.monotonic()}
+            self._cache[entry_id] = cache
+
+        payload = cache["payload"]
+        if request.query.get("since") == payload["sleutel"]:
+            return web.json_response(
+                {"api": payload["api"], "sleutel": payload["sleutel"], "ongewijzigd": True},
+                headers=_GEEN_CACHE,
+            )
+        return web.json_response(payload, headers=_GEEN_CACHE)
+
+    async def _bouw(self, coordinator) -> dict:
+        from homeassistant.util import dt as dt_util
+
+        from .dashboard.broker import build_payload, candles_slice, read_database
+        from .status import build_status
+
+        data = coordinator.data
+        # Candles kopiëren in de event-loop: de coordinator voegt ze daar toe.
+        candles = candles_slice(getattr(coordinator, "_candles", None))
+        db_deel = None
+        db = getattr(coordinator, "db", None)
+        run_id = getattr(coordinator, "run_id", None)
+        if db is not None and run_id is not None and getattr(db, "path", None):
+            try:
+                db_deel = await self._hass.async_add_executor_job(
+                    read_database, db.path, run_id)
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Broker-dashboard: database niet te lezen", exc_info=True)
+        places_orders = bool(
+            coordinator.mode.places_orders
+            and coordinator.enabled
+            and getattr(coordinator.venue, "supports_trading", False)
+        )
+        uses_real_money = bool(
+            coordinator.mode.uses_real_money
+            and (coordinator.gate or {}).get("unlocked")
+            and places_orders
+        )
+        exits = getattr(getattr(coordinator, "exits", None), "config", None)
+        exit_cfg = {
+            k: getattr(exits, k, None)
+            for k in ("time_stop_seconds", "time_stop_deadzone_atr", "max_hold_seconds")
+        } if exits is not None else {}
+        return build_payload(
+            data,
+            symbol=coordinator.symbol,
+            timeframe=getattr(coordinator, "timeframe", None),
+            candles=candles,
+            db=db_deel,
+            exit_cfg=exit_cfg,
+            version=INTEGRATION_VERSION,
+            status=build_status(data),
+            places_orders=places_orders,
+            uses_real_money=uses_real_money,
+            tz=dt_util.DEFAULT_TIME_ZONE,
+        )
+
+
 def _placeholder(title: str, message: str) -> str:
     """Nette pagina voor de gevallen waarin er nog niets te tonen valt.
 
@@ -229,35 +360,54 @@ p{{margin:0;color:#5A6156;font-size:13px}}
 
 
 async def async_register_frontend(hass: HomeAssistant, show_panel: bool = True) -> None:
-    """Registreer het adres en het menu-item. Veilig om vaker aan te roepen."""
+    """Registreer de adressen en het menu-item. Veilig om vaker aan te roepen.
+
+    1.8.0: het menu-item 'Gold Scalper' toont het broker-dashboard, een eigen
+    webcomponent (``panel_custom``) in plaats van de iframe met het overzicht.
+    Dezelfde zijbalk-ingang (``/gold-scalper``), dus geen handwerk. Het
+    klassieke overzicht en het keuringsrapport blijven bereikbaar op hun
+    eigen adres en zijn vanuit het dashboard gelinkt.
+    """
     if not hass.data.get(f"{DOMAIN}_view_registered"):
         hass.http.register_view(GoldScalperOverviewView())
         hass.http.register_view(GoldScalperReportView())
         hass.data[f"{DOMAIN}_view_registered"] = True
         _LOGGER.debug("Rapport bereikbaar op %s", REPORT_URL)
+    if not hass.data.get(f"{DOMAIN}_broker_registered"):
+        hass.http.register_view(GoldScalperBrokerView(hass))
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(BROKER_STATIC_URL, str(BROKER_JS_FILE), True)]
+        )
+        hass.data[f"{DOMAIN}_broker_registered"] = True
 
     if not show_panel:
         return
 
-    from homeassistant.components import frontend
+    from homeassistant.components import frontend, panel_custom
 
     if hass.data.get(f"{DOMAIN}_panel_registered"):
         return
+    versie = await hass.async_add_executor_job(broker_frontend_version)
+    kwargs = dict(
+        frontend_url_path=PANEL_URL_PATH,
+        webcomponent_name=BROKER_WEBCOMPONENT,
+        sidebar_title="Gold Scalper",
+        sidebar_icon="mdi:gold",
+        module_url=f"{BROKER_STATIC_URL}?v={versie}",
+        embed_iframe=False,
+        trust_external=False,
+        require_admin=True,
+        config={},
+    )
     try:
-        frontend.async_register_built_in_panel(
-            hass,
-            component_name="iframe",
-            sidebar_title="Gold Scalper",
-            sidebar_icon="mdi:gold",
-            frontend_url_path=PANEL_URL_PATH,
-            config={"url": OVERVIEW_URL},
-            require_admin=True,
-        )
-        hass.data[f"{DOMAIN}_panel_registered"] = True
-        _LOGGER.info("Menu-item 'Gold Scalper' toegevoegd aan de zijbalk")
+        await panel_custom.async_register_panel(hass, **kwargs)
     except ValueError:
-        # Al geregistreerd door een eerdere entry; geen probleem.
-        hass.data[f"{DOMAIN}_panel_registered"] = True
+        # Een achtergebleven registratie (bijvoorbeeld de oude iframe of een
+        # oude module-URL): vervangen, niet naast elkaar laten staan.
+        frontend.async_remove_panel(hass, PANEL_URL_PATH)
+        await panel_custom.async_register_panel(hass, **kwargs)
+    hass.data[f"{DOMAIN}_panel_registered"] = True
+    _LOGGER.info("Menu-item 'Gold Scalper' (broker-dashboard) in de zijbalk")
 
 
 async def async_unregister_frontend(hass: HomeAssistant) -> None:

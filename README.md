@@ -120,6 +120,21 @@ Welke valuta, welke dag en welke populatie achter elk getal zit: zie
 
 ---
 
+## Broker-dashboard (1.8.0)
+
+Klik op **Gold Scalper** in de zijbalk. Je ziet één scherm in dezelfde stijl
+als StormchaseNL en EMS: kopbalk met bied/laat, DEMO-badge, markt, status en
+alarmen; een account-strip; een candlestickgrafiek (1m/5m/15m, crosshair,
+zoomen en schuiven) met lijnen voor instap, stop-loss en take-profit van de
+open positie en markers van recente trades; de open posities met
+tijdstop-aftelling; equity en drawdown; de laatste 20 trades; en het
+onderzoekspaneel (trades, clusters, winst%, PF, t-statistiek, oordeel,
+doel/stop/onbekend, latency, afstemming). Op een telefoon één kolom.
+
+Alleen weergave: het dashboard heeft geen handelsknoppen. Bediening blijft
+via de entiteiten en acties van de integratie. Na een update eenmaal de
+browser verversen. Details en de nieuwe route: [`DASHBOARD.md`](DASHBOARD.md).
+
 ## Rapport en overzicht
 
     http://<home-assistant>/api/gold_scalper/overview
@@ -140,7 +155,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **1.7.10** (zie `CHANGELOG.md`).
+Huidige versie: **1.8.0** (zie `CHANGELOG.md`).
 
 Het domein blijft `gold_scalper`: bestaande entiteiten, databases en
 instellingen werken ongewijzigd door.

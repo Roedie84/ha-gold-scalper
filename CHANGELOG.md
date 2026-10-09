@@ -1,5 +1,26 @@
 # Changelog — Gold Scalper
 
+## 1.8.0
+
+* **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,
+  risico, positiegrootte en vingerafdruk zijn niet aangeraakt.
+* **Broker-dashboard** in dezelfde stijl als StormchaseNL en EMS (donker
+  petrol met goud, glaspanelen, kleine hoofdletterlabels, grote cijfers).
+  Het menu-item **Gold Scalper** toont het nu op dezelfde zijbalk-ingang:
+  kopbalk met bied/laat, DEMO-badge, markt, status en alarmen;
+  account-strip; candlestickgrafiek (1m/5m/15m, crosshair, zoom) met lijnen
+  voor instap, stop-loss en take-profit en markers van recente trades; open
+  posities met tijdstop-aftelling; equity en drawdown; laatste 20 trades;
+  onderzoek en statistiek. Op een telefoon één kolom.
+* Alleen weergave: geen handelsknoppen. Het klassieke overzicht en het
+  keuringsrapport blijven bereikbaar en zijn onderaan gelinkt.
+* Nieuwe route `GET /api/gold_scalper/broker`: geauthenticeerd, alleen
+  beheerders, alleen-lezend (eigen `mode=ro`-verbinding), begrensd en per
+  cyclus gecachet (zie `DASHBOARD.md`).
+* **Na de update eenmaal de browser verversen** (de module-URL heeft een
+  nieuwe versieparameter).
+* Nieuw: `tests/test_v180.py`.
+
 ## 1.7.10
 
 * **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,

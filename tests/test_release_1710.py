@@ -70,15 +70,3 @@ def test_de_coordinator_meldt_een_klokrand_niet_als_waarschuwing():
 
 PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalper"
 
-
-def test_version_is_consistent():
-    import json
-
-    from gold_scalper import const
-
-    manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.7.10"
-    readme = (PKG.parent.parent / "README.md").read_text(encoding="utf-8")
-    assert "Huidige versie: **1.7.10**" in readme
-    changelog = (PKG.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert changelog.split("## ")[1].startswith("1.7.10")

@@ -3,6 +3,51 @@
 Sinds 1.4.0 verschijnt het dashboard vanzelf. Geen knop indrukken, geen YAML
 plakken, geen `www/`-map, geen herstart.
 
+## Broker-dashboard (1.8.0)
+
+Het menu-item **Gold Scalper** in de zijbalk (`/gold-scalper`) toont sinds
+1.8.0 het broker-dashboard: een eigen webcomponent
+(`frontend/broker-panel.js`, geregistreerd als `panel_custom`) in plaats van
+de iframe met het overzicht. Zelfde zijbalk-ingang, dus geen handwerk. De
+module-URL draagt `?v=<versie>-<inhoudshash>`, zodat de browser na een update
+geen oude code houdt; ververs na de update eenmaal de browser.
+
+Indeling (desktop raster, telefoon één kolom, geen horizontale scroll):
+
+1. Kopbalk: merk-icoon, instrument, DEMO/PAPIER/ECHT GELD, markt open/dicht,
+   status, handel aan/uit, toestand, noodstop/dataprobleem, bied/laat, klok.
+2. Account-strip: equity en saldo, open P&L, dag-P&L (equity t.o.v.
+   dagstart), netto van de run, kosten, vermogensvloer met afstand.
+3. Koersgrafiek: candlesticks zelf getekend op canvas (geen bibliotheek of
+   CDN), tijdframe 1m/5m/15m door aggregatie, crosshair met OHLC, scrollen =
+   zoom, slepen = schuiven, dubbelklik = terug. Voor een open positie lijnen
+   voor instap (met richting, units en P&L), stop-loss (rood) en
+   take-profit (groen); recente trades als driehoekjes (instap) en bolletjes
+   (uitstap, groen/rood naar resultaat).
+4. Open positie en markt: P&L, SL/TP-ligging, tijdstop- en
+   maximale-duuraftelling; bied/laat, dagbereik, spread, ATR, signaal.
+5. Open posities, equity en drawdown, recente trades (laatste 20, met
+   sluitreden en kostenbron gemeten/berekend), onderzoek en statistiek.
+
+Alleen weergave: geen knoppen die handelen, sluiten of iets aan- of
+uitzetten. Bediening blijft via de entiteiten en acties van de integratie.
+Het klassieke overzicht en het keuringsrapport zijn onderaan gelinkt.
+
+### Route `/api/gold_scalper/broker`
+
+* `GET`, `requires_auth`, alleen beheerders (zoals het paneel). Geen andere
+  methodes; de database gaat open met een eigen alleen-lezende verbinding
+  (`mode=ro`).
+* Antwoord: één JSON-model (`api: 1`) met `instrument`, `koers`, `status`,
+  `alarm`, `candles` (hooguit 720), `posities`, `account`, `equity`
+  (hooguit 400 punten, gelijkmatig over de run), `trades` (laatste 20),
+  `markers` (trades binnen het candlevenster), `stats` en `sleutel`.
+* Per coordinatorcyclus één keer gebouwd. Het paneel vraagt elke 5 s met
+  `?since=<sleutel>`; zolang er geen nieuwe cyclus was is het antwoord
+  `{"ongewijzigd": true}`. Bij een verborgen tabblad vraagt het niets.
+* Optioneel `?entry=<entry_id>` bij meerdere configuraties.
+* "Clusters x van 30" is een richtgetal voor de weergave, geen poort.
+
 ## Meetkwaliteit
 
 Sinds 5.5.0 staat op de overzichtspagina een blok **Meetkwaliteit**: de
