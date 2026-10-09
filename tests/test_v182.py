@@ -172,8 +172,12 @@ def test_http_status_error_has_diagnosis():
 
 
 def test_http_reqerr_on_control_response():
-    ticks, live, fout, tr = _run(NepLightstreamer("reqerr"))
-    assert fout.soort == "REQERR" and fout.code == "21" and fout.tekst == "Bad item"
+    nep = NepLightstreamer("reqerr")
+    ticks, live, fout, tr = _run(nep)
+    # 1.9.1: REQERR 21 = volgende IG-item; alle vier geweigerd = één fout.
+    assert fout.soort == "REQERR" and fout.code == "alle"
+    assert "MARKET REQERR 21 Bad item" in fout.tekst and "CHART-1MINUTE REQERR 21" in fout.tekst
+    assert sum(v[0].endswith("control.txt") for v in nep.verzoeken) == 4
 
 
 def test_broken_stream_backs_off_with_one_diagnostic_warning(monkeypatch, caplog):

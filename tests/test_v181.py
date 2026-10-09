@@ -207,10 +207,10 @@ def test_conerr_auth_and_loop():
         asyncio.run(S.run_connection(tr, CREDS, lambda t: None, lambda: None))
     assert tr.sent.count("bind_session") == 1          # LOOP = opnieuw binden
     assert sum(x.startswith("control") for x in tr.sent) == 1   # niet opnieuw abonneren
-    tr = FakeTransport(["CONOK,S1,50000,5000,*", "REQERR,1,21,Bad item"])
+    tr = FakeTransport(["CONOK,S1,50000,5000,*", "REQERR,1,20,Session not found"])
     with pytest.raises(S.TlcpError) as err:
         asyncio.run(S.run_connection(tr, CREDS, lambda t: None, lambda: None))
-    assert err.value.soort == "REQERR" and err.value.code == "21"
+    assert err.value.soort == "REQERR" and err.value.code == "20"   # geen variantfout
 
 
 def test_silence_is_a_timeout(monkeypatch):

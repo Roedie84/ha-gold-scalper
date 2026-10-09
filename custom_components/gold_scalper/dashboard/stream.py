@@ -55,6 +55,31 @@ LS_MARKET_FIELDS = (
     "BID", "OFFER", "UPDATE_TIME", "CHANGE", "CHANGE_PCT", "HIGH", "LOW",
     "MARKET_STATE",
 )
+#: Te proberen IG-items, in volgorde (1.9.1). IG's live server antwoordde op
+#: ``MARKET:<epic>`` met alle velden "REQERR 21 Invalid group"; dan volgen
+#: minimale MARKET-velden, het chart-tick-item en de lopende 1-minuutcandle.
+#: ``velden`` koppelt elk schemaveld aan een rol in het tickbericht.
+LS_VARIANTEN: tuple[dict, ...] = (
+    {"naam": "MARKET", "group": "MARKET:{epic}", "mode": "MERGE",
+     "schema": LS_MARKET_FIELDS},
+    {"naam": "MARKET-minimaal", "group": "MARKET:{epic}", "mode": "MERGE",
+     "schema": ("BID", "OFFER", "UPDATE_TIME", "MARKET_STATE")},
+    {"naam": "CHART-TICK", "group": "CHART:{epic}:TICK", "mode": "DISTINCT",
+     "schema": ("BID", "OFR", "LTP", "UTM")},
+    {"naam": "CHART-1MINUTE", "group": "CHART:{epic}:1MINUTE", "mode": "MERGE",
+     "schema": ("BID_CLOSE", "OFR_CLOSE", "UTM", "CONS_END")},
+)
+#: REQERR-codes waarop de volgende variant geprobeerd wordt: 21 bad group,
+#: 22 group niet bij dit schema, 23 bad schema, 24 modus niet toegestaan.
+LS_VARIANT_CODES = frozenset({"21", "22", "23", "24"})
+#: Rollen per veldnaam, over alle varianten heen.
+_ROL = {
+    "BID": "bied", "BID_CLOSE": "bied",
+    "OFFER": "laat", "OFR": "laat", "OFR_CLOSE": "laat",
+    "UPDATE_TIME": "tijdtekst", "UTM": "utm",
+    "CHANGE": "verandering", "CHANGE_PCT": "pct", "HIGH": "hoog", "LOW": "laag",
+    "MARKET_STATE": "markt",
+}
 #: Gevraagde keepalive; de server mag een andere kiezen (staat in CONOK).
 LS_KEEPALIVE_MS = 5000
 #: Maximaal zoveel koersen per seconde naar het paneel (smoren).
@@ -136,14 +161,22 @@ def create_session_params(creds: dict) -> dict[str, Any]:
     }
 
 
-def subscribe_params(epic: str, req_id: int = 1, sub_id: int = 1) -> dict[str, Any]:
+def subscribe_params(epic: str, req_id: int = 1, sub_id: int = 1,
+                     variant: dict | None = None) -> dict[str, Any]:
+    """Control-parameters voor een abonnement.
+
+    Geen ``LS_data_adapter``: IG gebruikt de standaardadapter van de
+    adapterset. ``:`` in de groep wordt bij het formulier-coderen ``%3A``;
+    de server decodeert dat terug (TLCP: parameters zijn URL-gecodeerd).
+    """
+    v = variant or LS_VARIANTEN[0]
     return {
         "LS_reqId": req_id,
         "LS_op": "add",
         "LS_subId": sub_id,
-        "LS_mode": "MERGE",
-        "LS_group": f"MARKET:{epic}",
-        "LS_schema": " ".join(LS_MARKET_FIELDS),
+        "LS_mode": v["mode"],
+        "LS_group": v["group"].format(epic=epic),
+        "LS_schema": " ".join(v["schema"]),
         "LS_snapshot": "true",
     }
 
@@ -212,10 +245,30 @@ def _getal(v) -> float | None:
     return f if f == f and f not in (float("inf"), float("-inf")) else None
 
 
-def tick_from_values(waarden: list[str | None], ontvangen: float) -> dict:
-    """Veldwaarden van ``MARKET:<epic>`` naar het tickbericht voor het paneel."""
-    v = dict(zip(LS_MARKET_FIELDS, waarden))
-    bied, laat = _getal(v.get("BID")), _getal(v.get("OFFER"))
+def _utm_tekst(ms) -> str | None:
+    """IG-chartveld UTM (epoch in milliseconden) naar ``HH:MM:SS`` UTC."""
+    f = _getal(ms)
+    if f is None:
+        return None
+    try:
+        return time.strftime("%H:%M:%S", time.gmtime(f / 1000.0))
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def tick_from_values(waarden: list[str | None], ontvangen: float,
+                     schema: tuple[str, ...] = LS_MARKET_FIELDS) -> dict:
+    """Veldwaarden van een IG-item naar het tickbericht voor het paneel.
+
+    Werkt voor MARKET (BID/OFFER/UPDATE_TIME) en CHART (BID/OFR/UTM in
+    epoch-ms, of BID_CLOSE/OFR_CLOSE).
+    """
+    v: dict[str, Any] = {}
+    for naam, waarde in zip(schema, waarden):
+        rol = _ROL.get(naam)
+        if rol is not None:
+            v[rol] = waarde
+    bied, laat = _getal(v.get("bied")), _getal(v.get("laat"))
     mid = (bied + laat) / 2 if bied is not None and laat is not None else None
     return {
         "soort": "tick",
@@ -223,12 +276,12 @@ def tick_from_values(waarden: list[str | None], ontvangen: float) -> dict:
         "laat": laat,
         "mid": round(mid, 4) if mid is not None else None,
         "spread": round(laat - bied, 4) if mid is not None else None,
-        "verandering": _getal(v.get("CHANGE")),
-        "pct": _getal(v.get("CHANGE_PCT")),
-        "hoog": _getal(v.get("HIGH")),
-        "laag": _getal(v.get("LOW")),
-        "markt": v.get("MARKET_STATE"),
-        "broker_tijd": v.get("UPDATE_TIME"),
+        "verandering": _getal(v.get("verandering")),
+        "pct": _getal(v.get("pct")),
+        "hoog": _getal(v.get("hoog")),
+        "laag": _getal(v.get("laag")),
+        "markt": v.get("markt"),
+        "broker_tijd": v.get("tijdtekst") or _utm_tekst(v.get("utm")),
         "tijd": round(ontvangen, 3),
     }
 
@@ -359,12 +412,24 @@ def _fout_uit(soort: str, args: list[str]) -> TlcpError:
                      unquote(args[1]) if len(args) > 1 else "")
 
 
+def _variant_volgorde(start: int) -> list[int]:
+    """Eerst de variant die eerder werkte, daarna de rest in vaste volgorde."""
+    start = start if 0 <= start < len(LS_VARIANTEN) else 0
+    return [start] + [i for i in range(len(LS_VARIANTEN)) if i != start]
+
+
 async def run_connection(
     transport, creds: dict, on_tick: Callable[[dict], None],
     on_live: Callable[[], None], *, clock: Callable[[], float] = time.time,
     verouderd: Callable[[], bool] | None = None,
+    variant: int = 0, on_variant: Callable[[int], None] | None = None,
 ) -> str:
     """Eén TLCP-sessie over een transport, tot die eindigt.
+
+    Abonneert op de IG-items uit ``LS_VARIANTEN``, te beginnen bij
+    ``variant``; bij REQERR 21-24 volgt de volgende. ``on_variant(i)`` meldt
+    welke werd geaccepteerd (REQOK). Weigert IG ze allemaal, dan een
+    ``TlcpError`` met de code per variant.
 
     ``LOOP`` wordt binnen de sessie afgehandeld (``rebind``). Geeft
     ``"vernieuwd"`` terug als de IG-sessie intussen nieuwe tokens heeft
@@ -372,10 +437,48 @@ async def run_connection(
     keepalive). Elke andere afloop is een uitzondering.
     """
     await transport.create_session(create_session_params(creds))
-    item = ItemState(len(LS_MARKET_FIELDS))
     wacht = LS_CONNECT_TIMEOUT
     live = False
     geabonneerd = False
+    volgorde = _variant_volgorde(variant)
+    poging = -1                 # index in volgorde
+    req_id = 0
+    sub_id = 0
+    actief: dict | None = None
+    item: ItemState | None = None
+    geweigerd: list[str] = []
+
+    async def abonneer_volgende() -> None:
+        """Volgende variant proberen; REQERR 21-24 in het antwoord: door."""
+        nonlocal poging, req_id, sub_id, actief, item
+        while True:
+            poging += 1
+            if poging >= len(volgorde):
+                raise TlcpError("REQERR", "alle",
+                                "geen IG-item geaccepteerd: " + "; ".join(geweigerd))
+            v = LS_VARIANTEN[volgorde[poging]]
+            req_id += 1
+            sub_id += 1
+            actief = v
+            item = ItemState(len(v["schema"]))
+            antwoord = await transport.control(
+                subscribe_params(creds["epic"], req_id, sub_id, v))
+            if not antwoord:
+                return              # antwoord komt op de stroom
+            _LOGGER.debug("Koersstroom control (%s) <- %s", v["naam"], antwoord[:200])
+            a_soort, a_args = parse_message(antwoord)
+            if a_soort == "REQERR":
+                fout = _fout_uit(a_soort, a_args)
+                if fout.code in LS_VARIANT_CODES:
+                    geweigerd.append(f"{v['naam']} REQERR {fout.code} {fout.tekst}".strip())
+                    continue
+                raise fout
+            if a_soort in ("ERROR", "CONERR"):
+                raise _fout_uit(a_soort, a_args)
+            if a_soort == "REQOK" and on_variant is not None:
+                on_variant(volgorde[poging])
+            return
+
     while True:
         try:
             regel = await transport.receive(wacht)
@@ -396,26 +499,35 @@ async def run_connection(
             transport.bound(args[0] if args else "", args[3] if len(args) > 3 else None)
             if not geabonneerd:
                 geabonneerd = True
-                antwoord = await transport.control(subscribe_params(creds["epic"]))
-                if antwoord:
-                    _LOGGER.debug("Koersstroom control <- %s", antwoord[:200])
-                    a_soort, a_args = parse_message(antwoord)
-                    if a_soort in ("REQERR", "ERROR", "CONERR"):
-                        raise _fout_uit(a_soort, a_args)
+                await abonneer_volgende()
         elif soort == "SUBOK":
-            if not live:
+            if args and args[0] == str(sub_id) and not live:
                 live = True
+                if on_variant is not None:
+                    on_variant(volgorde[poging])
                 on_live()
         elif soort == "U":
-            if len(args) == 3 and args[1] == "1":
+            if (len(args) == 3 and args[0] == str(sub_id) and args[1] == "1"
+                    and item is not None and actief is not None):
                 waarden = item.apply(args[2])
-                on_tick(tick_from_values(waarden, clock()))
+                on_tick(tick_from_values(waarden, clock(), actief["schema"]))
         elif soort == "LOOP":
             await transport.rebind()
             wacht = LS_CONNECT_TIMEOUT
-        elif soort in ("CONERR", "END", "ERROR", "REQERR"):
+        elif soort == "REQERR":
+            fout = _fout_uit(soort, args)
+            # REQERR op de stroom (niet via HTTP-control): zelfde terugval.
+            if (not live and args and args[0] == str(req_id)
+                    and fout.code in LS_VARIANT_CODES and actief is not None):
+                geweigerd.append(f"{actief['naam']} REQERR {fout.code} {fout.tekst}".strip())
+                await abonneer_volgende()
+                continue
+            raise fout
+        elif soort in ("CONERR", "END", "ERROR"):
             raise _fout_uit(soort, args)
         elif soort == "UNSUB":
+            if args and args[0] != str(sub_id):
+                continue
             raise TlcpError(soort, "", "abonnement door de server beëindigd")
         # SERVNAME, CLIENTIP, CONS, PROBE, NOOP, SYNC, PROG, REQOK, CONF,
         # MSGDONE, EOS, CS, OV: geen actie nodig.
@@ -459,6 +571,8 @@ class PriceStream:
         self._status: dict = {"soort": "status", "status": "uit", "reden": None}
         self._gewaarschuwd = False
         self.verbindingen = 0
+        #: Index in LS_VARIANTEN die IG het laatst accepteerde (1.9.1).
+        self.variant = 0
 
     # -- abonnees ----------------------------------------------------------- #
     @property
@@ -616,7 +730,8 @@ class PriceStream:
                 transport = await self._open_transport(creds["endpoint"])
                 uitkomst = await run_connection(
                     transport, creds, self._op_tick, self._bij_live,
-                    clock=self._clock, verouderd=verouderd)
+                    clock=self._clock, verouderd=verouderd,
+                    variant=self.variant, on_variant=self._zet_variant)
             except asyncio.CancelledError:
                 raise
             except TlcpError as err:
@@ -650,6 +765,12 @@ class PriceStream:
                 wacht = max(wacht, LS_AUTH_WAIT_SECONDS)
             pogingen += 1
             await asyncio.sleep(wacht)
+
+    def _zet_variant(self, index: int) -> None:
+        if index != self.variant:
+            _LOGGER.debug("%s: koersstroom gebruikt IG-item %s", self._naam,
+                          LS_VARIANTEN[index]["naam"])
+        self.variant = index
 
     def _bij_live(self) -> None:
         self._zet_status("live", None)

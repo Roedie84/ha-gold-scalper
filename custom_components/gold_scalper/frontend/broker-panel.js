@@ -57,7 +57,7 @@ const IC = {
 
 const STIJL = `
 :host {
-  display: block; min-height: 100%;
+  display: block; width: 100%; min-height: 100%;
   --bg0: #050a0f; --bg1: #09131b; --bg2: #0e1c26;
   --paneel: rgba(19, 34, 45, .62); --paneel2: rgba(9, 18, 26, .72);
   --rand: rgba(160, 200, 220, .12); --rand2: rgba(160, 200, 220, .22);
@@ -84,7 +84,7 @@ const STIJL = `
   mask-image: linear-gradient(180deg, rgba(0,0,0,.9), transparent 70%);
   -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,.9), transparent 70%);
 }
-.wrap { container-type: inline-size; max-width: 1720px; margin: 0 auto; padding: 18px 22px 26px; }
+.wrap { container-type: inline-size; width: 100%; max-width: 1800px; margin: 0 auto; padding: 18px 22px 26px; }
 .num, td, .big, .w, .tijd, .px { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 .ic { width: 18px; height: 18px; flex: none; }
 .pos { color: var(--groen); } .neg { color: var(--rood); } .dim { color: var(--tekst3); }
@@ -160,6 +160,8 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 .lbl { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--tekst2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tegel .w { font-size: 23px; font-weight: 800; line-height: 1.15; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tegel .s { font-size: 12px; color: var(--tekst2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tegel .s:has(.ind) { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.tegel .s .ind { margin-left: 0; }
 .meter { position: relative; height: 6px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden; margin-top: 7px; }
 .meter b { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: var(--accent, var(--goud)); box-shadow: 0 0 10px var(--accent, transparent); }
 
@@ -240,11 +242,13 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 .bereik .lijn { position: absolute; left: 0; right: 0; top: 9px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); }
 .bereik .vul { position: absolute; top: 9px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, rgba(245,201,74,.25), rgba(245,201,74,.8)); }
 .bereik .nu { position: absolute; top: 4px; width: 3px; height: 14px; margin-left: -1px; border-radius: 2px; background: #fff; }
-.rijen { display: grid; gap: 0; font-size: 12.5px; }
-.rijen div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
-.rijen div:last-child { border-bottom: 0; }
+/* 1.9.1: sleutel links, waarde rechts; lange waarden (bijv. "waarom geen
+   trade") lopen over meerdere regels en blijven altijd binnen de kaart. */
+.rijen { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; font-size: 12.5px; min-width: 0; }
+.rijen > div { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.05); min-width: 0; }
+.rijen > div:last-child { border-bottom: 0; }
 .rijen span { color: var(--tekst3); white-space: nowrap; }
-.rijen b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rijen b { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; min-width: 0; white-space: normal; overflow-wrap: anywhere; word-break: normal; }
 
 /* tabellen */
 .tabel { padding: 0 8px; overflow: hidden; }

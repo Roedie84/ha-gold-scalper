@@ -1,5 +1,27 @@
 # Changelog — Gold Scalper
 
+## 1.9.1
+
+* **Geen strategiewijziging.** Alleen de live koers en de layout van het
+  dashboard; de handel is niet aangeraakt.
+* **Live koers via alternatieve IG-items.** IG antwoordde op
+  `MARKET:<epic>` met "REQERR 21 Invalid group". Bij REQERR 21-24 probeert de
+  stroom nu vanzelf, in deze volgorde: `MARKET:<epic>` met minimale velden
+  (BID OFFER UPDATE_TIME MARKET_STATE), `CHART:<epic>:TICK` (DISTINCT; BID OFR
+  LTP UTM) en `CHART:<epic>:1MINUTE` (MERGE; BID_CLOSE OFR_CLOSE UTM
+  CONS_END). Wat werkt, wordt onthouden voor de volgende verbinding. Pas als
+  alles geweigerd wordt, komt er één WARNING met de REQERR-code per variant.
+  Geen `LS_data_adapter` (IG gebruikt de standaardadapter); `:` in de groep
+  gaat correct gecodeerd als `%3A`.
+* **Markt-kaart**: lange waarden (bijv. "waarom geen trade") lopen nu over
+  meerdere regels binnen de kaart in plaats van er rechts buiten. Ook de
+  regel "live, indicatief" in de account-strip blijft op een telefoon binnen
+  de tegel. Het dashboard vult de beschikbare breedte (maximaal 1800 px,
+  gecentreerd).
+* **Na de update eenmaal de browser verversen** (nieuwe paneelcode).
+* Nieuw: `tests/test_v191.py` (variantvolgorde, chart-ticks, Playwright-check
+  van de kaarten op 1496 en 390 px).
+
 ## 1.9.0
 
 **Besluit van de eigenaar (Ruud, 09-10-2026, 07:59)**, na uitleg van de

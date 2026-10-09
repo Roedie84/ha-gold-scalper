@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gold Scalper live (preview)</title>
+<style>html,body{margin:0;background:#050a0f}</style>
+<script src="broker-panel.js"></script>
+</head><body>
+<script>
+// Nepdata: deterministische random walk, zodat de screenshots reproduceerbaar zijn.
+let seed = 42; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const nu = Math.floor(Date.now() / 1000);
+const tf = 60, N = 494;
+const t = [], o = [], h = [], l = [], c = [];
+let p = 4135;
+const eind = Math.floor(nu / tf) * tf;
+for (let i = 0; i < N; i++) {
+  const ts = eind - (N - 1 - i) * tf;
+  const drift = i < 200 ? 0.04 : i < 330 ? -0.05 : 0.06;
+  const op = p, cl = p + drift + (rnd() - 0.5) * 1.6;
+  const hi = Math.max(op, cl) + rnd() * 0.7, lo = Math.min(op, cl) - rnd() * 0.7;
+  t.push(ts); o.push(+op.toFixed(2)); h.push(+hi.toFixed(2)); l.push(+lo.toFixed(2)); c.push(+cl.toFixed(2)); p = cl;
+}
+const mid = +(c[N - 1]).toFixed(2), bid = +(mid - 0.15).toFixed(2), ask = +(mid + 0.15).toFixed(2);
+const instap = +(mid - 1.4).toFixed(2), units = 1.46;
+// Gesloten trades: 105, laatste ~12 in het venster van de grafiek.
+const trades = [];
+let tt = eind - 6 * 60;
+for (let i = 0; i < 24; i++) {
+  const lg = rnd() > 0.45, dur = 60 + Math.floor(rnd() * 600);
+  const k = t.findIndex((x) => x >= tt - dur); const kk = Math.max(0, k);
+  const ip = c[kk] || mid;
+  const ks = Math.max(0, t.findIndex((x) => x >= tt)); const up = c[ks] || mid;
+  const pts = lg ? up - ip : ip - up; const win = pts > 0;
+  const pnl = +(pts * units - 0.42).toFixed(2);
+  trades.push({ ticket: "DIAAAAY" + (9000 + i).toString(36).toUpperCase() + "Q7A", richting: lg ? "long" : "short", units,
+    open_t: tt - dur, sluit_t: tt, instap: ip, uitstap: up, pnl, pnl_account: +(pnl * 0.858).toFixed(2), valuta_account: "EUR",
+    kosten: 0.42 + +(rnd() * 0.1).toFixed(2), reden: pnl > 0 ? (rnd() > .5 ? "Doel" : "Trailing stop") : (rnd() > .4 ? "Stop" : "Tijdstop"),
+    reden_lang: win ? "take_profit" : "stop_loss", kostenbron: rnd() > 0.25 ? "measured" : "calculated", duur_s: dur });
+  tt -= (i < 10 ? 420 : 1800) + Math.floor(rnd() * (i < 10 ? 600 : 3600));
+}
+const markers = trades.slice().reverse().map((x) => ({ o_t: x.open_t, s_t: x.sluit_t, richting: x.richting, instap: x.instap, uitstap: x.uitstap, pnl: x.pnl }));
+// Equity: zes dagen, 400 punten, van 10.000 naar ~9.833 met een dip.
+const eqT = [], eqV = [], eqS = [];
+let e = 10000;
+for (let i = 0; i < 400; i++) {
+  eqT.push(nu - (399 - i) * 1300);
+  e += (rnd() - 0.53) * 9 + (i > 180 && i < 260 ? -1.1 : 0) + (i > 300 ? 0.25 : 0);
+  eqV.push(+e.toFixed(2)); eqS.push(+(e - 1.5).toFixed(2));
+}
+const equity = eqV[399], dagStart = +(equity - 4.85).toFixed(2);
+const DATA = {
+  api: 1, versie: "1.8.1", sleutel: "1", entry: "x", gegenereerd: nu - 3,
+  instrument: { symbool: "CS.D.CFEGOLD.CEA.IP", naam: "Goud", timeframe: "1m", tf_s: 60, valuta: "USD", valuta_account: "EUR", omrekening: 0.858 },
+  koers: { bied: bid, laat: ask, mid, spread: 0.30, tijd: nu - 2, leeftijd_s: 1.8, atr: 2.41,
+    dag: { ref: o[0], ref_t: t[0], verandering: +(mid - o[0]).toFixed(2), pct: +((mid - o[0]) / o[0] * 100).toFixed(3), hoog: Math.max(...h), laag: Math.min(...l), volledig: false } },
+  status: { code: "positie_open", label: "Positie open", toon: "ok", detail: "1 positie(s) open; exits worden bewaakt. Een heel lange toelichting die over meerdere regels moet kunnen lopen zonder dat hij buiten de kaart terechtkomt, ook op een telefoon.", modus: "demo", geld: "demo",
+    handel_aan: true, toestand: "running", toestand_label: "Draait", risico: "normal", markt_open: true, koers_verouderd: false,
+    signaal: { richting: "long", score: 0.62, zekerheid: 0.71 }, reden_geen_trade: "spreiding: er opende al een long-positie in deze candle; een tweede is een kopie van hetzelfde moment" },
+  alarm: { noodstop: { actief: false, reden: null }, dataprobleem: { actief: false, redenen: [] }, afstemming_probleem: false },
+  candles: { t, o, h, l, c },
+  posities: [{ ticket: "DIAAAAYMFVR7YAY", richting: "long", units, instap, koers: bid, sl: +(instap - 5.5).toFixed(2), tp: +(instap + 8.2).toFixed(2),
+    punten: +(bid - instap).toFixed(3), pnl: +((bid - instap) * units).toFixed(2), pnl_account: +((bid - instap) * units * 0.858).toFixed(2),
+    geopend: nu - 97, regime: "tijdstop", tijdstop_s: 240, dode_zone_atr: 0.3, max_duur_s: 900 }],
+  account: { valuta: "EUR", equity, saldo: +(equity - 1.75).toFixed(2), dag_pnl: +(equity - dagStart).toFixed(2), vloer: 9000, vloer_afstand: +(equity - 9000).toFixed(2),
+    netto: -195.42, bruto: -150.31, kosten: 45.11, kosten_per_trade: 0.43, stats_valuta: "USD" },
+  equity: { t: eqT, equity: eqV, saldo: eqS, rijen: 25814 },
+  trades: trades.slice(0, 20), markers,
+  stats: { trades: 105, winst: 44, verlies: 61, clusters: 14, clusters_richtgetal: 30, winst_pct: 41.9, pf: 0.63, t: -2.7, t_drempel: 2,
+    netto: -195.42, verwachting: -1.86, max_dd_pct: 3.1, oordeel: "failed", oordeel_label: "Geen edge aantoonbaar",
+    oordeel_tekst: "Over 105 trades voldoet de strategie niet: netto resultaat is niet positief; t-statistiek −2,70 ligt onder 2,0: het resultaat is niet te onderscheiden van toeval; profit factor 0,63 is te laag voor marge.",
+    doel_pct: 28, stop_pct: 51, onbekend_pct: 6, exits_noemer: 105, latency_p50: 182, latency_p99: 640, latency_staart: "p99", latency_n: 820,
+    afstemming: { in_orde: true, afwijkingen: 0, tekst: "12 posities vergeleken, alles klopt" },
+    poort: { echte_marktdata: true, kosten_meegerekend: true, genoeg_trades: true, genoeg_verstreken_tijd: false, genoeg_handelsdagen: false, prestatie_oordeel: false }, run: 7 },
+};
+window.__stream = { subs: 0, unsubs: 0, sent: [], mode: new URLSearchParams(location.search).get("mode") || "live" };
+let liveMid = mid;
+const connection = {
+  subscribeMessage(cb, msg) {
+    window.__stream.subs++;
+    window.__stream.msg = msg;
+    if (window.__stream.mode === "paper") {
+      return Promise.reject({ code: "not_supported", message: "live koers alleen in demo- of live-modus, niet op papier" });
+    }
+    let n = 0, timer = null;
+    setTimeout(() => {
+      cb({ soort: "status", status: "verbinden", reden: null });
+      cb({ soort: "status", status: "live", reden: null });
+      timer = setInterval(() => {
+        n++;
+        liveMid = +(liveMid + 0.35).toFixed(2);       // stijgt elke tick
+        const t = { soort: "tick", bied: +(liveMid - 0.15).toFixed(2), laat: +(liveMid + 0.15).toFixed(2), mid: liveMid,
+          spread: 0.3, verandering: null, pct: null, hoog: null, laag: null, markt: "TRADEABLE", broker_tijd: "12:00:00",
+          tijd: Date.now() / 1000 };
+        window.__stream.sent.push(t);
+        cb(t);
+      }, 250);
+    }, 50);
+    return Promise.resolve(() => { window.__stream.unsubs++; clearInterval(timer); });
+  },
+};
+const hass = { config: { time_zone: "Europe/Amsterdam" }, callApi: async () => DATA, connection };
+DATA.posities_telling = { long: 1, short: 0, limiet: 3 };
+DATA.schaduw = { valuta: "USD", trades: 37, open: 2, vervallen: 1, winst_pct: 43.2, pf: 0.81, netto: -42.17, kosten: 15.5, verwachting: -1.14, t: -1.2, clusters: 11,
+  per_reden: { positielimiet: 20, cooldown: 9, marge: 4, onbevestigde_order: 2, per_cyclus: 2 } };
+window.__DATA = DATA;
+const el = document.createElement("gold-scalper-broker-panel");
+document.body.appendChild(el);
+el.hass = hass;
+</script>
+</body></html>
