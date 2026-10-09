@@ -33,6 +33,17 @@ class TradingState(str, Enum):
     HALTED = "halted"      # vereist handmatig ingrijpen
 
 
+
+def risicobasis(starting_balance: float | None, referentie: float | None) -> float:
+    """De kleinste positieve van startbalans en accountreferentie (1.9.4).
+
+    De daglimiet en verliesvloer rekenen hierover, zodat een groot
+    demosaldo de beveiligingen niet buiten werking zet en een saldo onder
+    de startbalans ze niet versoepelt.
+    """
+    waarden = [float(w) for w in (starting_balance, referentie) if w and w > 0]
+    return min(waarden) if waarden else 0.0
+
 @dataclass(slots=True)
 class RiskLimits:
     """Grenzen waarbinnen de bot mag opereren.
@@ -138,11 +149,32 @@ class RiskManager:
         Daarom telt de strengste van de twee: de vloer op de ingestelde balans
         en die op de equity bij de start van de run. Het percentage verandert
         niet.
+
+        1.9.4: daarnaast een **verliesvloer**: vanaf de equity bij de start
+        van de run mag hooguit (100 - pct)% van de *kleinste* van startbalans
+        en die equity verloren gaan. Op de IG-demo staat ~10 miljoen; de
+        procentvloeren lagen daar op 5 miljoen en deden feitelijk niets. Met
+        de verliesvloer is het maximale verlies 5.000 (bij 50% en een
+        startbalans van 10.000), ongeacht hoe groot het demosaldo is. Op een
+        echt account met equity rond de startbalans verandert er niets: de
+        strengste vloer wint nog steeds.
         """
         pct = self.limits.equity_floor_pct
         geconfigureerd = (starting_balance or 0.0) * pct / 100.0
         run = (opening_equity * pct / 100.0) if opening_equity else None
-        effectief = max(geconfigureerd, run or 0.0)
+        verlies = None
+        max_verlies = None
+        if opening_equity:
+            basis = risicobasis(starting_balance, opening_equity)
+            max_verlies = basis * (100.0 - pct) / 100.0
+            verlies = opening_equity - max_verlies
+        kandidaten = {
+            "configured_floor": geconfigureerd,
+            "run_floor": run if run is not None else float("-inf"),
+            "verliesvloer": verlies if verlies is not None else float("-inf"),
+        }
+        applied = max(kandidaten, key=kandidaten.get)
+        effectief = max(0.0, kandidaten[applied])
         return {
             "configured_starting_balance": starting_balance,
             "opening_equity_account": opening_equity,
@@ -150,11 +182,12 @@ class RiskManager:
             "equity_floor_pct": pct,
             "configured_floor": round(geconfigureerd, 2),
             "run_floor": round(run, 2) if run is not None else None,
-            "effective_equity_floor": round(effectief, 2),
-            "applied": (
-                "run_floor" if run is not None and run > geconfigureerd
-                else "configured_floor"
+            "verliesvloer": round(verlies, 2) if verlies is not None else None,
+            "max_verlies_run": (
+                round(max_verlies, 2) if max_verlies is not None else None
             ),
+            "effective_equity_floor": round(effectief, 2),
+            "applied": applied,
         }
 
     # -- dagwissel ---------------------------------------------------------- #
@@ -236,7 +269,13 @@ class RiskManager:
             return False, "dataverbinding dood"
 
         vloer = self.floor_breakdown(starting_balance, opening_equity, equity)
+        sprong = self.saldosprong is not None and self.saldosprong.actief
         if equity < vloer["effective_equity_floor"]:
+            if sprong:
+                # 1.9.4: een onverklaarde saldosprong (bijv. een reset van het
+                # demosaldo) is een dataprobleem, geen verlies. Niet openen,
+                # maar ook geen noodstop die handmatig hervat moet worden.
+                return False, "saldosprong: vloer niet betrouwbaar te toetsen"
             self.halt(
                 f"equity {equity:.2f} onder de ondergrens van "
                 f"{vloer['effective_equity_floor']:.2f} ({vloer['applied']})"
@@ -252,12 +291,20 @@ class RiskManager:
         # De strengste van de twee wint: een gerealiseerd verlies dat al boven
         # de limiet ligt mag niet gemaskeerd worden door een open positie die
         # toevallig in de plus staat.
+        #
+        # 1.9.4: het percentage geldt over de kleinste van dagstartsaldo en
+        # startbalans. Op de IG-demo (~10 miljoen) was 10% anders 1 miljoen en
+        # ging de daglimiet nooit af; nu is het 10% van 10.000. Op een echt
+        # account rond de startbalans verandert er niets.
         worst = min(balance, equity)
+        basis = risicobasis(starting_balance, self.state.day_start_balance)
         day_loss_pct = (
-            (self.state.day_start_balance - worst) / self.state.day_start_balance * 100.0
-            if self.state.day_start_balance
+            (self.state.day_start_balance - worst) / basis * 100.0
+            if self.state.day_start_balance and basis
             else 0.0
         )
+        if day_loss_pct >= self.limits.max_daily_loss_pct and sprong:
+            return False, "saldosprong: daglimiet niet betrouwbaar te toetsen"
         if day_loss_pct >= self.limits.max_daily_loss_pct:
             unrealised = equity - balance
             self.halt(
