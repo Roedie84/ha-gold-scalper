@@ -150,3 +150,11 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-09 07:40,TUSSEN,gs_sluitreden_onbekend_pct,1.9,210,
 2026-10-09 07:40,TUSSEN,gs_kosten_gemeten_pct,96.2,210,
 2026-10-09 07:40,TUSSEN,gs_noodstop_na_179,0,1,"t/m 07:45"
+2026-10-09 11:40,TUSSEN,gs_run100_slot_trades,239,16,"run 100 gesloten 10:07 (1.9.0 start run 101 om 10:09); netto -262.99, bruto +92.48, kosten 355.47; t -3.279"
+2026-10-09 11:40,TUSSEN,gs_sinds_vorige_netto_usd,-47.41,29,"07:45-10:07 run 100: bruto -12.81, kosten 34.59 (1.19/trade)"
+2026-10-09 11:40,TUSSEN,gs_run101_trades,7,1,"1.9.0 tot 3 posities per richting (besluit Ruud); 1 cluster 10:11-10:45, netto -20.61, bruto -10.29, kosten 10.32 (1.47/trade); niet vergelijkbaar met run 100"
+2026-10-09 11:40,TUSSEN,gs_run101_spreiding_geweigerd,165,568,"signalen geweigerd: al een long in deze candle; 361 onder drempel, 35 cooldown"
+2026-10-09 11:40,TUSSEN,gs_latency_p99_ms,1044.1,2000,"p50 222; venster met herstarts 10:09/10:40; candles->exits p99 495, signal->bookkeeping 405"
+2026-10-09 11:40,TUSSEN,gs_sluitreden_onbekend_pct,0,7,"run 101"
+2026-10-09 11:40,TUSSEN,gs_kosten_gemeten_pct,71.4,7,"5 gemeten / 2 berekend (recent, zo ontworpen)"
+2026-10-09 11:40,TUSSEN,gs_afstemming_correctie_usd,8.61,1,"11:26 uitstap 4194.89 -> 4199.83 bij IG; -9.82 -> -1.21 bijgewerkt"

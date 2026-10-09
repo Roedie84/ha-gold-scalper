@@ -31,6 +31,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 
 
 ## L-GS-005 · tijdstops laten werken op IG (open_time van de positie vullen)
+- 09-10 11:40: **beslismoment vraagt een keuze van Ruud.** Run 100 sloot om 10:07 met 6 clusters in het tijdstopregime (142 trades, netto −0,11/trade, bruto +1,32, kosten 1,43); run 101 (1.9.0, tot 3 posities per richting) voegt gelijktijdige trades samen in één cluster en is niet vergelijkbaar. Opties: (a) gepaarde toets nu op de 6 clusters van run 100 (zwak, df 5); (b) opnieuw tellen tot 10 clusters in run 101; (c) toetsen op tijdblokken zodra L-GS-007 er is.
 - 09-10 03:40: regime `tijdstop` 94 trades / 6 clusters, netto −0,01/trade (t −0,02), bruto +1,40/trade (t 1,84), kosten 1,41/trade; 15,7 trades per cluster (zonder 6,8). Clusters worden langer (cluster 16: 39 trades, 220 min) → ≥ 10 clusters duurt langer dan gedacht.
 - Status: **akkoord 08-10 11:19 — gebouwd 1.7.4** (geen parameterwijziging), geïnstalleerd ~12:16 — eerste meetpunt 15:40: tijdstop 3× en max. duur 1× (900 s); regime `tijdstop` 7 trades/2 clusters +0,40/trade (t 0,11). Oordeel na ≥10 clusters in dit regime. — 08-10 23:40: 55 trades/5 clusters, netto −0,31/trade (t −0,55), bruto +0,98/trade tegen kosten 1,29 (H-GS-7).
 - 08-10 19:40: regime `tijdstop` 33 trades / 4 clusters, netto +0,13/trade (t 0,20), bruto +1,57/trade tegen −1,21 zonder; kosten 1,44/trade eten het bruto voordeel bijna op (H-GS-7). Nog geen oordeel.
@@ -51,3 +52,4 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Bouw: in `performance` een extra blok `per_tijdblok`: netto/bruto per vast blok van 60 min (en per handelssessie), met t over blokken en per exitregime; plus `cluster_langer_dan_120_min` als waarschuwing. Tests.
 - Verwacht effect: een toetsbare n die meegroeit met het aantal handelsuren; Ruud kan daarna kiezen of het beslismoment op blokken gaat (dat is een keuze voor Ruud, niet automatisch).
 - Meten na bouw: aantal blokken per dag (~15-20) en t-blok naast t-cluster.
+- 09-10 11:40: sinds 1.9.0 (run 101, tot 3 posities per richting) vallen gelijktijdige posities in één cluster → nog minder clusters per handelsuur; blokken per uur zijn de toetsbare n. Blijft gepland voor een dagafsluiting.

@@ -169,3 +169,14 @@ laatste ronde: 09-10 03:40, gemeten t/m 09-10 03:45
 - Geen release (tussenronde). Geen knoppen, geen instellingen.
 
 laatste ronde: 09-10 07:40, gemeten t/m 09-10 07:45
+
+## 09-10 11:40 · tussenronde
+- Geïnstalleerd: **1.9.1** (1.9.0 meerdere posities + 1.9.1 live koers; chatsessie 08:27). HA-herstarts 10:09, 10:40 (lifecycle reconciling → running). Demo.
+- **Run 100 afgesloten om 10:07** (1.9.0 start run 101 om 10:09): eindstand 239 trades / 16 clusters, netto −262,99 = bruto +92,48 − kosten 355,47; t −3,28. Sinds 07:45 nog 29 trades: netto −47,41, bruto −12,81, kosten 34,59 (1,19/trade).
+- **Run 101 = nieuwe regel (besluit Ruud 09-10):** tot 3 posities per richting, long en short naast elkaar; gelijktijdige trades vallen in één cluster. Tot 11:44: 7 trades in 1 cluster (10:11-10:45), netto −20,61, bruto −10,29, kosten 10,32; 5 tijdstops, 2 stops. 165 signalen geweigerd omdat er in dezelfde candle al een long opende. Niet vergelijkbaar met run 100 → aparte baseline.
+- **Gevolg L-GS-005:** het tijdstopregime van run 100 bleef op 6 clusters staan (142 trades: netto −0,11/trade, bruto +1,32, kosten 1,43). Het beslismoment "≥ 10 clusters" kan in run 100 niet meer gehaald worden; in run 101 meten gelijktijdige posities als één cluster. Wat het beslismoment nu wordt is aan Ruud (zie VOORSTELLEN). L-GS-007 (tijdblokken) wordt daardoor belangrijker.
+- **L-GS-004 werkt:** 11:26 afstemming corrigeerde een uitstap (4194,89 → 4199,83 bij IG; −9,82 → −1,21). Afstemming in_orde; sluitreden onbekend 0/7; kosten gemeten 5/7 (recente trades berekend, zo ontworpen).
+- **H-GS-8 (latency):** p99 1044 ms, p50 222 (n=2000, venster met 2 herstarts) → geen schone toets; staart weer in candles→exits (495) en signal→bookkeeping (405).
+- Noodstop sinds 1.7.9: 0×. Geen release (tussenronde). Geen knoppen, geen instellingen.
+
+laatste ronde: 09-10 11:40, gemeten t/m 09-10 11:45
