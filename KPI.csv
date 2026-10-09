@@ -172,3 +172,12 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-09 19:40,TUSSEN,gs_kosten_gemeten_pct,96.2,53,
 2026-10-09 19:40,TUSSEN,gs_latency_p99_ms,890.0,2000,"venster met herstarts"
 2026-10-09 19:40,TUSSEN,gs_schaduw_trades,8,0,"teller sensor"
+2026-10-09 23:40,TUSSEN,gs_run101_trades,64,6,"netto -80.10, bruto +18.09, kosten 98.19 (1.53/trade); PF 0.436; winst 35.94%; t -2.339; alles tijdstop"
+2026-10-09 23:40,TUSSEN,gs_sinds_vorige_netto_usd,-19.58,11,"19:44-23:00: bruto -2.95, kosten 16.63 (1.51/trade); 20:00-20:48"
+2026-10-09 23:40,TUSSEN,gs_tijdblok_t_netto,-2.341,7,"t_bruto 0.623; Londen bruto +5.67 (3), NY bruto +12.42 (4, t_bruto 1.057)"
+2026-10-09 23:40,TUSSEN,gs_tijdstopvariant_overeenkomst_pct,93.3,15,"480/720/geen vs 240: -0.28/-0.75/-0.89 per trade (2 blokken)"
+2026-10-09 23:40,TUSSEN,gs_vrijdag_flikker_wissels,21,1,"22:47:20-23:00 marketState wisselend; 1 WARNING feestdag; 0 trades (H-GS-10)"
+2026-10-09 23:40,TUSSEN,gs_testsuite_groen,1991,1996,"L-GS-002: 1991 passed 5 skipped tijdens gesloten markt"
+2026-10-09 23:40,TUSSEN,gs_sluitreden_onbekend_pct,3.1,64,
+2026-10-09 23:40,TUSSEN,gs_kosten_gemeten_pct,96.9,64,
+2026-10-09 23:40,TUSSEN,gs_latency_p99_ms,825.7,2000,"p50 184.9; venster met 3 herstarts"

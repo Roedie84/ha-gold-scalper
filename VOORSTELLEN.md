@@ -10,7 +10,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Meten na bouw: target_hit_rate in geleerd == doel_geraakt-sensor/100 (±0,001).
 
 ## L-GS-002 · klokafhankelijke tests vastzetten
-- Status: **gebouwd 1.7.7** (klok in `tests/test_unconfirmed_orders.py` vast op `HANDELSMOMENT`; gezien 09-10 03:40) — verifiëren: volledige suite groen tijdens de dagpauze (ronde 23:40)
+- Status: **geverifieerd 09-10 23:40** — volledige suite groen bij gesloten markt (1991 passed, 5 skipped). Eerder: gebouwd 1.7.7 (klok in `tests/test_unconfirmed_orders.py` vast op `HANDELSMOMENT`)
 - (eerder: gepland, zelf bouwen: testrobuustheid)
 - Onderbouwing: 07-10 23:25: 4 van 21 tests in `tests/test_unconfirmed_orders.py` falen tijdens de dagpauze van de markt, ook op main zonder wijziging; met de klok vast op 10:00 UTC slagen ze. Een release in de pauze kan daardoor niet met een groene suite.
 - Bouw: in die tests (of in conftest) de tijd vastzetten op een handelsmoment, of de markttijd injecteren.

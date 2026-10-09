@@ -201,3 +201,14 @@ laatste ronde: 09-10 15:40, gemeten t/m 09-10 15:45
 - Geen release (tussenronde).
 
 laatste ronde: 09-10 19:40, gemeten t/m 09-10 19:44
+
+## 09-10 23:40 · tussenronde
+- Geïnstalleerd: 1.9.5. HA-herstarts 19:48, 20:53, 22:43 (lifecycle sluit netjes af). Demo, handel aan; markt sinds vrijdag 23:00 dicht (weekend). Geen knoppen gebruikt. Noodstop 0×.
+- Run 101 t/m 23:00: **64 trades / 6 clusters**, netto −80,10, bruto +18,09, kosten 98,19; PF 0,44, winst 35,9 %, t −2,34. Sinds 19:44: 11 trades (20:00-20:48, één uurblok), netto −19,58 = bruto −2,95 − kosten 16,63 (1,51/trade).
+- L-GS-007 tijdblokken: 7 blokken, t_netto −2,34, **t_bruto +0,62**; Londen bruto +5,67 (3 blokken), New York bruto +12,42 (4, t_bruto 1,06). H-GS-7 (bruto < kosten) houdt: bruto 0,28/trade tegen 1,53 kosten. Geen conclusie bij 7 van ~20 blokken.
+- L-GS-008: 15 volledige trades, 240-s-variant 93,3 % gelijk aan echt (zelfde sluitreden 100 %); 480/720/geen −0,28/−0,75/−0,89 per trade t.o.v. 240 (2 blokken). Langere tijdstop tot nu slechter; oordeel bij ≥ 20 blokken.
+- **Vrijdagsluiting gemeten:** broker meldde 22:47:20-23:00 21 keer wisselend open/dicht (rooster: open tot 23:00) → 1 WARNING "… feestdag of vervroegde sluiting"; geen trades in die periode (sluitbuffer). **H-GS-10 (nieuw):** IG sluit spot goud op vrijdag in de praktijk ~13 min vóór 23:00 met een flikkerende `marketState`. Toets vrijdag 16-10; geen risico (gesloten wint), wel een misleidende meldtekst.
+- **L-GS-002 geverifieerd:** volledige suite tijdens gesloten markt (23:4x) groen: 1991 passed, 5 skipped (6 min 50 s).
+- Sluitreden onbekend 2/64 (3,1 %), kosten gemeten 96,9 %, latency p99 826 ms / p50 185 (venster met 3 herstarts). Afstemming in_orde. Geen release (tussenronde).
+
+laatste ronde: 09-10 23:40, gemeten t/m 09-10 23:50
