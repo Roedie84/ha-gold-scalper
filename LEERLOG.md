@@ -144,3 +144,16 @@ laatste ronde: 08-10 19:40, gemeten t/m 08-10 19:44
 - Geen release (tussenronde, niets acuut). Geen knoppen, geen instellingen.
 
 laatste ronde: 08-10 23:40, gemeten t/m 08-10 23:44
+
+## 09-10 03:40 · dagafsluiting 08-10
+- Dag 08-10 (lokaal, clusters 8-15): 67 trades, netto −95,69 = bruto −8,58 − kosten 87,11 (1,30/trade); t netto −2,01, t bruto −0,15 (8 clusters, geen conclusie). Noodstop 21:20 (race, vóór 1.7.9).
+- Na middernacht cluster 16: 39 trades 00:01-03:41 (220 min), netto +15,21, bruto +76,40, kosten 61,19. Totaal 162 trades / 16 clusters: netto −201,00 = bruto +49,19 − kosten 250,19; PF 0,677; winst 38,9%; t −2,54 (bruto +0,41).
+- **L-GS-005 (tijdstops):** regime `tijdstop` 94 trades / 6 clusters: netto −0,73 (−0,01/trade, t −0,02), bruto +131,48 (+1,40/trade, t bruto 1,84) tegen `zonder_tijdstop` −2,95/trade (t −3,28). Bij gem./sd van nu is t bruto ≥ 2 na ~7 clusters; netto is ~0 → netto-toets onbereikbaar. Beslismoment blijft de gepaarde toets bij ≥ 10 clusters in dit regime.
+- **H-GS-7 bevestigd en uitgebreid:** bruto 1,40/trade ≈ kosten 1,41/trade; trades per cluster 15,7 (tijdstop) tegen 6,8. Tijdstops maken ook de clusters langer (cluster 16: 220 min, herinstap steeds < 10 min) → clusters groeien trager en het beslismoment schuift op. Toets (volgende dagafsluiting, uit de recorder): bruto van de eerste instap per cluster tegen de herinstappen na een tijdstop.
+- **H-GS-6 verworpen:** p99 1067 ms over 2000 metingen uit ~22:10-03:45, een venster zonder herstart (laatste 22:02). De staart komt dus niet van herstarts. Uitsplitsing p99: signal→bookkeeping 409, candles→exits 334, exits→signal 319, start→quote (IG) 217 ms → de staart zit vooral in eigen verwerking (H-GS-8, nieuw). Opvallend: p99 exact gelijk aan 23:40 (1066,704) terwijl p50 en max veranderden — volgende ronde controleren of hij beweegt.
+- **L-GS-004:** sluitreden onbekend 3/162 (1,9%), kosten gemeten 96,3%. Bij 1.7.9-herstart 22:02: 1 trade in database open maar bij IG al dicht → afgestemd.
+- **Rooster-klokrand (gebouwd 1.7.10, L-GS-006; 1831 tests groen, workflow groen, HACS ververst):** elke nacht 2× WARNING "broker gesloten, rooster open … feestdag" om 22:59:59 en 23:59:59. Oorzaak: pauze tot en met 23:59:59 vergeleken mét microseconden (23:59:59,06 = open) en een klokverschil van < 1 s op de sluiting. Handelen veranderde niet (gesloten wint).
+- L-GS-002 bleek al gebouwd in 1.7.7 (klok vast op handelsmoment); verificatie tijdens de dagpauze in de ronde van 23:40.
+- H-GS-3 (regime) en H-GS-4/5 (schaduwtoetsen, drempel 20 clusters) volgen.
+
+laatste ronde: 09-10 03:40, gemeten t/m 09-10 03:45

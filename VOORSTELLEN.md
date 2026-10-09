@@ -10,7 +10,8 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Meten na bouw: target_hit_rate in geleerd == doel_geraakt-sensor/100 (±0,001).
 
 ## L-GS-002 · klokafhankelijke tests vastzetten
-- Status: **gepland (zelf bouwen: testrobuustheid, raakt geen handelslogica)**
+- Status: **gebouwd 1.7.7** (klok in `tests/test_unconfirmed_orders.py` vast op `HANDELSMOMENT`; gezien 09-10 03:40) — verifiëren: volledige suite groen tijdens de dagpauze (ronde 23:40)
+- (eerder: gepland, zelf bouwen: testrobuustheid)
 - Onderbouwing: 07-10 23:25: 4 van 21 tests in `tests/test_unconfirmed_orders.py` falen tijdens de dagpauze van de markt, ook op main zonder wijziging; met de klok vast op 10:00 UTC slagen ze. Een release in de pauze kan daardoor niet met een groene suite.
 - Bouw: in die tests (of in conftest) de tijd vastzetten op een handelsmoment, of de markttijd injecteren.
 - Meten na bouw: volledige suite groen om 21:30 UTC.
@@ -30,9 +31,16 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 
 
 ## L-GS-005 · tijdstops laten werken op IG (open_time van de positie vullen)
+- 09-10 03:40: regime `tijdstop` 94 trades / 6 clusters, netto −0,01/trade (t −0,02), bruto +1,40/trade (t 1,84), kosten 1,41/trade; 15,7 trades per cluster (zonder 6,8). Clusters worden langer (cluster 16: 39 trades, 220 min) → ≥ 10 clusters duurt langer dan gedacht.
 - Status: **akkoord 08-10 11:19 — gebouwd 1.7.4** (geen parameterwijziging), geïnstalleerd ~12:16 — eerste meetpunt 15:40: tijdstop 3× en max. duur 1× (900 s); regime `tijdstop` 7 trades/2 clusters +0,40/trade (t 0,11). Oordeel na ≥10 clusters in dit regime. — 08-10 23:40: 55 trades/5 clusters, netto −0,31/trade (t −0,55), bruto +0,98/trade tegen kosten 1,29 (H-GS-7).
 - 08-10 19:40: regime `tijdstop` 33 trades / 4 clusters, netto +0,13/trade (t 0,20), bruto +1,57/trade tegen −1,21 zonder; kosten 1,44/trade eten het bruto voordeel bijna op (H-GS-7). Nog geen oordeel.
 - Onderbouwing (08-10, varianten-analyse, zie LEERLOG 08-10 11:00): `broker/ig_capital.py` bouwt `VenuePosition` zonder `open_time`; `coordinator._manage_open_positions` doet `_as_datetime(None, now)` → leeftijd altijd 0 s. Daardoor vuren de ontworpen tijdstop (240 s binnen 0,3×ATR) en de harde limiet (900 s) uit `broker/exits.py` nooit. Gemeten: gem. duur 1408 s, langste 5272 s (> 900). Backtest/Lab rekenen wél met tijdstops → live en backtest zijn op dit punt niet vergelijkbaar.
 - Wat verandert: alleen dat `open_time` gevuld wordt (IG `position.createdDateUTC`, terugval: `open_time` van de eigen trade via ticket) + test. **Geen parameterwijziging**; daardoor gaan de bestaande defaults werken: `time_stop_seconds=240`, `time_stop_deadzone_atr=0.3`, `max_hold_seconds=900`. Doel 1,5×ATR, stop 1,0×ATR, break-even 0,8×ATR blijven gelijk.
 - Verwacht effect (replay van 66 live trades op het 10-s koerspad, IS = clusters 1-5, OOS = 6-10): netto/trade −3,83 → −1,34 (IS −3,63 → −2,18; OOS −4,04 → −0,49); 49/66 exits worden tijdexits, gem. duur ~1576 → ~263 s, doel geraakt 20% → 8%. Gepaarde t per cluster +2,15 (10 clusters; kritiek 2,26 bij df 9) → **niet bewezen**, en netto blijft negatief: dit verkleint verlies, maakt de strategie niet winstgevend. Replay modelleert niet dat posities sneller vrijkomen en er dus vaker opnieuw ingestapt wordt (meer kosten).
 - Meten na invoering: (1) sluitreden "maximale positieduur"/"tijdstop" verschijnt; langste duur ≤ 910 s; (2) netto, bruto en kosten per trade en per cluster tegen baseline live −2,95 netto/trade (68 trades, 10 clusters); trades per cluster tegen 6,8; (3) na 10 nieuwe clusters gepaarde toets: zelfde trades zonder tijdstops naspelen (scripts in `analyse/2026-10-08-varianten/`) vs werkelijk. Houden bij verschil/cluster > 0 met t ≥ 2; terugdraaien bij verschil ≤ 0 na 10 clusters.
+
+## L-GS-006 · rooster: klokrand niet als roosterafwijking melden
+- Status: **gebouwd 1.7.10** (09-10 04:10, release + workflow groen, HACS ververst; 1831 tests groen; zelf gebouwd: valse waarschuwing/rapportage; strategie, parameters en handelslogica ongewijzigd) — wacht op installatie
+- Onderbouwing: system_log 08-10: 2× "De broker meldt de markt gesloten terwijl het rooster hem open zegt … vrijwel altijd een feestdag", om 22:59:59,10 en 23:59:59,06. `is_open` vergeleek de pauze (23:00-23:59:59) met microseconden → 23:59:59,06 = open; om 22:59:59 liep onze klok < 1 s achter op de sluiting van IG. Gesloten won al, dus er werd niets anders gehandeld.
+- Bouw: `is_open` in hele seconden; `bij_roostergrens()` (±15 s rond opening/sluiting) → dan DEBUG in plaats van WARNING. Tests `tests/test_release_1710.py`.
+- Meten na installatie: 0 WARNINGs "Handelstijden" rond 23:00/00:00 per nacht; een afwijking midden in de sessie blijft WARNING.
