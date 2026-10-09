@@ -1,5 +1,19 @@
 # Changelog — Gold Scalper
 
+## 1.9.2
+
+* **Geen strategiewijziging.** Alleen de berekening van schaduwtrades.
+* **Schaduwtrades op de echte ordergrootte.** De grootte van een schaduwtrade
+  kwam uit de equity van het brokeraccount (IG-demo: ~10 miljoen) in plaats
+  van het startsaldo dat een echte order gebruikt. Bij risicogestuurde
+  grootte openden schaduwtrades daardoor op de maximale grootte, en waren
+  resultaat en kosten tientallen keren groter dan bij een echte trade
+  (bijv. +$203 en $42 kosten per trade). Nu exact dezelfde berekening als
+  een echte order (papersimulatie bij paper, anders het startsaldo).
+* De schaduwtrades van vóór deze versie krijgen eenmalig de status
+  *vervallen* ("grootte onjuist berekend"); ze tellen niet meer mee in de
+  schaduwstatistiek. De telling begint opnieuw.
+
 ## 1.9.1
 
 * **Geen strategiewijziging.** Alleen de live koers en de layout van het

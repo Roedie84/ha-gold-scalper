@@ -483,6 +483,32 @@ class TradeDatabase:
             "CREATE INDEX IF NOT EXISTS idx_runs_fingerprint ON runs(fingerprint)"
         )
         self._conn.commit()
+        self._vervang_schaduw_oude_grootte()
+
+    def _vervang_schaduw_oude_grootte(self) -> int:
+        """1.9.2: schaduwtrades van vóór de groottecorrectie laten vervallen.
+
+        Tot 1.9.1 kregen schaduwtrades hun grootte uit de equity van het
+        brokeraccount in plaats van het startsaldo; hun resultaat is daardoor
+        niet te vergelijken met echte trades. Eenmalig (vlag in ``meta``).
+        """
+        vlag = self._conn.execute(
+            "SELECT value FROM meta WHERE key='schaduw_grootte_192'"
+        ).fetchone()
+        if vlag is not None:
+            return 0
+        n = self._conn.execute(
+            "UPDATE schaduw_trades SET status='vervallen', close_reason="
+            "'grootte onjuist berekend (vóór 1.9.2): niet vergelijkbaar' "
+            "WHERE status IN ('open', 'gesloten')"
+        ).rowcount
+        self._conn.execute(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES('schaduw_grootte_192', '1')"
+        )
+        self._conn.commit()
+        if n:
+            _LOGGER.info("%d schaduwtrade(s) van vóór 1.9.2 laten vervallen", n)
+        return n
 
     def _backfill_exit_regime(self) -> int:
         """Vul het uitstapregime van trades van vóór 1.7.6 in (idempotent).

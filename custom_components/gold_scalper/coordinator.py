@@ -3008,12 +3008,24 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         return bedrag * koers if koers else bedrag
 
     def _grootte(self, signal, quote: VenueQuote, equity: float | None) -> float:
-        """Ordergrootte zoals ``_open_position`` hem zou bepalen (ounces)."""
+        """Ordergrootte zoals ``_open_position`` hem zou bepalen (ounces).
+
+        1.9.2: met precies dezelfde equity als ``_open_position``: de
+        papersimulatie bij paper, anders het startsaldo. Hier stond eerst de
+        equity van het brokeraccount; op de IG-demo is dat ~10 miljoen, zodat
+        schaduwtrades op de maximale grootte openden en hun resultaat en kosten
+        tientallen keren groter waren dan bij een echte trade. ``equity``
+        blijft als argument bestaan maar bepaalt de grootte niet meer.
+        """
         side = "buy" if signal.direction == 1 else "sell"
         entry_price = quote.ask if side == "buy" else quote.bid
         try:
+            basis = (
+                self.paper.equity(self._paper_quote(quote))
+                if self.paper else self.starting_balance
+            )
             sized = position_size(
-                self.sizing, equity or self.starting_balance, entry_price,
+                self.sizing, basis, entry_price,
                 signal.stop_loss, signal.score, self.strategy_cfg.entry_threshold,
             )
             return float(sized.units)
