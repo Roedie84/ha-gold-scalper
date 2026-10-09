@@ -164,3 +164,11 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-09 15:40,TUSSEN,gs_sluitreden_onbekend_pct,5.0,40,"2/40; 6 herstarts 12:10-14:42 (H-GS-9)"
 2026-10-09 15:40,TUSSEN,gs_kosten_gemeten_pct,90.0,40,
 2026-10-09 15:40,TUSSEN,gs_latency_p99_ms,980.5,2000,"p50 194; venster met herstarts"
+2026-10-09 19:40,TUSSEN,gs_run101_trades,53,5,"netto -60.52, bruto +21.04, kosten 81.56 (1.54/trade); PF 0.486; winst 35.85%; t -1.774; alles tijdstop"
+2026-10-09 19:40,TUSSEN,gs_sinds_vorige_netto_usd,-1.95,13,"15:44-19:44: bruto +13.63, kosten 15.58 (1.20/trade)"
+2026-10-09 19:40,TUSSEN,gs_tijdblok_t_netto,-1.816,6,"L-GS-007: 6 uurblokken; t_bruto 0.733; lag1 netto 0.278; Londen netto -55.41 / NY -5.11"
+2026-10-09 19:40,TUSSEN,gs_tijdstopvariant_overeenkomst_pct,100,4,"L-GS-008: 240-variant vs echt, gem verschil -0.054; 480/720/geen vs 240: -0.27/-1.04/-1.31 per trade"
+2026-10-09 19:40,TUSSEN,gs_sluitreden_onbekend_pct,3.8,53,"2/53; geen nieuwe sinds 15:44 ondanks 7 herstarts (H-GS-9)"
+2026-10-09 19:40,TUSSEN,gs_kosten_gemeten_pct,96.2,53,
+2026-10-09 19:40,TUSSEN,gs_latency_p99_ms,890.0,2000,"venster met herstarts"
+2026-10-09 19:40,TUSSEN,gs_schaduw_trades,8,0,"teller sensor"

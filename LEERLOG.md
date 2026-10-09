@@ -191,3 +191,13 @@ laatste ronde: 09-10 11:40, gemeten t/m 09-10 11:45
 - Noodstop 0×. Geen release (tussenronde).
 
 laatste ronde: 09-10 15:40, gemeten t/m 09-10 15:45
+
+## 09-10 19:40 · tussenronde
+- Geïnstalleerd: **1.9.5** (L-GS-007 tijdblokken + L-GS-008 tijdstopvarianten). HA-herstarts 16:16-19:29 (7). Demo, handel aan, status wachtend; geen knoppen gebruikt. Noodstop 0×, dataprobleem uit.
+- Run 101 t/m 19:44: **53 trades / 5 clusters**, netto −60,52, kosten 81,56 → bruto +21,04; PF 0,49, winst 36 %, t −1,77; alles regime `tijdstop`. Sinds 15:44: 13 trades, netto −1,95 = bruto +13,63 − kosten 15,58 (1,20/trade).
+- **L-GS-007 werkt:** 6 uurblokken (08-15 UTC), t_netto −1,82, t_bruto +0,73, lag-1 netto 0,28. Per sessie: Londen 3 blokken netto −55,41 (bruto +5,67), New York 3 blokken netto −5,11 (bruto +15,38, t_bruto 1,70). Langste cluster 109 min (< 120). n = 6 blokken: geen conclusie; ~20 blokken nodig.
+- **L-GS-008 werkt:** 4 volledig nagespeelde trades, 240-s-variant komt 4/4 overeen met de echte trade (gem. verschil −0,05). Langere tijdstops 480/720/geen: −0,27/−1,04/−1,31 per trade t.o.v. 240 (1 blok, t n.v.t.). Oordeel pas bij ≥ 20 uurblokken.
+- H-GS-7 (bruto < kosten) houdt: bruto 0,40/trade tegen kosten 1,54/trade over run 101. H-GS-9: sluitreden onbekend 2/53 (3,8 %), geen nieuwe sinds 15:44 ondanks 7 herstarts. Kosten gemeten 96,2 %. Latency p99 890 ms (venster met herstarts). Afstemming in_orde.
+- Geen release (tussenronde).
+
+laatste ronde: 09-10 19:40, gemeten t/m 09-10 19:44
