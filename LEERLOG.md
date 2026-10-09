@@ -157,3 +157,15 @@ laatste ronde: 08-10 23:40, gemeten t/m 08-10 23:44
 - H-GS-3 (regime) en H-GS-4/5 (schaduwtoetsen, drempel 20 clusters) volgen.
 
 laatste ronde: 09-10 03:40, gemeten t/m 09-10 03:45
+
+## 09-10 07:40 · tussenronde
+- Geïnstalleerd: 1.7.10 (06:02), 1.8.0 (07:00), **1.8.1** (07:41; broker-dashboard, live koers via IG-streaming; chatsessie). Herstarts 06:03, 06:57, 07:02, 07:42; bij de laatste 1 trade in database open maar bij IG al dicht → afgestemd (`afstemming` in_orde).
+- Sinds 03:45: **48 trades**, netto −14,58 = bruto +56,10 − kosten 70,69 (1,47/trade). Totaal 210 trades: netto −215,58 = bruto +105,29 − kosten 320,88; PF 0,69; winst 37,6%; t −2,88 (16 clusters). Geen conclusie.
+- **Clusterteller staat stil:** cluster 16 loopt sinds 22:01 UTC door — 87 trades in 461 min (41% van alle trades), netto +0,63, bruto +132,50. Met tijdstops volgt de herinstap steeds < 10 min, dus komt er geen nieuw cluster bij. Gevolg: t-cluster en het beslismoment van L-GS-005 (≥ 10 clusters in het tijdstopregime, nu 6) komen niet dichterbij, hoeveel trades er ook bijkomen. → L-GS-007 (zelf bouwen: extra maat, bestaande t en oordeel ongewijzigd).
+- **L-GS-005 / H-GS-7:** regime `tijdstop` 142 trades / 6 clusters: netto −0,11/trade (t −0,51, PF 0,94), bruto +1,32/trade tegen kosten 1,43/trade — patroon ongewijzigd: bruto ≈ kosten.
+- **H-GS-8 (latency):** p99 1306 ms (was 1067); venster (~2000 rondes ≈ 02:10-07:45) bevat 4 herstarts, dus geen schone toets. p99 candles→exits 514, signal→bookkeeping 467, exits→signal 369, start→quote 353. Antwoord op de vraag van 03:40: p99 beweegt wel (geen bevroren waarde).
+- Nieuw (1.8.1): 1× WARNING "live koers via IG-streaming niet beschikbaar (verbinding verbroken door de server); dashboard ververst elke 5 s" — handel niet geraakt; volgen of het blijft.
+- Noodstop sinds 1.7.9: 0×. Sluitreden onbekend 1,9%, kosten gemeten 96,2%.
+- Geen release (tussenronde). Geen knoppen, geen instellingen.
+
+laatste ronde: 09-10 07:40, gemeten t/m 09-10 07:45

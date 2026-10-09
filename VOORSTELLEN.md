@@ -44,3 +44,10 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Onderbouwing: system_log 08-10: 2× "De broker meldt de markt gesloten terwijl het rooster hem open zegt … vrijwel altijd een feestdag", om 22:59:59,10 en 23:59:59,06. `is_open` vergeleek de pauze (23:00-23:59:59) met microseconden → 23:59:59,06 = open; om 22:59:59 liep onze klok < 1 s achter op de sluiting van IG. Gesloten won al, dus er werd niets anders gehandeld.
 - Bouw: `is_open` in hele seconden; `bij_roostergrens()` (±15 s rond opening/sluiting) → dan DEBUG in plaats van WARNING. Tests `tests/test_release_1710.py`.
 - Meten na installatie: 0 WARNINGs "Handelstijden" rond 23:00/00:00 per nacht; een afwijking midden in de sessie blijft WARNING.
+
+## L-GS-007 · onafhankelijke steekproef naast de clusters (tijdblokken)
+- Status: **gepland (zelf bouwen: meetbaarheid; extra diagnose-attribuut)** — bestaande cluster-t, oordeel en handelslogica blijven ongewijzigd; bouwen in een dagafsluiting
+- Onderbouwing: 09-10 07:40: cluster 16 loopt sinds 08-10 22:01 UTC door, 87 trades in 461 min (41% van alle trades). Met tijdstops volgt elke herinstap binnen 10 min, dus groeit één cluster onbeperkt en blijft de clusterteller op 16. Het beslismoment van L-GS-005 (≥ 10 clusters in het tijdstopregime, nu 6) en de bruto-edge-toets (~17-20 clusters) worden zo onbereikbaar.
+- Bouw: in `performance` een extra blok `per_tijdblok`: netto/bruto per vast blok van 60 min (en per handelssessie), met t over blokken en per exitregime; plus `cluster_langer_dan_120_min` als waarschuwing. Tests.
+- Verwacht effect: een toetsbare n die meegroeit met het aantal handelsuren; Ruud kan daarna kiezen of het beslismoment op blokken gaat (dat is een keuze voor Ruud, niet automatisch).
+- Meten na bouw: aantal blokken per dag (~15-20) en t-blok naast t-cluster.

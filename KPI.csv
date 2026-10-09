@@ -140,3 +140,13 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-09 03:40,TUSSEN,gs_sluitreden_onbekend,3,162,1.9%
 2026-10-09 03:40,TUSSEN,gs_kosten_gemeten_pct,96.3,162,
 2026-10-09 03:40,TUSSEN,gs_noodstop_na_179,0,1,"sinds herstart 22:02 (1.7.9) geen noodstop"
+2026-10-09 07:40,TUSSEN,gs_trades_totaal,210,16,clusters
+2026-10-09 07:40,TUSSEN,gs_netto_usd,-215.58,210,"bruto +105.29, kosten 320.88 (1.53/trade); PF 0.69; winst 37.6%"
+2026-10-09 07:40,TUSSEN,gs_t_clusters,-2.878,16,"per trade -1.90"
+2026-10-09 07:40,TUSSEN,gs_sinds_vorige_netto_usd,-14.58,48,"bruto +56.10, kosten 70.69 (1.47/trade)"
+2026-10-09 07:40,TUSSEN,gs_cluster16_trades,87,1,"22:01-05:42 UTC, 461 min, netto +0.63, bruto +132.50; clusterteller staat stil"
+2026-10-09 07:40,TUSSEN,gs_tijdstop_netto_per_trade,-0.108,142,"6 clusters, t -0.51, PF 0.94; bruto 1.32/trade, kosten 1.43/trade"
+2026-10-09 07:40,TUSSEN,gs_latency_p99_ms,1305.7,2000,"venster met 4 herstarts; candles->exits 514, signal->bookkeeping 467"
+2026-10-09 07:40,TUSSEN,gs_sluitreden_onbekend_pct,1.9,210,
+2026-10-09 07:40,TUSSEN,gs_kosten_gemeten_pct,96.2,210,
+2026-10-09 07:40,TUSSEN,gs_noodstop_na_179,0,1,"t/m 07:45"
