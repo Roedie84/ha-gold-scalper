@@ -73,6 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_reload))
 
     async def _on_stop(event) -> None:
+        await _stop_koersstroom(hass, entry.entry_id)
         await coordinator.async_shutdown_hook()
 
     entry.async_on_unload(
@@ -676,6 +677,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         coordinator: GoldScalperCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        await _stop_koersstroom(hass, entry.entry_id)
         await coordinator.async_shutdown_hook()
         await async_unregister_frontend(hass)
         if not hass.data.get(DOMAIN):
@@ -683,6 +685,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # nieuwe setup het terug, zonder tweede herstel.
             await _async_lab(hass, "async_unload_lab")
     return unloaded
+
+
+async def _stop_koersstroom(hass: HomeAssistant, entry_id: str) -> None:
+    """Live koers van het dashboard stoppen (1.8.1). Raakt de handel niet."""
+    try:
+        from .broker_stream import async_stop_stream
+
+        await async_stop_stream(hass, entry_id)
+    except Exception:  # noqa: BLE001
+        _LOGGER.debug("Koersstroom stoppen mislukte", exc_info=True)
 
 
 async def _async_reload(hass: HomeAssistant, entry: ConfigEntry) -> None:

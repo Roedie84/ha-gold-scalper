@@ -21,6 +21,9 @@ rapportgenerator niet voor. Wie meeleest ziet dus wat je strategie deed, niet
 hoe hij bij je geld komt. Vind je dat alsnog te veel, dan zet je het paneel uit
 met ``show_panel: false`` in de opties.
 
+1.8.1: daarnaast een websocket-abonnement ``gold_scalper/broker_stream``
+(``broker_stream.py``) voor de live koers; ook alleen voor beheerders.
+
 1.8.0: de zijbalk-ingang toont nu het broker-dashboard, een eigen webcomponent
 (``frontend/broker-panel.js``). Dat haalt zijn gegevens via ``hass.callApi``
 bij ``/api/gold_scalper/broker``; díe route vraagt wél authenticatie en
@@ -379,6 +382,14 @@ async def async_register_frontend(hass: HomeAssistant, show_panel: bool = True) 
             [StaticPathConfig(BROKER_STATIC_URL, str(BROKER_JS_FILE), True)]
         )
         hass.data[f"{DOMAIN}_broker_registered"] = True
+    # 1.8.1: live koers voor het paneel (websocket-abonnement, alleen lezen).
+    try:
+        from .broker_stream import async_register_websocket
+
+        async_register_websocket(hass)
+    except Exception:  # noqa: BLE001
+        _LOGGER.warning("Live koers voor het dashboard niet beschikbaar; "
+                        "het dashboard ververst elke 5 s", exc_info=True)
 
     if not show_panel:
         return

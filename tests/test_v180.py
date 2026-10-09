@@ -38,13 +38,12 @@ def test_version_is_consistent():
     from gold_scalper import const
 
     manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.8.0"
+    assert manifest["version"] == const.INTEGRATION_VERSION
     readme = (PKG.parent.parent / "README.md").read_text(encoding="utf-8")
-    assert "Huidige versie: **1.8.0**" in readme
+    assert f"Huidige versie: **{const.INTEGRATION_VERSION}**" in readme
     changelog = (PKG.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    eerste = changelog.split("## ")[1]
-    assert eerste.startswith("1.8.0")
-    assert "browser verversen" in eerste.lower()
+    sectie = changelog.split("\n## 1.8.0\n")[1].split("\n## ")[0]
+    assert "browser verversen" in sectie.lower()
 
 
 # ------------------------------------------------------------- nephulp -- #
@@ -204,7 +203,7 @@ def test_route_payload_shape_and_cache(tmp_path):
                     "markers", "stats"):
         assert sleutel in body, sleutel
     assert body["api"] == B.BROKER_API_VERSION
-    assert body["versie"] == "1.8.0"
+    assert body["versie"] == gh.INTEGRATION_VERSION
     assert body["status"]["geld"] == "demo"
     assert len(body["candles"]["t"]) == 494 and body["instrument"]["tf_s"] == 60
     p = body["posities"][0]
@@ -293,7 +292,7 @@ def test_frontend_is_display_only():
 
 def test_frontend_version_busts_cache():
     v = gh.broker_frontend_version()
-    assert v.startswith("1.8.0-") and len(v) == len("1.8.0-") + 12
+    assert v.startswith(gh.INTEGRATION_VERSION + "-") and len(v) == len(gh.INTEGRATION_VERSION) + 13
 
 
 # ------------------------------------------------------------ zijbalk --- #
@@ -343,7 +342,7 @@ def test_sidebar_entry_shows_broker_panel(monkeypatch):
     paneel = p.zijbalk[gh.PANEL_URL_PATH]
     assert gh.PANEL_URL_PATH == "gold-scalper"
     assert paneel["webcomponent_name"] == "gold-scalper-broker-panel"
-    assert paneel["module_url"].startswith("/gold_scalper_static/broker-panel.js?v=1.8.0-")
+    assert paneel["module_url"].startswith("/gold_scalper_static/broker-panel.js?v=" + gh.INTEGRATION_VERSION + "-")
     assert paneel["require_admin"] is True and paneel["embed_iframe"] is False
     assert paneel["trust_external"] is False
     names = sorted(type(v).__name__ for v in hass.http.views)

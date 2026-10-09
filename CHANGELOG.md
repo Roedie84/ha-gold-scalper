@@ -1,5 +1,25 @@
 # Changelog — Gold Scalper
 
+## 1.8.1
+
+* **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,
+  risico, positiegrootte en vingerafdruk zijn niet aangeraakt. De handel
+  blijft op REST en op de bestaande cyclus.
+* **Live koers op het broker-dashboard via IG-streaming** (Lightstreamer):
+  bied/laat in de kopbalk, laatste koers en verandering, de lopende candle
+  en prijslijn in de grafiek, en open P&L per positie en in de account-strip,
+  gemarkeerd "live, indicatief" (het officiële bedrag blijft dat van de
+  broker per cyclus). Statusbolletje LIVE (groen) of "elke 5 s" (grijs).
+* **Live alleen met IG, in demo- of live-modus, niet in paper.** Anders, of
+  bij een storing, blijft het dashboard elke 5 s verversen (één WARNING in
+  het logboek, opnieuw proberen met oplopende wachttijd).
+* Alleen-lezend en alleen zolang het dashboard open is (stopt 60 s na het
+  laatste paneel). Eigen minimale TLCP-client over aiohttp: geen nieuwe
+  afhankelijkheid, geen extra REST-verzoek (tokens uit de bestaande sessie).
+  Nieuw websocket-commando `gold_scalper/broker_stream`, alleen beheerders.
+* **Na de update eenmaal de browser verversen.**
+* Nieuw: `tests/test_v181.py`.
+
 ## 1.8.0
 
 * **Geen strategiewijziging.** Strategie, in- en uitstap, parameters,

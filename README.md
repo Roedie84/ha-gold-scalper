@@ -135,6 +135,12 @@ Alleen weergave: het dashboard heeft geen handelsknoppen. Bediening blijft
 via de entiteiten en acties van de integratie. Na een update eenmaal de
 browser verversen. Details en de nieuwe route: [`DASHBOARD.md`](DASHBOARD.md).
 
+Sinds 1.8.1 loopt de koers live mee (bied/laat, lopende candle, open P&L)
+via IG-streaming, zolang het dashboard open staat. Alleen met IG in demo- of
+live-modus, niet in paper; anders, of bij een storing, ververst het dashboard
+gewoon elke 5 s. Live bedragen zijn indicatief; de handel gebruikt de stroom
+niet.
+
 ## Rapport en overzicht
 
     http://<home-assistant>/api/gold_scalper/overview
@@ -155,7 +161,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **1.8.0** (zie `CHANGELOG.md`).
+Huidige versie: **1.8.1** (zie `CHANGELOG.md`).
 
 Het domein blijft `gold_scalper`: bestaande entiteiten, databases en
 instellingen werken ongewijzigd door.

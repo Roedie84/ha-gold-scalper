@@ -414,6 +414,9 @@ def build_payload(
             "tf_s": _tf_seconds(candles, timeframe),
             "valuta": conversion.get("instrument") or "USD",
             "valuta_account": account_valuta,
+            # 1.8.1: accountvaluta per eenheid instrumentvaluta, voor de
+            # indicatieve live P&L in het paneel. None = onbekend.
+            "omrekening": _num(conversion.get("rate"), 6),
         },
         "koers": {
             "bied": _num(getattr(quote, "bid", None)),
