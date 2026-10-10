@@ -212,3 +212,13 @@ laatste ronde: 09-10 19:40, gemeten t/m 09-10 19:44
 - Sluitreden onbekend 2/64 (3,1 %), kosten gemeten 96,9 %, latency p99 826 ms / p50 185 (venster met 3 herstarts). Afstemming in_orde. Geen release (tussenronde).
 
 laatste ronde: 09-10 23:40, gemeten t/m 09-10 23:50
+
+## 10-10 03:40 · dagafsluiting 09-10
+- Markt dicht sinds vrijdag 23:00 (weekend); demo, handel aan, geen knoppen gebruikt. Sinds 23:50 geen trades of wijzigingen.
+- Dag 09-10 (lokaal): **180 trades** (run 100 tot 10:07: 116; run 101: 64), netto −126,88 = bruto +137,78 − kosten 264,66 → per trade −0,70 / +0,77 / 1,47. H-GS-7 (bruto < kosten) houdt over de hele dag.
+- Run 101 (tot 3 posities per richting): 64 trades / 6 clusters / 7 uurblokken: netto −80,10, bruto +18,09 (+0,28/trade) tegen kosten 98,19 (1,53/trade); PF 0,44; t_cluster −2,34; uurblokken t_netto −2,34, t_bruto +0,62, lag-1 netto 0,20. Londen bruto +5,67 (3 blokken), New York +12,42 (4). **Geen conclusie:** 7 van ~20 blokken; bij sd van nu is t_bruto 2 pas bij ~70 blokken haalbaar als de bruto-edge per blok +2,6 blijft — d.w.z. netto blijft negatief zolang kosten/blok ~14 zijn.
+- L-GS-008: 15 nagespeelde trades, 240-s-variant 93,3 % gelijk; langere tijdstops slechter (480 −0,28, 720 −0,75, geen −0,89 per trade; 2 blokken). NB: `t_blokken` −2,0/−3,9/−4,7 bij 2 blokken (df 1) is geen toets; de sensor zegt zelf "te weinig blokken".
+- H-GS-7-toets (eerste instap per cluster tegen herinstappen) niet gedaan: trade-niveau staat niet in diagnostics/attributen (alleen samenvattingen) → meetbaarheid; kandidaat-attribuut `bruto_eerste_instap_vs_herinstap` bij een volgende dagafsluiting met handel.
+- H-GS-10 (vrijdagsluiting ~13 min vroeg, flikkerende marketState) toets vrijdag 16-10. Geen release (geen gepland punt, geen bug; weekend).
+
+laatste ronde: 10-10 03:40, gemeten t/m 10-10 03:46

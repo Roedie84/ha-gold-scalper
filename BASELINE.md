@@ -17,3 +17,5 @@
 | Tijdstopregime per trade | netto −0,01 · bruto +1,40 (t 1,84) · kosten 1,41; 15,7 trades/cluster | 94 trades, 6 clusters | 09-10 03:40 |
 | Latency p99 zonder herstart | 1067 ms (p50 229) | n=2000, 22:10-03:45 | 09-10 03:40 |
 | Rooster-klokrand-WARNINGs | 2 per nacht | 08-10 | 09-10 03:40 |
+| Dag 09-10 per trade (run 100+101) | netto −0,70 · bruto +0,77 · kosten 1,47 USD | 180 trades | 10-10 03:40 |
+| Run 101 uurblokken | 7 blokken: t_netto −2,34, t_bruto +0,62, bruto +2,58/blok, kosten ~14/blok | 64 trades | 10-10 03:40 |

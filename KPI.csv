@@ -181,3 +181,14 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-09 23:40,TUSSEN,gs_sluitreden_onbekend_pct,3.1,64,
 2026-10-09 23:40,TUSSEN,gs_kosten_gemeten_pct,96.9,64,
 2026-10-09 23:40,TUSSEN,gs_latency_p99_ms,825.7,2000,"p50 184.9; venster met 3 herstarts"
+2026-10-09,DAG,gs_trades,180,9,"lokale dag: run 100 (00:01-10:07, 116 trades, cluster 16 en verder) + run 101 (64 trades, 6 clusters)"
+2026-10-09,DAG,gs_netto_usd,-126.88,180,"bruto +137.78, kosten 264.66 (som van de rondes 03:40/07:40/11:40 en run 101)"
+2026-10-09,DAG,gs_netto_per_trade_usd,-0.70,180,
+2026-10-09,DAG,gs_bruto_per_trade_usd,0.77,180,
+2026-10-09,DAG,gs_kosten_per_trade_usd,1.47,180,
+2026-10-09,DAG,gs_run101_trades,64,6,"netto -80.10, bruto +18.09, kosten 98.19; PF 0.436; winst 35.9%; t -2.34"
+2026-10-09,DAG,gs_uurblokken,7,64,"t_netto -2.34, t_bruto +0.62, lag1 netto 0.20 / bruto -0.10"
+2026-10-09,DAG,gs_tijdstop_240_overeenkomst_pct,93.3,15,"zelfde sluitreden 100%; 480/720/geen -0.28/-0.75/-0.89 per trade t.o.v. 240 (2 blokken)"
+2026-10-09,DAG,gs_noodstop,0,1,
+2026-10-09,DAG,gs_sluitreden_onbekend_pct,3.1,64,run 101
+2026-10-09,DAG,gs_kosten_gemeten_pct,96.9,64,run 101
