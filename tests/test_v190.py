@@ -723,7 +723,7 @@ def test_overlap_in_een_run_met_limiet_per_richting_is_geen_fout(tmp_path):
 def test_vingerafdruk_en_uitvoeringsversie(tmp_path, monkeypatch):
     from gold_scalper.const import EXECUTION_SEMANTICS_VERSION, INTEGRATION_VERSION
     assert EXECUTION_SEMANTICS_VERSION == 4
-    assert INTEGRATION_VERSION.startswith("1.9.")
+    assert tuple(int(x) for x in INTEGRATION_VERSION.split(".")[:2]) >= (1, 9)
     coordinator, _, _ = _opzet(tmp_path, monkeypatch)
     config = coordinator._run_config()
     assert config["risk"]["max_positions_per_richting"] == 3 and config["risk"]["hedge"]

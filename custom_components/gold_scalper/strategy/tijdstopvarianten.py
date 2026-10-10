@@ -244,7 +244,8 @@ def echte_sluitcode(reden: str | None) -> str:
         return "max_duur"
     if ("binnen" in tekst and "ATR" in tekst) or "dode zone" in tekst:
         return "tijdstop"
-    if tekst in ("time_stop", "timeout"):
+    if tekst in ("time_stop", "timeout", "tijdslimiet"):
+        # 1.10.0: "tijdslimiet" is de vaste soort van de oude tekst.
         return "tijdstop"
     return tekst or "unknown"
 

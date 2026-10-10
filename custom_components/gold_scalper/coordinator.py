@@ -413,6 +413,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: Handelsdag waarop voor het laatst automatisch is afgestemd.
         self._afgestemd_op: str | None = None
         self._afgestemd_om: datetime | None = None
+        #: 1.10.0: loopt er een afstemming (na de herstart en in de lus
+        #: tegelijk zou dubbel opvragen zijn), en waarom de laatste mislukte.
+        self._afstemming_bezig = False
+        self._afstemming_fout: str | None = None
         #: Kosten uit het ledger en hoeveel daarvan gemeten zijn.
         self.ledger_cost_info: dict = {}
         self._ledger_cost_value: float | None = None
@@ -1473,6 +1477,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 1.7.6: de latencysteekproef, zodat p99 niet na elke herstart
             # weer op een handvol metingen rust.
             "latency": self.latency.export(),
+            # 1.10.0: de laatste afstemming met de broker. Zonder dit stond
+            # de sensor na elke herstart op "nog niet", en in het weekend
+            # bleef dat zo tot de markt weer openging.
+            "afstemming": self.reconciliation or {},
         }
 
     async def _bewaar_resultaten(self, direct: bool = False) -> None:
@@ -1503,6 +1511,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             waarde = data.get(veld)
             if isinstance(waarde, dict) and waarde and not getattr(self, veld):
                 setattr(self, veld, waarde)
+        # 1.10.0: de bewaarde afstemming, gemarkeerd als bewaard. Een nieuwe
+        # afstemming vervangt hem (zonder die markering).
+        afstemming = data.get("afstemming")
+        if isinstance(afstemming, dict) and afstemming and not self.reconciliation:
+            self.reconciliation = {**afstemming, "hersteld": True}
 
     def _herstel_geheugen(self) -> None:
         """Wat uit de bewaarde toestand alleen terug in het geheugen hoeft.
@@ -2506,6 +2519,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             },
             "exit_stats": self.exit_stats,
             "reconciliation": self.reconciliation,
+            "afstemming_fout": self._afstemming_fout,
             "candle_setting": self.candle_setting.as_dict(),
             "ledger_costs": self.ledger_cost_info,
             "validation": self.validation,
@@ -2591,6 +2605,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 "levenscyclus_afgewikkeld": self.lifecycle.safe_to_restart,
             },
             "reconciliation": self.reconciliation,
+            "afstemming_fout": self._afstemming_fout,
             "enabled": self._enabled,
         })
         return data
@@ -3363,13 +3378,68 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
             _LOGGER.debug("Tijdstopvarianten niet geladen: %s", err)
 
+    async def async_afstemming_na_herstart(self) -> dict | None:
+        """1.10.0: één keer afstemmen na het opstarten, ook bij een gesloten markt.
+
+        De lus stemt alleen af als de markt handelbaar is; in het weekend bleef
+        de sensor daardoor na een herstart op "nog niet". Dit is alleen lezen
+        bij de broker - transactie- en activiteitenoverzicht - en plaatst,
+        sluit of wijzigt niets. Faalt de broker, dan blijft de bewaarde
+        uitkomst staan en probeert de lus het later opnieuw.
+        """
+        if not self.mode.places_orders or self.run_id is None:
+            return None
+        if getattr(self.venue, "transactions", None) is None:
+            return None
+        try:
+            uitslag = await self.async_reconcile()
+        except Exception as err:  # noqa: BLE001 - mag het opstarten nooit raken
+            self._afstemming_fout = f"{type(err).__name__}: {err}"[:200]
+            _LOGGER.warning(
+                "Afstemming na de herstart niet gelukt (%s); de bewaarde "
+                "uitkomst blijft staan en de lus probeert het later opnieuw.",
+                err,
+            )
+            self._meld_afstemming()
+            return None
+        if uitslag:
+            self._afgestemd_om = datetime.now(timezone.utc)
+        self._meld_afstemming()
+        return uitslag
+
+    def _meld_afstemming(self) -> None:
+        """Sensoren meteen bijwerken, zonder op de volgende cyclus te wachten."""
+        try:
+            if isinstance(self.data, dict):
+                self.data["reconciliation"] = self.reconciliation
+                self.data["afstemming_fout"] = self._afstemming_fout
+                self.async_update_listeners()
+        except Exception as err:  # noqa: BLE001 - alleen weergave
+            _LOGGER.debug("Afstemming niet doorgegeven aan de sensoren: %s", err)
+
     async def async_reconcile(self, dagen: float = 3.0) -> dict:
         """Leg de gesloten trades van de laatste dagen naast de broker.
 
         Zes keer werd een fout in de koppeling gevonden door een schermafdruk
         van het brokeroverzicht naast het rapport te leggen. Dit doet dat werk,
         elke dag, met dezelfde koppelregel als de correctie.
+
+        1.10.0: nooit twee tegelijk (na de herstart en in de lus); de uitkomst
+        wordt bewaard, en onbekende sluitredenen worden waar mogelijk uit de
+        broker ingevuld.
         """
+        if self._afstemming_bezig:
+            return self.reconciliation
+        self._afstemming_bezig = True
+        try:
+            uitslag = await self._stem_af_met_broker(dagen)
+        finally:
+            self._afstemming_bezig = False
+        if uitslag:
+            self._afstemming_fout = None
+        return uitslag
+
+    async def _stem_af_met_broker(self, dagen: float) -> dict:
         from .learning.afstemming import stem_af
 
         haal = getattr(self.venue, "transactions", None)
@@ -3411,7 +3481,17 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 len(bijgewerkt), uitslag.slippage_overgenomen,
                 uitslag.kosten_gemeten,
             )
-        self.reconciliation = {**uitslag.as_dict(), "moment": nu.isoformat()}
+        # 1.10.0: onbekende sluitredenen uit de broker invullen.
+        try:
+            ingevuld = await self._vul_sluitredenen_in(recent, transacties, nu)
+        except Exception as err:  # noqa: BLE001 - invullen mag de afstemming niet slopen
+            _LOGGER.debug("Sluitredenen niet ingevuld: %s", err)
+            ingevuld = 0
+        self.reconciliation = {
+            **uitslag.as_dict(), "moment": nu.isoformat(),
+            "sluitreden_ingevuld": ingevuld,
+        }
+        await self._bewaar_resultaten(direct=True)
         if uitslag.afwijkingen:
             regels = "; ".join(a.uitleg for a in uitslag.afwijkingen[:5])
             _LOGGER.warning(
@@ -3422,6 +3502,94 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 uitslag.samenvatting() + " " + regels,
             )
         return self.reconciliation
+
+    #: Hooguit zoveel onbekende sluitredenen per afstemming bij de broker
+    #: nazoeken (één verzoek per trade).
+    SLUITREDEN_MAX_PER_RONDE = 10
+
+    async def _vul_sluitredenen_in(self, recent: list, transacties: list,
+                                   nu: datetime) -> int:
+        """1.10.0: trades met sluitreden onbekend achteraf een reden geven.
+
+        Uit het transactieoverzicht de uitstap en het sluitmoment, uit het
+        activiteitenoverzicht wie sloot (zie ``learning/sluitreden.py``). Alleen
+        opvragen; de reden komt in de afstemmingsvelden met bron
+        ``afstemming``, de oorspronkelijke reden blijft staan.
+        """
+        from .broker.ig_capital import match_transaction
+        from .learning.exit_stats import effective_reason, exit_stats
+        from .learning.sluitreden import BRON_AFSTEMMING, looptijd_van, reden_uit_broker
+
+        onbekend = [
+            t for t in recent
+            if t.close_time and t.broker_ticket and effective_reason(t) == "unknown"
+        ][: self.SLUITREDEN_MAX_PER_RONDE]
+        if not onbekend:
+            return 0
+        zoek = getattr(self.venue, "closed_deal_activity", None)
+        cfg = self.exits.config
+        ingevuld = 0
+        for trade in onbekend:
+            units = (trade.volume or 0) * CONTRACT_SIZE
+            match = match_transaction(
+                transacties, trade.broker_ticket, trade.open_price,
+                trade.side, units or None, trade.open_time,
+            )
+            uitstap = (match or {}).get("exit_price")
+            gesloten = (match or {}).get("closed_at")
+            activiteit = None
+            if zoek is not None:
+                try:
+                    activiteit = await zoek(
+                        str(trade.broker_ticket), trade.side, trade.open_price,
+                        _as_datetime(trade.open_time, None),
+                    )
+                except Exception as err:  # noqa: BLE001 - alleen lezen; falen mag
+                    _LOGGER.debug(
+                        "Activiteit van %s niet op te halen: %s",
+                        trade.broker_ticket, err,
+                    )
+            if uitstap is None and activiteit:
+                uitstap = activiteit.get("exit_price")
+            if uitstap is None:
+                uitstap = trade.close_price
+            # Zonder tijdstop (uitstapregime van vóór 1.7.6) is een sluiting
+            # na de tijdstopduur geen tijdslimiet.
+            tijdstop = (
+                None if trade.exit_regime == "zonder_tijdstop"
+                else cfg.time_stop_seconds
+            )
+            reden = reden_uit_broker(
+                trade, uitstap, activiteit,
+                tijdstop, cfg.max_hold_seconds, gesloten,
+            )
+            if reden is None:
+                continue
+            trade.reconciled_close_reason = reden.reden
+            trade.close_reason_source = BRON_AFSTEMMING
+            trade.close_reason_evidence = reden.bewijs
+            trade.reconciliation_status = "reconciled"
+            trade.reconciled_at = nu.isoformat()
+            trade.reconciliation_source = (
+                "broker_activity" if activiteit else "broker_transactions"
+            )
+            if trade.looptijd_s is None:
+                trade.looptijd_s = looptijd_van(
+                    trade, gesloten or (activiteit or {}).get("activity_date"),
+                )
+            await self.hass.async_add_executor_job(self.db.update_trade, trade)
+            ingevuld += 1
+            _LOGGER.info(
+                "Sluitreden van %s achteraf ingevuld uit de afstemming: %s (%s).",
+                trade.broker_ticket, reden.reden, reden.bewijs,
+            )
+        if ingevuld and self.run_id is not None:
+            # Doel geraakt, stop geraakt en onbekend meteen bijwerken.
+            alle = await self.hass.async_add_executor_job(
+                self.db.closed_trades, self.run_id
+            )
+            self.exit_stats = exit_stats(alle)
+        return ingevuld
 
     def _record_account_amount(self, trade) -> None:
         """Resultaat in accountvaluta vastleggen met de koers van nu.

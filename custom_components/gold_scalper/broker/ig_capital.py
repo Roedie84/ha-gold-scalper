@@ -371,6 +371,11 @@ def match_activity(
             "closing_deal_id": act.get("dealId"),
             "activity_date": act.get("dateUTC") or act.get("dateUtc") or act.get("date"),
             "source": "broker_activity",
+            # 1.10.0: wie sloot - SYSTEM (stop/doel), PUBLIC_WEB_API (deze
+            # integratie), WEB/MOBILE/DEALER (met de hand). Voor het achteraf
+            # invullen van een onbekende sluitreden.
+            "channel": act.get("channel"),
+            "description": act.get("description"),
         }
     return None
 

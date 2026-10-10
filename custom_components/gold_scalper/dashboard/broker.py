@@ -134,8 +134,10 @@ def sluitreden(reden: str | None, gereconcilieerd: str | None = None) -> tuple[s
         kort = "Trailing stop"
     elif r.startswith("maximale positieduur") or r.startswith("max"):
         kort = "Max. duur"
-    elif r.startswith("na ") and "atr" in r:
+    elif r == "tijdslimiet" or (r.startswith("na ") and "atr" in r):
         kort = "Tijdstop"
+    elif r == "eigen_exit":
+        kort = "Eigen exit"
     elif r.startswith("eerste doel") or r == "partial_close":
         kort = "Deelsluiting"
     elif r in ("handmatig", "manual"):
@@ -158,6 +160,19 @@ _TRADE_KOLOMMEN = (
     "duration_seconds, stop_loss, take_profit, exit_regime"
 )
 
+#: 1.10.0: optioneel, alleen als de kolom er al is (een database die nog
+#: niet door deze versie is geopend, heeft ze niet).
+_TRADE_KOLOMMEN_EXTRA = ("looptijd_s", "close_reason_source")
+
+
+def _kolommen(conn: sqlite3.Connection) -> str:
+    try:
+        bestaand = {r[1] for r in conn.execute("PRAGMA table_info(trades)").fetchall()}
+    except sqlite3.Error:
+        bestaand = set()
+    extra = [k for k in _TRADE_KOLOMMEN_EXTRA if k in bestaand]
+    return ", ".join([_TRADE_KOLOMMEN, *extra])
+
 
 def open_readonly(path: str | Path) -> sqlite3.Connection:
     """Alleen-lezende verbinding. Schrijven geeft 'attempt to write a readonly database'."""
@@ -171,12 +186,13 @@ def read_database(path: str | Path, run_id: int) -> dict:
     """Open trades, recente gesloten trades en een uitgedunde equitycurve."""
     conn = open_readonly(path)
     try:
+        kolommen = _kolommen(conn)
         open_rijen = conn.execute(
-            f"SELECT {_TRADE_KOLOMMEN} FROM trades WHERE run_id=? AND close_time IS NULL",
+            f"SELECT {kolommen} FROM trades WHERE run_id=? AND close_time IS NULL",
             (run_id,),
         ).fetchall()
         gesloten = conn.execute(
-            f"SELECT {_TRADE_KOLOMMEN} FROM trades WHERE run_id=? AND close_time IS NOT NULL "
+            f"SELECT {kolommen} FROM trades WHERE run_id=? AND close_time IS NOT NULL "
             "ORDER BY close_time DESC LIMIT ?",
             (run_id, max(RECENT_TRADES, MARKER_TRADES)),
         ).fetchall()
@@ -303,6 +319,14 @@ def _trade_rows(rijen: list[dict]) -> list[dict]:
     uit = []
     for r in rijen[:RECENT_TRADES]:
         kort, lang = sluitreden(r.get("close_reason"), r.get("reconciled_close_reason"))
+        # 1.10.0: looptijd apart; een achteraf uit de afstemming ingevulde
+        # reden is als zodanig gemarkeerd.
+        looptijd = r.get("looptijd_s")
+        if looptijd is not None and lang:
+            lang = f"{lang} (na {looptijd}s)"
+        bron = "afstemming" if r.get("close_reason_source") == "afstemming" else None
+        if bron:
+            lang = f"{lang} - achteraf ingevuld uit de afstemming met de broker"
         uit.append({
             "ticket": r.get("broker_ticket") or str(r.get("id")),
             "richting": "long" if r.get("side") == "buy" else "short",
@@ -317,6 +341,8 @@ def _trade_rows(rijen: list[dict]) -> list[dict]:
             "kosten": _num(r.get("total_cost"), 2),
             "reden": kort,
             "reden_lang": lang,
+            "reden_bron": bron,
+            "looptijd_s": looptijd,
             "kostenbron": r.get("cost_source") or "unknown",
             "duur_s": r.get("duration_seconds"),
         })
@@ -536,7 +562,11 @@ def build_payload(
                 None if not recon else
                 {"in_orde": bool(recon.get("in_orde")),
                  "afwijkingen": len(recon.get("afwijkingen") or []),
-                 "tekst": recon.get("samenvatting")}
+                 "tekst": recon.get("samenvatting"),
+                 # 1.10.0: tijdstip, en of het de bewaarde uitkomst van
+                 # vóór een herstart is.
+                 "moment": recon.get("moment"),
+                 "hersteld": bool(recon.get("hersteld"))}
             ),
             "poort": (data.get("gate") or {}).get("checks") or {},
             "run": stats.get("run_id"),

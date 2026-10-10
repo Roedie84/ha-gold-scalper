@@ -1,5 +1,28 @@
 # Changelog — Gold Scalper
 
+## 1.10.0
+
+* **Afstemming met de broker bewaard.** De uitkomst van de laatste afstemming
+  (status, tijdstip, aantallen, verschillen) overleeft een herstart; de sensor
+  toont hem met `moment` en `hersteld` als attribuut. Na een herstart wordt
+  één keer afgestemd, ook als de markt dicht is. Alleen lezen bij de broker
+  (transactie- en activiteitenoverzicht); er wordt niets geplaatst, gesloten
+  of gewijzigd. Is de broker niet bereikbaar, dan blijft de bewaarde uitkomst
+  staan (`laatste_fout`) en probeert de lus het later opnieuw.
+* **Sluitreden achteraf ingevuld.** Een trade met sluitreden onbekend krijgt
+  zijn reden uit de afstemming als de broker hem kent: doel (uitstap op het
+  doel), stop (door het systeem van de broker gesloten), tijdslimiet of
+  maximale duur (via de API gesloten na die looptijd), handmatig (web,
+  mobiel, dealer). Gemarkeerd met bron `afstemming`; de oorspronkelijke reden
+  blijft staan. Doel geraakt, stop geraakt en sluitreden onbekend volgen
+  meteen.
+* **Sluitredenen gegroepeerd.** "na 243s nog binnen 0.3xATR ..." is nu de
+  soort `tijdslimiet` (en "maximale positieduur ..." `max_duur`), met de
+  looptijd apart in `looptijd_s`. Opgeslagen trades worden bij het openen van
+  de database omgezet. Paneel: looptijd in de toelichting, een `*` bij een
+  achteraf ingevulde reden.
+* Geen strategie- of handelswijziging.
+
 ## 1.9.6
 
 * **Het paneel verspringt niet meer tijdens scrollen op mobiel.** De live

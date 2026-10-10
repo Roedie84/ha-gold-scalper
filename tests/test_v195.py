@@ -365,7 +365,9 @@ def _scenario(tmp_path, monkeypatch, met_varianten=True):
 def test_varianten_in_de_lus_240_spiegelt_de_echte_tijdstop(tmp_path, monkeypatch):
     coordinator, venue = _scenario(tmp_path, monkeypatch)
     echte = coordinator.db.closed_trades(coordinator.run_id)
-    assert len(echte) == 1 and "binnen" in echte[0].close_reason
+    # 1.10.0: de tijdstop is een vaste soort, de looptijd staat apart.
+    assert len(echte) == 1 and echte[0].close_reason == "tijdslimiet"
+    assert echte[0].looptijd_s is not None
     rijen = {r["variant"]: r for r in coordinator.db.tijdstop_varianten(coordinator.run_id)}
     assert set(rijen) == set(VARIANTEN)
     assert all(r["trade_ref"] == echte[0].broker_ticket for r in rijen.values())

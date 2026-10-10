@@ -121,6 +121,9 @@ SPECS: tuple[dict, ...] = (
             "aantal": (_exits(d).get("unknown") or {}).get("n"),
             "van": _exits(d).get("noemer"),
             "afgestemd": _exits(d).get("afgestemd"),
+            # 1.10.0: redenen die achteraf uit de afstemming kwamen.
+            "achteraf_ingevuld": _exits(d).get("achteraf_ingevuld"),
+            "reden_bron": "afstemming" if _exits(d).get("achteraf_ingevuld") else None,
         },
     ),
     dict(
@@ -135,6 +138,20 @@ SPECS: tuple[dict, ...] = (
             "samenvatting": (d.get("reconciliation") or {}).get("samenvatting"),
             "afwijkingen": len((d.get("reconciliation") or {}).get("afwijkingen") or []),
             "moment": (d.get("reconciliation") or {}).get("moment"),
+            # 1.10.0: de bewaarde uitkomst overleeft een herstart; "hersteld"
+            # zegt dat het die van vóór de herstart is.
+            "hersteld": bool((d.get("reconciliation") or {}).get("hersteld")),
+            "trades": (d.get("reconciliation") or {}).get("trades"),
+            "gevonden": (d.get("reconciliation") or {}).get("gevonden"),
+            "kloppend": (d.get("reconciliation") or {}).get("kloppend"),
+            "nog_niet_verwerkt": (d.get("reconciliation") or {}).get("nog_niet_verwerkt"),
+            "verschillen": [
+                a.get("uitleg") for a in
+                ((d.get("reconciliation") or {}).get("afwijkingen") or [])[:5]
+                if isinstance(a, dict)
+            ],
+            "sluitreden_ingevuld": (d.get("reconciliation") or {}).get("sluitreden_ingevuld"),
+            "laatste_fout": d.get("afstemming_fout"),
         },
     ),
     dict(

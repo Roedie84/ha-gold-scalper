@@ -24,9 +24,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..learning.sluitreden import normaliseer_trade
+
 _LOGGER = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
+
+
+@dataclass(slots=True)
+class _RijTrade:
+    """Alleen de sluitvelden van een rij, voor de normalisatie."""
+
+    close_reason: str | None
+    original_close_reason: str | None
+    looptijd_s: int | None
 
 MODE_PAPER = "paper"
 MODE_LIVE = "live"
@@ -379,6 +390,10 @@ class Trade:
     #: orders inbegrepen) op het moment van instap. Alleen statistiek: om
     #: later te toetsen of stapelen iets toevoegt. None = van vóór 1.9.0.
     gelijktijdig_open: int | None = None
+    #: 1.10.0: looptijd in seconden zoals de sluitreden hem noemde ("na 243s
+    #: ..."). De reden zelf is sindsdien een vaste soort (``tijdslimiet``);
+    #: zie ``learning/sluitreden.py``.
+    looptijd_s: int | None = None
     #: Ticketnummer bij de broker. Tekst, niet numeriek: IG gebruikt sleutels
     #: als 'DIAAAAYCJETQ7A8'.
     broker_ticket: str | None = None
@@ -499,8 +514,12 @@ class TradeDatabase:
                 "ALTER TABLE trades ADD COLUMN gelijktijdig_open INTEGER"
             )
             _LOGGER.info("Database bijgewerkt: kolom 'gelijktijdig_open' toegevoegd")
+        if "looptijd_s" not in trade_columns:
+            self._conn.execute("ALTER TABLE trades ADD COLUMN looptijd_s INTEGER")
+            _LOGGER.info("Database bijgewerkt: kolom 'looptijd_s' toegevoegd")
         self._backfill_exit_regime()
         self._migrate_close_reasons()
+        self._normaliseer_sluitredenen()
         self._conn.commit()
 
         for kolom, soort in (("opening_equity_account", "REAL"),
@@ -702,6 +721,7 @@ class TradeDatabase:
     # -- trades ------------------------------------------------------------- #
 
     def insert_trade(self, trade: Trade) -> int:
+        normaliseer_trade(trade)
         data = asdict(trade)
         data.pop("id", None)
         columns = ", ".join(data)
@@ -717,6 +737,8 @@ class TradeDatabase:
     def update_trade(self, trade: Trade) -> None:
         if trade.id is None:
             raise ValueError("Trade heeft geen id; eerst insert_trade aanroepen")
+        # 1.10.0: vaste soort, looptijd apart.
+        normaliseer_trade(trade)
         data = asdict(trade)
         data.pop("id")
         # De oorspronkelijke sluitreden wordt één keer gezet en daarna nooit
@@ -916,6 +938,45 @@ class TradeDatabase:
         }
 
     # -- equity ------------------------------------------------------------- #
+
+    def _normaliseer_sluitredenen(self) -> int:
+        """1.10.0: sluitredenen met looptijd in de tekst naar een vaste soort.
+
+        "na 243s nog binnen 0.3xATR ..." wordt ``tijdslimiet`` met
+        ``looptijd_s`` 243; "maximale positieduur van 900s ..." wordt
+        ``max_duur``. Raakt ``close_reason`` en ``original_close_reason``;
+        idempotent - een soort normaliseert naar zichzelf.
+        """
+        c = self._conn
+        rijen = c.execute(
+            "SELECT id, close_reason, original_close_reason, looptijd_s "
+            "FROM trades WHERE close_reason LIKE 'na %' "
+            "OR close_reason LIKE 'maximale positieduur%' "
+            "OR original_close_reason LIKE 'na %' "
+            "OR original_close_reason LIKE 'maximale positieduur%'"
+        ).fetchall()
+        aantal = 0
+        for rij in rijen:
+            t = _RijTrade(
+                rij["close_reason"], rij["original_close_reason"], rij["looptijd_s"]
+            )
+            normaliseer_trade(t)
+            if (t.close_reason, t.original_close_reason, t.looptijd_s) == (
+                rij["close_reason"], rij["original_close_reason"], rij["looptijd_s"]
+            ):
+                continue
+            c.execute(
+                "UPDATE trades SET close_reason=?, original_close_reason=?, "
+                "looptijd_s=? WHERE id=?",
+                (t.close_reason, t.original_close_reason, t.looptijd_s, rij["id"]),
+            )
+            aantal += 1
+        if aantal:
+            _LOGGER.info(
+                "Database bijgewerkt: %d sluitreden(en) naar een vaste soort "
+                "met de looptijd apart.", aantal,
+            )
+        return aantal
 
     def _migrate_close_reasons(self) -> None:
         """Historische sluitredenen niet-destructief vastleggen. Idempotent.

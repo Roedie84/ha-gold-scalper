@@ -33,6 +33,6 @@ def test_versie_196():
 
     pkg = JS.parents[1]
     manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.9.6"
+    assert manifest["version"] == const.INTEGRATION_VERSION
     log = (pkg.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert log.split("\n## ")[1].startswith("1.9.6")
+    assert "\n## 1.9.6\n" in log

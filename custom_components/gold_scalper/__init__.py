@@ -81,10 +81,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     _register_services(hass)
 
+    # 1.10.0: één afstemming na het opstarten, ook als de markt dicht is.
+    # Op de achtergrond: alleen lezen bij de broker, en het opstarten wacht
+    # er niet op en kan er niet op stuklopen.
+    _plan_afstemming_na_herstart(hass, entry, coordinator)
+
     # Experiment Lab (fase 9A): na de handel, en omhuld. Een fout hier wordt
     # gelogd en blokkeert niets. Eén Lab per Home Assistant, niet per entry.
     await _async_lab(hass, "async_setup_lab")
     return True
+
+
+def _plan_afstemming_na_herstart(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
+    """Start ``async_afstemming_na_herstart`` op de achtergrond (1.10.0)."""
+    try:
+        taak = coordinator.async_afstemming_na_herstart()
+        maak = getattr(entry, "async_create_background_task", None)
+        if maak is not None:
+            maak(hass, taak, "gold_scalper afstemming na herstart")
+        else:
+            hass.async_create_task(taak)
+    except Exception:  # noqa: BLE001 - mag het laden nooit breken
+        _LOGGER.exception("Afstemming na de herstart niet gepland")
 
 
 async def _async_lab(hass: HomeAssistant, actie: str) -> None:

@@ -1059,7 +1059,7 @@ ${tl}
       `<div><div class="lbl">Hoe trades eindigden${s.exits_noemer ? ` · ${s.exits_noemer}` : ""}</div><div class="verdeling" style="margin-top:7px">` +
       `<b style="width:${doel}%;background:var(--groen)"></b><b style="width:${stop}%;background:var(--rood)"></b><b style="width:${rest}%;background:rgba(160,200,220,.35)"></b><b style="width:${onb}%;background:rgba(255,255,255,.12)"></b></div>` +
       `<div class="vlegenda"><span><i style="background:var(--groen)"></i>doel ${fmt(doel, 0)}%</span><span><i style="background:var(--rood)"></i>stop ${fmt(stop, 0)}%</span><span><i style="background:rgba(160,200,220,.35)"></i>overig ${fmt(rest, 0)}%</span><span><i style="background:rgba(255,255,255,.12)"></i>onbekend ${fmt(onb, 0)}%</span></div></div>` +
-      `<div class="rijen"><div><span>Afstemming met broker</span><b class="${af ? (af.in_orde ? "pos" : "neg") : ""}" title="${esc(af ? af.tekst || "" : "")}">${af ? (af.in_orde ? "in orde" : `${af.afwijkingen} afwijking(en)`) : "nog niet"}</b></div></div>` +
+      `<div class="rijen"><div><span>Afstemming met broker</span><b class="${af ? (af.in_orde ? "pos" : "neg") : ""}" title="${esc(af ? (af.tekst || "") + (af.moment ? " · laatste afstemming " + af.moment : "") + (af.hersteld ? " (bewaard van vóór de herstart)" : "") : "")}">${af ? (af.in_orde ? "in orde" : `${af.afwijkingen} afwijking(en)`) : "nog niet"}</b></div></div>` +
       (checks ? `<div><div class="lbl" style="margin-bottom:7px">Live-poort (alleen informatie)</div><div class="checks">${checks}</div></div>` : "");
   }
 
@@ -1076,7 +1076,7 @@ ${tl}
         cel("Richting", `<span class="tag ${t.richting}">${t.richting.toUpperCase()}</span>`) +
         cel("Units", fmt(t.units), "r") + cel("Instap", fmt(t.instap), "r") + cel("Uitstap", fmt(t.uitstap), "r") +
         cel("P&amp;L", `<b>${fmtS(t.pnl)}</b>${pa}`, `r ${toon(t.pnl)}`) +
-        cel("Reden", esc(t.reden), "", "", t.reden_lang) +
+        cel("Reden", esc(t.reden) + (t.reden_bron === "afstemming" ? ' <span class="dim" title="achteraf ingevuld uit de afstemming met de broker">*</span>' : ""), "", "", t.reden_lang) +
         cel("Kosten", `${fmt(t.kosten)} <span class="tag ${b}">${b}</span>`, "r breed") +
         cel("Duur", duur(t.duur_s), "r") + "</tr>";
     }).join("");

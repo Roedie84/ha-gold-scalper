@@ -36,6 +36,8 @@ PRIJS_BEWIJS = 0.01
 EIGEN_EXITS = {
     "timeout", "time_stop", "trailing", "break_even", "breakeven",
     "partial_close", "close_all", "drain", "handmatig", "exit",
+    # 1.10.0: vaste soorten (zie ``sluitreden.py``).
+    "tijdslimiet", "max_duur", "eigen_exit",
 }
 
 
@@ -114,10 +116,14 @@ def exit_stats(trades: Sequence) -> dict:
     noemer = len(gesloten)
     telling = {"take_profit": 0, "stop_loss": 0, "eigen_exit": 0, "unknown": 0}
     afgestemd = 0
+    achteraf = 0
     for t in gesloten:
         reden = effective_reason(t)
         if getattr(t, "reconciliation_status", None) == "reconciled":
             afgestemd += 1
+        # 1.10.0: reden achteraf uit de afstemming ingevuld.
+        if getattr(t, "close_reason_source", None) == "afstemming":
+            achteraf += 1
         if reden == "take_profit":
             telling["take_profit"] += 1
         elif reden == "stop_loss":
@@ -133,6 +139,7 @@ def exit_stats(trades: Sequence) -> dict:
     return {
         "noemer": noemer,
         "afgestemd": afgestemd,
+        "achteraf_ingevuld": achteraf,
         **{
             soort: {"n": n, "pct": deel(n)}
             for soort, n in telling.items()
