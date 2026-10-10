@@ -195,3 +195,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-10 07:44,TUSSEN,gs_trades_nieuw,0,0,"weekend: status markt_gesloten sinds vr 23:00; run 101 64 trades / 6 clusters ongewijzigd"
 2026-10-10 07:44,TUSSEN,gs_latency_p99_ms,242.2,1,"gesloten markt, geen handelscycli (geen H-GS-8-toets)"
 2026-10-10 07:44,TUSSEN,gs_afstemming,in_orde,1,"open posities 0; noodstop off; dataprobleem off"
+2026-10-10 11:44,TUSSEN,gs_trades_nieuw,0,0,"weekend: markt_gesloten; run 101 64 trades / 6 clusters ongewijzigd (netto -80.09, PF 0.436, t -2.339)"
+2026-10-10 11:44,TUSSEN,gs_max_drawdown_pct,99.9,1,"sinds herstart 08:20; terugvalpunt startbalans 10000 in de equitycurve -> L-GS-009 (1.10.1)"
+2026-10-10 11:44,TUSSEN,gs_afstemming,nog_niet,1,"na herstart 10:52 (1.10.0 bewaart de uitkomst over herstarts; niet geinstalleerd)"
+2026-10-10 11:44,TUSSEN,gs_latency_p99_ms,241.6,1,"gesloten markt, geen handelscycli"

@@ -230,3 +230,11 @@ laatste ronde: 10-10 03:40, gemeten t/m 10-10 03:46
 - Hypotheses H-GS-7 (bruto < kosten), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
 
 laatste ronde: 10-10 07:40, gemeten t/m 10-10 07:44
+
+## 10-10 11:40 · tussenronde
+- Weekend: `markt_gesloten`, demo, handel aan, open posities 0, noodstop/dataprobleem uit. Geen knoppen gebruikt. Geïnstalleerd **1.9.6**; 1.10.0 (chatsessie 11:42: afstemming bewaard, sluitreden achteraf) nog niet. HA-herstarts 08:20, 08:44, 09:18, 10:52. Run 101 ongewijzigd (64 trades / 6 clusters, netto −80,09, PF 0,436, t −2,34).
+- **Gevonden (acuut) → L-GS-009, gebouwd 1.10.1:** `max_drawdown` 99,9 % sinds 08:20. Bij een mislukte accountopvraging schreef de cyclus de startbalans (10.000) als equitypunt weg; tegen ~10 mln demo-equity is dat 99,9 %. Nu alleen gemeten equity; oude terugvalpunten tellen niet. Geen strategie- of risicowijziging. Suite 2025 groen, workflow groen, HACS ververst. (Meetbaarheidspunt van 07:40 over 0,0 % afronding blijft: in % zegt het op dit account weinig.)
+- Afstemming `nog_niet` na de herstart van 10:52 (in 1.9.6 niet bewaard; 1.10.0 lost dat op).
+- Hypotheses H-GS-7 (bruto < kosten, ~20 uurblokken nodig; nu 7), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd.
+
+laatste ronde: 10-10 11:40, gemeten t/m 10-10 11:50
