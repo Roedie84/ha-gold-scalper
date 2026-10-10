@@ -446,8 +446,8 @@ def test_versie_1100():
     from gold_scalper import const
 
     manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.10.0"
+    # 1.10.1: niet meer vast op 1.10.0; de nieuwste versie bewaakt test_release_1101.
+    assert manifest["version"] == const.INTEGRATION_VERSION
     root = PKG.parent.parent
-    assert "Huidige versie: **1.10.0**" in (root / "README.md").read_text(encoding="utf-8")
     log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert log.split("\n## ")[1].startswith("1.10.0")
+    assert "\n## 1.10.0\n" in log

@@ -2375,10 +2375,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 reject_reason, signal.components,
             )
 
-        await self.hass.async_add_executor_job(
-            self.db.record_equity, self.run_id, balance, equity,
-            len(open_positions), await self._ledger_cost(),
-        )
+        # 1.10.1: alleen een gemeten equity in de equitycurve. De terugval op
+        # de startbalans (opvraging mislukt) is geen meting; hij gaf op 10-10
+        # een drawdown van 99,9 % (10.000 tegen ~10 mln demo-equity).
+        if gemeten_equity is not None:
+            await self.hass.async_add_executor_job(
+                self.db.record_equity, self.run_id, balance, equity,
+                len(open_positions), await self._ledger_cost(),
+            )
         budget.mark("bookkeeping")
         self.latency.record(budget)
 

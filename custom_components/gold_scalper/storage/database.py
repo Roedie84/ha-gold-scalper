@@ -1031,17 +1031,36 @@ class TradeDatabase:
         De drawdown werd berekend door dollarresultaten op te tellen bij de
         ingestelde startbalans van 10.000 - twee valuta en een verouderde basis
         in één getal. Deze leest de equity zoals de broker hem meldt.
+
+        1.10.1: punten die de terugval op de startbalans zijn (opvraging bij
+        de broker mislukt) tellen niet. Die stonden tot 1.10.1 in de tabel: op
+        10-10 gaf één zo'n punt (10.000 tegen ~10 mln demo-equity) een
+        drawdown van 99,9 %. Herkend als equity = saldo = startbalans van de
+        run, terwijl de gemeten opening van de run meer dan 1 % afwijkt.
         """
+        terugval = (
+            "r.opening_equity_account IS NOT NULL "
+            "AND e.equity = r.starting_balance AND e.balance = r.starting_balance "
+            "AND ABS(r.opening_equity_account - r.starting_balance) "
+            "> 0.01 * ABS(r.opening_equity_account)"
+        )
         rij = self.conn.execute(
             "SELECT MAX(piek - equity) AS dd, "
             "MAX(CASE WHEN piek > 0 THEN (piek - equity) / piek END) AS ddpct, "
             "COUNT(*) AS n FROM ("
-            " SELECT equity, MAX(equity) OVER (ORDER BY id) AS piek "
-            " FROM equity WHERE run_id=?)",
+            " SELECT e.equity, MAX(e.equity) OVER (ORDER BY e.id) AS piek "
+            " FROM equity e JOIN runs r ON r.id = e.run_id "
+            f" WHERE e.run_id=? AND NOT ({terugval}))",
+            (run_id,),
+        ).fetchone()
+        overgeslagen = self.conn.execute(
+            "SELECT COUNT(*) AS n FROM equity e JOIN runs r ON r.id = e.run_id "
+            f"WHERE e.run_id=? AND ({terugval})",
             (run_id,),
         ).fetchone()
         n = int(rij["n"] or 0)
         return {
+            "terugvalpunten_overgeslagen": int(overgeslagen["n"] or 0),
             "max_drawdown": round(float(rij["dd"] or 0.0), 2) if n else None,
             "max_drawdown_pct": (
                 round(float(rij["ddpct"] or 0.0) * 100, 2) if n else None

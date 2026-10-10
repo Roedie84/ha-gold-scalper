@@ -1,5 +1,22 @@
 # Changelog — Gold Scalper
 
+## 1.10.1
+
+* **Geen strategiewijziging; meetfout in de drawdown.** Instappen, uitstappen,
+  ordergrootte, risico en handelslogica zijn niet aangeraakt.
+* **De terugval op de startbalans is geen equitymeting.** Mislukte de
+  accountopvraging bij de broker (zoals na een herstart in het weekend), dan
+  rekende de cyclus met de ingestelde startbalans (10.000) en schreef die als
+  equitypunt in de equitycurve. Op een demo-account van ~10 mln gaf één zo'n
+  punt op 10-10 een **max. drawdown van 99,9 %** (sensor, rapport en de
+  redenen van het oordeel). Nu wordt alleen een gemeten equity weggeschreven.
+* **Bestaande terugvalpunten tellen niet meer.** `account_drawdown` slaat
+  punten over waar equity = saldo = startbalans van de run terwijl de
+  gemeten opening van de run meer dan 1 % afwijkt; het aantal staat in
+  `terugvalpunten_overgeslagen`. Zonder gemeten opening (papier) of met een
+  opening rond de startbalans verandert er niets.
+* Tests: `test_release_1101.py` (6).
+
 ## 1.10.0
 
 * **Afstemming met de broker bewaard.** De uitkomst van de laatste afstemming
