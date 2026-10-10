@@ -246,3 +246,11 @@ laatste ronde: 10-10 11:40, gemeten t/m 10-10 11:50
 - Hypotheses H-GS-7 (bruto < kosten, ~20 uurblokken nodig; nu 7), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
 
 laatste ronde: 10-10 15:40, gemeten t/m 10-10 15:45
+
+## 10-10 19:40 · tussenronde
+- Weekend: `markt_gesloten`, demo, handel aan, open posities 0, noodstop/dataprobleem uit, oordeel `insufficient_data`. Geen knoppen gebruikt. Geïnstalleerd 1.10.1. Run 101 ongewijzigd (64 trades / 6 clusters, netto −80,10, PF 0,436, t −2,34).
+- 3 HA-herstarts (16:19, 16:40, 18:07): afstemming bleef `in_orde`, max. drawdown 0,0 %, sluitreden onbekend 0,0 % → 1.10.0/1.10.1 houden over herstarts.
+- **Gevonden:** 19:27 1× ERROR "Unexpected error fetching gold_scalper data" met traceback: IG antwoordde niet binnen 15 s op GET /positions. De koersopvraging vangt een `VenueError` af (laatste beeld vasthouden, niets beslissen); de positie-voorcheck (`_open_positions` in `_async_update_data`) niet → de hele cyclus faalt als onverwachte fout. Geen schade (weekend, geen beslissing), wel foute classificatie → **L-GS-010** (gepland, zelf bouwen: foutafhandeling, geen strategiewijziging), bouwen in een dagafsluiting.
+- Latency p99 273 ms (gesloten markt, geen toets). Hypotheses H-GS-7 (bruto < kosten; 7 van ~20 uurblokken), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
+
+laatste ronde: 10-10 19:40, gemeten t/m 10-10 19:45

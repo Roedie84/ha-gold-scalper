@@ -70,3 +70,10 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Verwacht effect: `max_drawdown` terug naar ~0,0 % op dit demo-account; oordeel-redenen zonder "drawdown te groot".
 - Meten na installatie: `max_drawdown` < 1 %, diagnostics `account_drawdown.terugvalpunten_overgeslagen` ≥ 1, geen nieuwe equitypunten van 10.000 na een herstart.
 
+
+## L-GS-010 · time-out bij de positie-voorcheck als gewone, tijdelijke fout behandelen
+- Status: **gepland** (zelf bouwen: bug in foutafhandeling; geen strategie-, risico- of handelswijziging) — bouwen in een dagafsluiting (niet in het weekend nodig).
+- Onderbouwing: 10-10 19:27 (markt dicht) 1× `VenueError` "IG antwoordde niet binnen 15s op GET /positions" vanuit `_open_positions()` in `_async_update_data` (coordinator ~2069). Die is niet afgevangen → HA logt "Unexpected error" met traceback en de cyclus faalt. De koersopvraging (~2031) vangt hetzelfde type wél af en houdt het laatste beeld vast zonder te beslissen.
+- Bouw: `VenueError` bij de voorcheck afvangen zoals bij de koers: `_houd_laatste_data(err)` of `UpdateFailed`, in deze cyclus niets beslissen (geen instap, geen stopwijziging); test die een time-out op /positions nabootst.
+- Verwacht effect: geen "Unexpected error"-tracebacks meer voor broker-time-outs; gedrag in die cyclus blijft "niets doen".
+- Meten na bouw: 0 "Unexpected error fetching gold_scalper" in system_log; time-outs zichtbaar als warning/telling.

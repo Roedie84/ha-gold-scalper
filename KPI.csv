@@ -204,3 +204,6 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-10 15:45,TUSSEN,gs_sluitreden_onbekend_pct,0.0,64,"3.1 -> 0.0 om 12:04 (1.10.0 sluitreden achteraf)"
 2026-10-10 15:45,TUSSEN,gs_afstemming,in_orde,1,"sinds 12:04, bewaard over herstarts 13:37 en 14:41 (1.10.0)"
 2026-10-10 15:45,TUSSEN,gs_latency_p99_ms,252.2,1,"gesloten markt, geen handelscycli"
+2026-10-10 19:45,TUSSEN,gs_unexpected_errors,1,1,"19:27 IG time-out GET /positions in voorcheck -> L-GS-010"
+2026-10-10 19:45,TUSSEN,gs_afstemming,in_orde,3,"over herstarts 16:19, 16:40, 18:07"
+2026-10-10 19:45,TUSSEN,gs_latency_p99_ms,273.4,1,"gesloten markt, geen handelscycli"
