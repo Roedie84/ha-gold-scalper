@@ -254,3 +254,11 @@ laatste ronde: 10-10 15:40, gemeten t/m 10-10 15:45
 - Latency p99 273 ms (gesloten markt, geen toets). Hypotheses H-GS-7 (bruto < kosten; 7 van ~20 uurblokken), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
 
 laatste ronde: 10-10 19:40, gemeten t/m 10-10 19:45
+
+## 10-10 23:40 · tussenronde
+- Weekend: `markt_gesloten`, demo, handel aan, open posities 0, noodstop/dataprobleem uit, oordeel `insufficient_data`. Geen knoppen gebruikt. Geïnstalleerd 1.10.1. Run 101 ongewijzigd (64 trades / 6 clusters, netto −80,10, PF 0,436, t −2,34).
+- 2 HA-herstarts (19:47, 20:25): afscheid netjes gelogd, afstemming `in_orde`, max. drawdown 0,0 %, sluitreden onbekend 0,0 % → houdt over herstarts. Logboek sinds 19:27: geen nieuwe Gold Scalper-fouten (L-GS-010 eenmalig, blijft gepland).
+- Latency p99 408 ms (was 273; gesloten markt, geen handelscycli → geen toets).
+- Hypotheses H-GS-7 (bruto < kosten; 7 van ~20 uurblokken), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
+
+laatste ronde: 10-10 23:40, gemeten t/m 10-10 23:45
