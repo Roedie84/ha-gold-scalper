@@ -386,6 +386,46 @@ function niceStep(range, ticks) {
 
 // ------------------------------------------------------------- paneel -- //
 
+// --- rustig scrollen (1.9.6) ------------------------------------------- //
+// Op mobiel (vooral iOS, dat geen scroll anchoring kent) verspringt de pagina
+// als blokken tijdens het scrollen opnieuw worden opgebouwd; de live koers
+// doet dat meerdere keren per seconde. Daarom: tijdens aanraken en scrollen
+// (plus het uitrollen daarna) niets tekenen, en daarna in een keer bijwerken.
+const SCROLL = { tot: 0, aan: false, klaar: false };
+function volgScroll() {
+  if (SCROLL.klaar || typeof window === "undefined") return;
+  SCROLL.klaar = true;
+  const opt = { passive: true, capture: true };
+  const rust = (ms) => () => { SCROLL.tot = Math.max(SCROLL.tot, Date.now() + ms); };
+  window.addEventListener("scroll", rust(400), opt);
+  window.addEventListener("wheel", rust(400), opt);
+  window.addEventListener("touchmove", rust(400), opt);
+  window.addEventListener("touchstart", () => { SCROLL.aan = true; rust(400)(); }, opt);
+  // Na het loslaten rolt een veegbeweging nog na; scroll-events uit de
+  // shadow DOM komen niet altijd bij window, dus ruim wachten.
+  const los = () => { SCROLL.aan = false; rust(1200)(); };
+  window.addEventListener("touchend", los, opt);
+  window.addEventListener("touchcancel", los, opt);
+}
+const scrolltNog = () => SCROLL.aan || Date.now() < SCROLL.tot;
+// Een blok alleen vervangen als de HTML echt anders is: dezelfde HTML opnieuw
+// zetten bouwt het blok toch helemaal opnieuw op (en kan de hoogte even laten
+// verspringen).
+const HTML = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+const TEKST = Object.getOwnPropertyDescriptor(Node.prototype, "textContent");
+function onthoudHtml(el) {
+  Object.defineProperty(el, "innerHTML", {
+    configurable: true,
+    get() { return HTML.get.call(this); },
+    set(v) { const s = String(v); if (this.__html === s) return; this.__html = s; HTML.set.call(this, s); },
+  });
+  Object.defineProperty(el, "textContent", {
+    configurable: true,
+    get() { return TEKST.get.call(this); },
+    set(v) { this.__html = undefined; TEKST.set.call(this, v); },
+  });
+}
+
 class GoldScalperBrokerPanel extends HTMLElement {
   constructor() {
     super();
@@ -454,6 +494,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._afmelden();
     clearTimeout(this._herTimer); this._herTimer = null;
     if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+    clearTimeout(this._wachtT); clearTimeout(this._liveT); this._wachtT = this._liveT = null;
   }
 
   // ------------------------------------------------- live koers (1.8.1) -- //
@@ -531,7 +572,14 @@ class GoldScalperBrokerPanel extends HTMLElement {
   }
   _planLive() {
     if (this._raf || !this._actief) return;
-    this._raf = requestAnimationFrame(() => { this._raf = null; this._renderLive(); });
+    this._raf = requestAnimationFrame(() => {
+      this._raf = null;
+      if (scrolltNog()) {
+        if (!this._liveT) this._liveT = setTimeout(() => { this._liveT = null; this._planLive(); }, 300);
+        return;
+      }
+      this._renderLive();
+    });
   }
   _renderLive() {
     const d = this._eff();
@@ -650,6 +698,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
       this._tfMul = Number(b.dataset.m) || 1; this._offset = 0;
       this._renderTf(); this._teken();
     });
+    for (const el of this._root.querySelectorAll("[id]")) onthoudHtml(el);
+    volgScroll();
   }
 
   // ------------------------------------------------------------ tijd -- //
@@ -668,6 +718,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
   _nu() { return (this._nuOverride || Date.now()) / 1000; }
 
   _tik() {
+    if (scrolltNog()) return;
     const nu = new Date(this._nu() * 1000);
     this._q("#tijd").textContent = this._tf({ hour: "2-digit", minute: "2-digit" }).format(nu);
     const datum = this._tf({ weekday: "short", day: "numeric", month: "short" }).format(nu);
@@ -679,6 +730,13 @@ class GoldScalperBrokerPanel extends HTMLElement {
 
   // ----------------------------------------------------------- render -- //
   _render() {
+    if (scrolltNog()) {
+      if (!this._wachtT) this._wachtT = setTimeout(() => { this._wachtT = null; this._render(); }, 300);
+      return;
+    }
+    this._renderNu();
+  }
+  _renderNu() {
     const d = this._eff();
     const m = this._q("#meldingen");
     if (!d) {

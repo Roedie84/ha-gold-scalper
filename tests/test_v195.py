@@ -513,7 +513,8 @@ def test_dashboard_en_paneel_tonen_varianten():
 def test_versie_195():
     from gold_scalper import const
     manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.9.5"
+    # 1.9.6: niet meer vast op 1.9.5; de nieuwste versie bewaakt test_v196.
+    assert manifest["version"] == const.INTEGRATION_VERSION
     log = (PKG.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert log.split("\n## ")[1].startswith("1.9.5")
+    assert "\n## 1.9.5\n" in log
     assert "Geen strategiewijziging" in log.split("## 1.9.4")[0]

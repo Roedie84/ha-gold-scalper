@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 1.9.6
+
+* **Het paneel verspringt niet meer tijdens scrollen op mobiel.** De live
+  koers bouwde meerdere keren per seconde blokken opnieuw op, ook als er
+  niets veranderde. Op een telefoon (vooral iOS) schoof de pagina daardoor
+  tijdens het scrollen. Nu wordt een blok alleen vervangen als de HTML echt
+  anders is, en tijdens aanraken, scrollen en het uitrollen daarna wacht het
+  paneel met bijwerken; daarna in een keer. Geen strategiewijziging.
+
 ## 1.9.5
 
 * **Geen strategiewijziging, alleen meting.** Instappen, uitstappen,
