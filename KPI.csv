@@ -192,3 +192,6 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-09,DAG,gs_noodstop,0,1,
 2026-10-09,DAG,gs_sluitreden_onbekend_pct,3.1,64,run 101
 2026-10-09,DAG,gs_kosten_gemeten_pct,96.9,64,run 101
+2026-10-10 07:44,TUSSEN,gs_trades_nieuw,0,0,"weekend: status markt_gesloten sinds vr 23:00; run 101 64 trades / 6 clusters ongewijzigd"
+2026-10-10 07:44,TUSSEN,gs_latency_p99_ms,242.2,1,"gesloten markt, geen handelscycli (geen H-GS-8-toets)"
+2026-10-10 07:44,TUSSEN,gs_afstemming,in_orde,1,"open posities 0; noodstop off; dataprobleem off"

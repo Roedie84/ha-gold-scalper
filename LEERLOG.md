@@ -222,3 +222,11 @@ laatste ronde: 09-10 23:40, gemeten t/m 09-10 23:50
 - H-GS-10 (vrijdagsluiting ~13 min vroeg, flikkerende marketState) toets vrijdag 16-10. Geen release (geen gepland punt, geen bug; weekend).
 
 laatste ronde: 10-10 03:40, gemeten t/m 10-10 03:46
+
+## 10-10 07:40 · tussenronde
+- Weekend: status `markt_gesloten`, demo, handel aan, open posities 0, noodstop/dataprobleem uit, afstemming in_orde. Geen knoppen gebruikt. Geen trades sinds vrijdag 23:00 → run 101 ongewijzigd (64 trades / 6 clusters, netto −80,10, t −2,34, PF 0,44).
+- Logboek sinds 03:46: geen nieuwe Gold Scalper-meldingen. Latency p99 242 ms (gesloten markt, geen handelscycli → geen toets).
+- Meetbaarheid: `max_drawdown` 0,0 % is afronding (−80 op een demosaldo van ~10 mln = 0,0008 %); in % zegt hij op dit account niets — volgen of een absolute drawdown nodig is (geen voorstel nu).
+- Hypotheses H-GS-7 (bruto < kosten), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
+
+laatste ronde: 10-10 07:40, gemeten t/m 10-10 07:44
