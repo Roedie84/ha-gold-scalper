@@ -238,3 +238,11 @@ laatste ronde: 10-10 07:40, gemeten t/m 10-10 07:44
 - Hypotheses H-GS-7 (bruto < kosten, ~20 uurblokken nodig; nu 7), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd.
 
 laatste ronde: 10-10 11:40, gemeten t/m 10-10 11:50
+
+## 10-10 15:40 · tussenronde
+- Weekend: `markt_gesloten`, demo, handel aan, open posities 0, noodstop/dataprobleem uit, oordeel `insufficient_data`. Geen knoppen gebruikt. Geïnstalleerd **1.10.0** (12:04) en **1.10.1** (13:37). HA-herstarts 12:04, 13:37, 14:41. Run 101 ongewijzigd (64 trades / 6 clusters, netto −80,10, PF 0,436, t −2,34).
+- **L-GS-009 geverifieerd:** `max_drawdown` 99,9 → **0,0 %** om 13:37 en blijft 0,0 na de herstart van 14:41.
+- 1.10.0 eerste meetpunten: sluitreden onbekend 3,1 → **0,0 %** (2 trades achteraf ingevuld), afstemming `in_orde` sinds 12:04 en bewaard over 2 herstarts (was `nog_niet` na elke herstart). Kosten gemeten 96,9 %.
+- Hypotheses H-GS-7 (bruto < kosten, ~20 uurblokken nodig; nu 7), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
+
+laatste ronde: 10-10 15:40, gemeten t/m 10-10 15:45
