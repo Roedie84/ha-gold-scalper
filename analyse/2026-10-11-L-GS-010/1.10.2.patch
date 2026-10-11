@@ -1,0 +1,333 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 45272ea..8c8c3f3 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,22 @@
+ # Changelog — Gold Scalper
+ 
++## 1.10.2
++
++* **Geen strategiewijziging; foutafhandeling.** Instappen, uitstappen,
++  ordergrootte, risico en handelslogica zijn niet aangeraakt.
++* **Time-out op het positie-overzicht is een tijdelijke brokerfout.** Op
++  10-10 19:27 antwoordde IG niet binnen 15 s op `GET /positions` in de
++  voorcheck van de cyclus. Die fout werd niet afgevangen: Home Assistant
++  logde "Unexpected error fetching gold_scalper" met traceback en alle
++  entiteiten waren even onbeschikbaar. Nu gaat het zoals bij een mislukte
++  koers (1.7.0): het laatste beeld blijft staan (`koers_verouderd`,
++  `mislukte_opvraging: Positie-opvraging`), en in die cyclus wordt niets
++  beslist - geen instap, geen stop verplaatsen, geen sluiting. Na drie keer op
++  rij volgt een gewone updatefout (geen "Unexpected error").
++* De teller van mislukte opvragingen gaat pas terug naar nul als koers én
++  positie-overzicht binnen zijn; de logtekst noemt welke opvraging mislukte.
++* Tests: `test_release_1102.py` (5).
++
+ ## 1.10.1
+ 
+ * **Geen strategiewijziging; meetfout in de drawdown.** Instappen, uitstappen,
+diff --git a/README.md b/README.md
+index 9bb56c9..855a129 100644
+--- a/README.md
++++ b/README.md
+@@ -176,7 +176,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
+ Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
+ (1.0.1).
+ 
+-Huidige versie: **1.10.1** (zie `CHANGELOG.md`).
++Huidige versie: **1.10.2** (zie `CHANGELOG.md`).
+ 
+ Het domein blijft `gold_scalper`: bestaande entiteiten, databases en
+ instellingen werken ongewijzigd door.
+diff --git a/custom_components/gold_scalper/const.py b/custom_components/gold_scalper/const.py
+index 5224acf..2903aff 100644
+--- a/custom_components/gold_scalper/const.py
++++ b/custom_components/gold_scalper/const.py
+@@ -208,7 +208,7 @@ DISCLAIMER: Final = (
+ 
+ 
+ #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
+-INTEGRATION_VERSION: Final = "1.10.1"
++INTEGRATION_VERSION: Final = "1.10.2"
+ 
+ #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
+ #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
+diff --git a/custom_components/gold_scalper/coordinator.py b/custom_components/gold_scalper/coordinator.py
+index d52eb42..ad31f25 100644
+--- a/custom_components/gold_scalper/coordinator.py
++++ b/custom_components/gold_scalper/coordinator.py
+@@ -2049,12 +2049,6 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+         budget.mark("quote")
+ 
+         now = datetime.now(timezone.utc)
+-        if self._koers_mislukt:
+-            _LOGGER.info(
+-                "Koers weer beschikbaar na %d mislukte opvraging(en).",
+-                self._koers_mislukt,
+-            )
+-            self._koers_mislukt = 0
+         self._laatste_verse_koers_om = now
+         tick_age = (now - quote.time).total_seconds()
+ 
+@@ -2066,7 +2060,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+         self._bars_since_last_check = max(1, self._new_bars_this_cycle)
+         budget.mark("candles")
+ 
+-        open_positions_precheck = bool(await self._open_positions())
++        open_positions_precheck = await self._voorcheck_posities()
++        if isinstance(open_positions_precheck, dict):
++            return open_positions_precheck  # 1.10.2: vastgehouden beeld
+ 
+         # Posities die de broker zélf sloot - op de server-side stop of het
+         # doel - verdwijnen zonder dat wij er iets van merken. Zonder deze
+@@ -2550,7 +2546,40 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+         self._laatste_data = data
+         return data
+ 
+-    def _houd_laatste_data(self, err: Exception) -> dict | None:
++    async def _voorcheck_posities(self) -> bool | dict:
++        """Zijn er open posities? (voorcheck van de cyclus, 1.10.2)
++
++        Live op 10-10 19:27: "IG antwoordde niet binnen 15s op GET
++        /positions". Die fout liet de hele cyclus vallen als onverwachte fout
++        met traceback. Nu net als bij een mislukte koers (1.7.0): het laatste
++        beeld vasthouden (dict terug) en in deze cyclus niets beslissen - geen
++        instap, geen stop verplaatsen, geen sluiting. Na de drempel een gewone
++        ``UpdateFailed``.
++
++        De teller van mislukte opvragingen gaat pas hier terug naar nul, als
++        koers én positie-overzicht binnen zijn; anders zou een aanhoudende
++        time-out op /positions elke cyclus als de eerste tellen.
++        """
++        try:
++            heeft_posities = bool(await self._open_positions())
++        except VenueError as err:
++            vastgehouden = self._houd_laatste_data(err, wat="Positie-opvraging")
++            if vastgehouden is not None:
++                return vastgehouden
++            raise UpdateFailed(
++                f"Geen positie-overzicht van de broker: {err}"
++            ) from err
++        if self._koers_mislukt:
++            _LOGGER.info(
++                "Brokergegevens weer beschikbaar na %d mislukte opvraging(en).",
++                self._koers_mislukt,
++            )
++            self._koers_mislukt = 0
++        return heeft_posities
++
++    def _houd_laatste_data(
++        self, err: Exception, wat: str = "Koersopvraging"
++    ) -> dict | None:
+         """Laatste gegevens aanhouden na een mislukte koersopvraging (1.7.0).
+ 
+         Live op 7 oktober: de koersopvraging bij IG liep zes keer in
+@@ -2562,6 +2591,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+         aan, of None als de drempel voorbij is (dan de oude storing). De
+         cyclus beslist niets: geen signaal, geen instap, geen exitbeheer op
+         een oude koers. Stops en doelen staan bij de broker en werken door.
++
++        1.10.2: ook voor een mislukt positie-overzicht (``wat``); de teller
++        is gedeeld, dus ook dan geen instap tot de broker weer antwoordt.
+         """
+         self._koers_mislukt += 1
+         vorige = self._laatste_data
+@@ -2574,17 +2606,17 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+             or leeftijd > KOERS_HOUD_MAX_SECONDEN
+         ):
+             _LOGGER.warning(
+-                "Koersopvraging %d keer op rij mislukt (laatste verse koers "
+-                "%.0f s oud); entiteiten worden onbeschikbaar tot de koers "
+-                "terug is.", self._koers_mislukt, leeftijd,
++                "%s %d keer op rij mislukt (laatste verse koers "
++                "%.0f s oud); entiteiten worden onbeschikbaar tot de broker "
++                "weer antwoordt.", wat, self._koers_mislukt, leeftijd,
+             )
+             return None
+ 
+         _LOGGER.warning(
+-            "Koersopvraging mislukt (%d van max. %d op rij): %s. Laatste "
++            "%s mislukt (%d van max. %d op rij): %s. Laatste "
+             "gegevens aangehouden (koers %.0f s oud); geen nieuwe posities "
+-            "en geen exitbeheer tot er een verse koers is.",
+-            self._koers_mislukt, KOERS_HOUD_MAX_MISLUKT, err, leeftijd,
++            "en geen exitbeheer tot de broker weer antwoordt.",
++            wat, self._koers_mislukt, KOERS_HOUD_MAX_MISLUKT, err, leeftijd,
+         )
+         data = dict(vorige)
+         quote = vorige.get("quote")
+@@ -2595,6 +2627,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+             "koers_leeftijd_seconden": round(leeftijd, 1),
+             "koers_mislukt_op_rij": self._koers_mislukt,
+             "koers_fout": str(err)[:200],
++            "mislukte_opvraging": wat,
+             # Er is in deze cyclus niets geëvalueerd.
+             "signal": None,
+             "reject_reason": "koers verouderd: geen verse koers van de broker",
+diff --git a/custom_components/gold_scalper/manifest.json b/custom_components/gold_scalper/manifest.json
+index 439b6c8..957c5b3 100644
+--- a/custom_components/gold_scalper/manifest.json
++++ b/custom_components/gold_scalper/manifest.json
+@@ -10,7 +10,7 @@
+   "iot_class": "local_polling",
+   "issue_tracker": "https://github.com/Roedie84/ha-gold-scalper/issues",
+   "requirements": [],
+-  "version": "1.10.1",
++  "version": "1.10.2",
+   "dependencies": [
+     "http",
+     "frontend",
+diff --git a/tests/test_release_1101.py b/tests/test_release_1101.py
+index e3e40fb..4244387 100644
+--- a/tests/test_release_1101.py
++++ b/tests/test_release_1101.py
+@@ -108,8 +108,8 @@ def test_versie_1101():
+ 
+     pkg = Path(HIER).parent / "custom_components" / "gold_scalper"
+     manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
+-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.10.1"
++    assert manifest["version"] == const.INTEGRATION_VERSION
+     root = pkg.parent.parent
+-    assert "Huidige versie: **1.10.1**" in (root / "README.md").read_text(encoding="utf-8")
++    assert f"Huidige versie: **{const.INTEGRATION_VERSION}**" in (root / "README.md").read_text(encoding="utf-8")
+     log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+-    assert log.split("\n## ")[1].startswith("1.10.1")
++    assert "\n## 1.10.1" in log
+diff --git a/tests/test_release_1102.py b/tests/test_release_1102.py
+new file mode 100644
+index 0000000..636a9c7
+--- /dev/null
++++ b/tests/test_release_1102.py
+@@ -0,0 +1,133 @@
++"""1.10.2: time-out op het positie-overzicht is een tijdelijke brokerfout.
++
++Live op 10-10 19:27: "IG antwoordde niet binnen 15s op GET /positions" vanuit
++de positie-voorcheck in ``_async_update_data``. Die fout werd niet afgevangen,
++HA logde "Unexpected error fetching gold_scalper" met traceback en alle
++entiteiten waren 11 s onbeschikbaar. De koersopvraging vangt hetzelfde type al
++af (1.7.0). Nu de voorcheck ook: laatste beeld vasthouden, niets beslissen.
++"""
++from __future__ import annotations
++
++import asyncio
++import os
++import sys
++from datetime import datetime, timezone
++
++import pytest
++
++sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "custom_components"))
++sys.path.insert(0, os.path.dirname(__file__))
++
++from gold_scalper.broker.adapter import VenueError, VenueQuote  # noqa: E402
++from gold_scalper.const import KOERS_HOUD_MAX_MISLUKT  # noqa: E402
++
++FOUT = "IG antwoordde niet binnen 15s op GET /positions."
++
++
++def _opzet(tmp_path, monkeypatch):
++    from test_broker_cycle import ScriptedVenue, _coordinator
++    from test_unconfirmed_orders import _Signaal
++
++    import gold_scalper.coordinator as co
++
++    class TraagOverzicht(ScriptedVenue):
++        faalt: bool = False
++
++        async def quote(self, symbol=None):
++            half = self.spread / 2
++            return VenueQuote(bid=self.price - half, ask=self.price + half,
++                              time=datetime.now(timezone.utc), tradeable=True)
++
++        async def positions(self, symbol=None):
++            if self.faalt:
++                raise VenueError(FOUT)
++            return await super().positions(symbol)
++
++    aanroepen = []
++
++    def altijd(*args):
++        aanroepen.append(args)
++        return _Signaal()
++
++    monkeypatch.setattr(co, "evaluate", altijd)
++    venue = TraagOverzicht()
++    coordinator, _ = _coordinator(venue, tmp_path, monkeypatch)
++    coordinator.executor.venue = venue
++    coordinator._enabled = True
++    return coordinator, venue, aanroepen
++
++
++def test_timeout_op_posities_houdt_het_laatste_beeld(tmp_path, monkeypatch):
++    coordinator, venue, _ = _opzet(tmp_path, monkeypatch)
++    vers = asyncio.run(coordinator._async_update_data())
++    assert vers["koers_verouderd"] is False
++
++    venue.faalt = True
++    data = asyncio.run(coordinator._async_update_data())   # geen uitzondering
++
++    assert data["koers_verouderd"] is True
++    assert data["mislukte_opvraging"] == "Positie-opvraging"
++    assert "/positions" in data["koers_fout"]
++    assert data["signal"] is None
++    assert data["risk"]["state"] == coordinator.risk.as_dict()["state"]
++
++
++def test_bij_timeout_op_posities_wordt_niets_beslist(tmp_path, monkeypatch):
++    coordinator, venue, aanroepen = _opzet(tmp_path, monkeypatch)
++    asyncio.run(coordinator._async_update_data())
++    orders, evaluaties = len(venue.orders), len(aanroepen)
++
++    venue.faalt = True
++    for _ in range(KOERS_HOUD_MAX_MISLUKT):
++        asyncio.run(coordinator._async_update_data())
++
++    assert len(venue.orders) == orders, "instap zonder positie-overzicht"
++    assert len(aanroepen) == evaluaties, "strategie draaide zonder posities"
++
++
++def test_aanhoudende_timeout_wordt_een_gewone_updatefout(tmp_path, monkeypatch):
++    import gold_scalper.coordinator as co
++
++    coordinator, venue, _ = _opzet(tmp_path, monkeypatch)
++    asyncio.run(coordinator._async_update_data())
++    venue.faalt = True
++    for _ in range(KOERS_HOUD_MAX_MISLUKT):
++        asyncio.run(coordinator._async_update_data())
++    # UpdateFailed logt HA als gewone storing, niet als "Unexpected error".
++    with pytest.raises(co.UpdateFailed):
++        asyncio.run(coordinator._async_update_data())
++
++
++def test_zonder_eerder_beeld_meteen_updatefout(tmp_path, monkeypatch):
++    import gold_scalper.coordinator as co
++
++    coordinator, venue, _ = _opzet(tmp_path, monkeypatch)
++    venue.faalt = True
++    with pytest.raises(co.UpdateFailed):
++        asyncio.run(coordinator._async_update_data())
++
++
++def test_herstel_na_timeout_op_posities(tmp_path, monkeypatch):
++    coordinator, venue, _ = _opzet(tmp_path, monkeypatch)
++    asyncio.run(coordinator._async_update_data())
++    venue.faalt = True
++    asyncio.run(coordinator._async_update_data())
++    venue.faalt = False
++    data = asyncio.run(coordinator._async_update_data())
++    assert data["koers_verouderd"] is False
++    assert coordinator.koers_verouderd is False
++
++
++def test_versie_1102():
++    import json
++    from pathlib import Path
++
++    from gold_scalper import const
++
++    pkg = Path(os.path.dirname(__file__)).parent / "custom_components" / "gold_scalper"
++    manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
++    assert manifest["version"] == const.INTEGRATION_VERSION == "1.10.2"
++    root = pkg.parent.parent
++    assert "Huidige versie: **1.10.2**" in (root / "README.md").read_text(encoding="utf-8")
++    log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
++    assert log.split("\n## ")[1].startswith("1.10.2")

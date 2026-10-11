@@ -72,7 +72,9 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 
 
 ## L-GS-010 · time-out bij de positie-voorcheck als gewone, tijdelijke fout behandelen
-- Status: **gepland** (zelf bouwen: bug in foutafhandeling; geen strategie-, risico- of handelswijziging) — bouwen in een dagafsluiting (niet in het weekend nodig).
+- Status: **gebouwd 1.10.2 lokaal, niet gereleased** (11-10 03:40): suite 2031 groen, 5 skipped; 6 nieuwe tests (`tests/test_release_1102.py`, 5 falen op 1.10.1). Push naar main werd door de toestemmingscontrole geweigerd → patch in `analyse/2026-10-11-L-GS-010/1.10.2.patch` (toepassen op main b3be347 met `git apply`). Wacht op Ruud: zelf pushen of de volgende ronde toestemming geven.
+- Uitvoering: voorcheck in `_voorcheck_posities()`; `VenueError` → `_houd_laatste_data(err, wat="Positie-opvraging")` (laatste beeld, `koers_verouderd`, niets beslissen), na 3× op rij `UpdateFailed`; teller pas terug na koers én posities (anders escaleert een aanhoudende time-out nooit).
+- (eerder: gepland, zelf bouwen: bug in foutafhandeling; geen strategie-, risico- of handelswijziging)
 - Onderbouwing: 10-10 19:27 (markt dicht) 1× `VenueError` "IG antwoordde niet binnen 15s op GET /positions" vanuit `_open_positions()` in `_async_update_data` (coordinator ~2069). Die is niet afgevangen → HA logt "Unexpected error" met traceback en de cyclus faalt. De koersopvraging (~2031) vangt hetzelfde type wél af en houdt het laatste beeld vast zonder te beslissen.
 - Bouw: `VenueError` bij de voorcheck afvangen zoals bij de koers: `_houd_laatste_data(err)` of `UpdateFailed`, in deze cyclus niets beslissen (geen instap, geen stopwijziging); test die een time-out op /positions nabootst.
 - Verwacht effect: geen "Unexpected error"-tracebacks meer voor broker-time-outs; gedrag in die cyclus blijft "niets doen".

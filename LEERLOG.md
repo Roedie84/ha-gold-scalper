@@ -262,3 +262,12 @@ laatste ronde: 10-10 19:40, gemeten t/m 10-10 19:45
 - Hypotheses H-GS-7 (bruto < kosten; 7 van ~20 uurblokken), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
 
 laatste ronde: 10-10 23:40, gemeten t/m 10-10 23:45
+
+## 11-10 03:40 · dagafsluiting 10-10
+- Zaterdag, markt dicht: 0 trades, demo, handel aan, geen knoppen. Geïnstalleerd 1.10.1. 12 HA-herstarts (08:20-20:25), netjes afgesloten. Recorder: automation 03:00 purge (o.a. Gold Scalper latency p99, status, evaluaties nu uitgesloten) + repack → historie van die sensoren is niet meer meetbaar, alleen de actuele stand.
+- Dag 10-10 gemeten: drawdown 317 min fout (99,9 % tot 13:37, daarna 0,0 door 1.10.1); afstemming `nog_niet` 08:20-12:04, daarna `in_orde` over 9 herstarts (1.10.0); dataprobleem 2× 10 s (00:08, 00:14); 1 "Unexpected error" 19:27 (entiteiten 11 s onbeschikbaar). Latency p99 253 / p50 183 ms (gesloten markt, geen toets).
+- **Handelsweek 06-10..09-10:** 303 trades, netto −343,09 = bruto +110,57 − kosten 453,66 → per trade −1,13 / +0,37 / 1,50; kosten 4,1× het bruto. Netto/trade per dag −1,61 → −1,43 → −0,70 (tijdstops vanaf 08-10). t_cluster run 100 −3,28 (16), run 101 −2,34 (6). Netto-verlies is aangetoond; een bruto-edge niet: run 101 t_bruto 0,62 bij 7 blokken, ~73 blokken nodig bij deze sd.
+- H-GS-7 (bruto < kosten): houdt over de hele week (0,37 tegen 1,50/trade). H-GS-9 (sluitreden onbekend door herstarts) gesloten: 1.10.0 vult achteraf in, 0,0 % na 12 herstarts. H-GS-10 (vrijdagsluiting ~13 min vroeg): toets vr 16-10.
+- **L-GS-010 gebouwd als 1.10.2** (voorcheck-time-out → laatste beeld vasthouden, niets beslissen; suite 2031 groen, 6 nieuwe tests), maar **niet gereleased**: push naar main geweigerd door de toestemmingscontrole. Patch in `analyse/2026-10-11-L-GS-010/`. Geen HACS-verversing.
+
+laatste ronde: 11-10 03:40, gemeten t/m 11-10 03:45

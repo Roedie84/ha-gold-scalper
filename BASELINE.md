@@ -19,3 +19,6 @@
 | Rooster-klokrand-WARNINGs | 2 per nacht | 08-10 | 09-10 03:40 |
 | Dag 09-10 per trade (run 100+101) | netto −0,70 · bruto +0,77 · kosten 1,47 USD | 180 trades | 10-10 03:40 |
 | Run 101 uurblokken | 7 blokken: t_netto −2,34, t_bruto +0,62, bruto +2,58/blok, kosten ~14/blok | 64 trades | 10-10 03:40 |
+| Handelsweek 06-10..09-10 per trade | netto −1,13 · bruto +0,37 · kosten 1,50 USD (kosten/bruto 4,1) | 303 trades (run 100: 16 clusters, t −3,28; run 101: 6, t −2,34) | 11-10 03:40 |
+| Run 101 uurblokken nodig | t_bruto 2 bij ~73 blokken (bruto +2,58/blok, sd 10,97); kosten 14,0/blok | 7 blokken | 11-10 03:40 |
+| Latency gesloten markt p50 / p99 | 183 / 253 ms (geen handelscycli; geen referentie voor handel) | n=2000 | 11-10 03:40 |
