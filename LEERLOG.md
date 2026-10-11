@@ -271,3 +271,10 @@ laatste ronde: 10-10 23:40, gemeten t/m 10-10 23:45
 - **L-GS-010 gebouwd als 1.10.2** (voorcheck-time-out → laatste beeld vasthouden, niets beslissen; suite 2031 groen, 6 nieuwe tests), maar **niet gereleased**: push naar main geweigerd door de toestemmingscontrole. Patch in `analyse/2026-10-11-L-GS-010/`. Geen HACS-verversing.
 
 laatste ronde: 11-10 03:40, gemeten t/m 11-10 03:45
+
+## 11-10 07:40 · tussenronde
+- Zondag, markt dicht (opent zo ~23:00): `markt_gesloten`, demo, handel aan, open posities 0, noodstop/dataprobleem uit, oordeel `insufficient_data`. Geen knoppen gebruikt. Geïnstalleerd 1.10.1 (geen nieuwere release; 1.10.2 ligt als patch klaar, L-GS-010). Run 101 ongewijzigd (64 trades / 6 clusters, netto −80,10, PF 0,436, t −2,34).
+- Geen HA-herstart sinds 20:26; afstemming `in_orde`, max. drawdown 0,0 %, sluitreden onbekend 0,0 %. Logboek 03:45-07:45: 0 Gold Scalper-fouten. Latency p99 258 ms (gesloten markt, geen toets).
+- Hypotheses H-GS-7 (bruto < kosten; 7 van ~20 uurblokken, ~73 nodig voor een bruto-toets), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release (L-GS-010 niet acuut: bij een time-out beslist de cyclus niets; wacht op de dagafsluiting/toestemming).
+
+laatste ronde: 11-10 07:40, gemeten t/m 11-10 07:45
