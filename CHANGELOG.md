@@ -1,5 +1,22 @@
 # Changelog — Gold Scalper
 
+## 1.10.2
+
+* **Geen strategiewijziging; foutafhandeling.** Instappen, uitstappen,
+  ordergrootte, risico en handelslogica zijn niet aangeraakt.
+* **Time-out op het positie-overzicht is een tijdelijke brokerfout.** Op
+  10-10 19:27 antwoordde IG niet binnen 15 s op `GET /positions` in de
+  voorcheck van de cyclus. Die fout werd niet afgevangen: Home Assistant
+  logde "Unexpected error fetching gold_scalper" met traceback en alle
+  entiteiten waren even onbeschikbaar. Nu gaat het zoals bij een mislukte
+  koers (1.7.0): het laatste beeld blijft staan (`koers_verouderd`,
+  `mislukte_opvraging: Positie-opvraging`), en in die cyclus wordt niets
+  beslist - geen instap, geen stop verplaatsen, geen sluiting. Na drie keer op
+  rij volgt een gewone updatefout (geen "Unexpected error").
+* De teller van mislukte opvragingen gaat pas terug naar nul als koers én
+  positie-overzicht binnen zijn; de logtekst noemt welke opvraging mislukte.
+* Tests: `test_release_1102.py` (5).
+
 ## 1.10.1
 
 * **Geen strategiewijziging; meetfout in de drawdown.** Instappen, uitstappen,

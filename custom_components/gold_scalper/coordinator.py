@@ -2049,12 +2049,6 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         budget.mark("quote")
 
         now = datetime.now(timezone.utc)
-        if self._koers_mislukt:
-            _LOGGER.info(
-                "Koers weer beschikbaar na %d mislukte opvraging(en).",
-                self._koers_mislukt,
-            )
-            self._koers_mislukt = 0
         self._laatste_verse_koers_om = now
         tick_age = (now - quote.time).total_seconds()
 
@@ -2066,7 +2060,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._bars_since_last_check = max(1, self._new_bars_this_cycle)
         budget.mark("candles")
 
-        open_positions_precheck = bool(await self._open_positions())
+        open_positions_precheck = await self._voorcheck_posities()
+        if isinstance(open_positions_precheck, dict):
+            return open_positions_precheck  # 1.10.2: vastgehouden beeld
 
         # Posities die de broker zélf sloot - op de server-side stop of het
         # doel - verdwijnen zonder dat wij er iets van merken. Zonder deze
@@ -2550,7 +2546,40 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._laatste_data = data
         return data
 
-    def _houd_laatste_data(self, err: Exception) -> dict | None:
+    async def _voorcheck_posities(self) -> bool | dict:
+        """Zijn er open posities? (voorcheck van de cyclus, 1.10.2)
+
+        Live op 10-10 19:27: "IG antwoordde niet binnen 15s op GET
+        /positions". Die fout liet de hele cyclus vallen als onverwachte fout
+        met traceback. Nu net als bij een mislukte koers (1.7.0): het laatste
+        beeld vasthouden (dict terug) en in deze cyclus niets beslissen - geen
+        instap, geen stop verplaatsen, geen sluiting. Na de drempel een gewone
+        ``UpdateFailed``.
+
+        De teller van mislukte opvragingen gaat pas hier terug naar nul, als
+        koers én positie-overzicht binnen zijn; anders zou een aanhoudende
+        time-out op /positions elke cyclus als de eerste tellen.
+        """
+        try:
+            heeft_posities = bool(await self._open_positions())
+        except VenueError as err:
+            vastgehouden = self._houd_laatste_data(err, wat="Positie-opvraging")
+            if vastgehouden is not None:
+                return vastgehouden
+            raise UpdateFailed(
+                f"Geen positie-overzicht van de broker: {err}"
+            ) from err
+        if self._koers_mislukt:
+            _LOGGER.info(
+                "Brokergegevens weer beschikbaar na %d mislukte opvraging(en).",
+                self._koers_mislukt,
+            )
+            self._koers_mislukt = 0
+        return heeft_posities
+
+    def _houd_laatste_data(
+        self, err: Exception, wat: str = "Koersopvraging"
+    ) -> dict | None:
         """Laatste gegevens aanhouden na een mislukte koersopvraging (1.7.0).
 
         Live op 7 oktober: de koersopvraging bij IG liep zes keer in
@@ -2562,6 +2591,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         aan, of None als de drempel voorbij is (dan de oude storing). De
         cyclus beslist niets: geen signaal, geen instap, geen exitbeheer op
         een oude koers. Stops en doelen staan bij de broker en werken door.
+
+        1.10.2: ook voor een mislukt positie-overzicht (``wat``); de teller
+        is gedeeld, dus ook dan geen instap tot de broker weer antwoordt.
         """
         self._koers_mislukt += 1
         vorige = self._laatste_data
@@ -2574,17 +2606,17 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             or leeftijd > KOERS_HOUD_MAX_SECONDEN
         ):
             _LOGGER.warning(
-                "Koersopvraging %d keer op rij mislukt (laatste verse koers "
-                "%.0f s oud); entiteiten worden onbeschikbaar tot de koers "
-                "terug is.", self._koers_mislukt, leeftijd,
+                "%s %d keer op rij mislukt (laatste verse koers "
+                "%.0f s oud); entiteiten worden onbeschikbaar tot de broker "
+                "weer antwoordt.", wat, self._koers_mislukt, leeftijd,
             )
             return None
 
         _LOGGER.warning(
-            "Koersopvraging mislukt (%d van max. %d op rij): %s. Laatste "
+            "%s mislukt (%d van max. %d op rij): %s. Laatste "
             "gegevens aangehouden (koers %.0f s oud); geen nieuwe posities "
-            "en geen exitbeheer tot er een verse koers is.",
-            self._koers_mislukt, KOERS_HOUD_MAX_MISLUKT, err, leeftijd,
+            "en geen exitbeheer tot de broker weer antwoordt.",
+            wat, self._koers_mislukt, KOERS_HOUD_MAX_MISLUKT, err, leeftijd,
         )
         data = dict(vorige)
         quote = vorige.get("quote")
@@ -2595,6 +2627,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "koers_leeftijd_seconden": round(leeftijd, 1),
             "koers_mislukt_op_rij": self._koers_mislukt,
             "koers_fout": str(err)[:200],
+            "mislukte_opvraging": wat,
             # Er is in deze cyclus niets geëvalueerd.
             "signal": None,
             "reject_reason": "koers verouderd: geen verse koers van de broker",

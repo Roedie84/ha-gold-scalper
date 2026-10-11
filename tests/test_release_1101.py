@@ -108,8 +108,8 @@ def test_versie_1101():
 
     pkg = Path(HIER).parent / "custom_components" / "gold_scalper"
     manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == const.INTEGRATION_VERSION == "1.10.1"
+    assert manifest["version"] == const.INTEGRATION_VERSION
     root = pkg.parent.parent
-    assert "Huidige versie: **1.10.1**" in (root / "README.md").read_text(encoding="utf-8")
+    assert f"Huidige versie: **{const.INTEGRATION_VERSION}**" in (root / "README.md").read_text(encoding="utf-8")
     log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert log.split("\n## ")[1].startswith("1.10.1")
+    assert "\n## 1.10.1" in log
