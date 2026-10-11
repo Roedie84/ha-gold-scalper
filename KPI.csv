@@ -237,3 +237,6 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-11 15:40,TUSSEN,gs_herstarts,20,0,"11:47-15:33; afstemming in_orde, max drawdown 0.0 %, sluitreden onbekend 0.0 %; 0 Gold Scalper-fouten"
 2026-10-11 19:45,TUSSEN,gs_trades_nieuw,0,0,"markt gesloten (zondag); run 101 64 trades/6 clusters, netto -80.10, PF 0.436, t -2.34"
 2026-10-11 19:45,TUSSEN,gs_afstemming_ok,1,10,"in_orde over 10 herstarts 15:49-18:09; drawdown 0.0, sluitreden onbekend 0.0"
+2026-10-11 23:45,TUSSEN,gs_trades,64,6,"markt_gesloten; run 101 ongewijzigd (netto -80.10, PF 0.436, t -2.34)"
+2026-10-11 23:45,TUSSEN,gs_latency_p99_ms,279,0,"gesloten markt, geen toets"
+2026-10-11 23:45,TUSSEN,gs_herstarts,8,0,"21:02-23:31; 1.10.2 actief sinds 23:31 (L-GS-010); afstemming in_orde, max drawdown 0.0 %, sluitreden onbekend 0.0 %"
