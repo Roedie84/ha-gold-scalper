@@ -229,3 +229,6 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-11 07:45,TUSSEN,gs_trades,0,0,"zondag markt dicht"
 2026-10-11 07:45,TUSSEN,gs_fouten_logboek,0,0,"03:45-07:45"
 2026-10-11 07:45,TUSSEN,gs_latency_p99_ms,258,1,"gesloten markt, geen toets"
+2026-10-11 11:40,TUSSEN,gs_trades,0,0,"zondag markt dicht"
+2026-10-11 11:40,TUSSEN,gs_fouten_logboek,0,0,"07:45-11:40; herstarts 08:40/10:15: afstemming in_orde, drawdown 0.0"
+2026-10-11 11:40,TUSSEN,gs_latency_p99_ms,328,1,"gesloten markt, geen toets"
