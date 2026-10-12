@@ -341,3 +341,14 @@ laatste ronde: 12-10 07:40, gemeten t/m 12-10 07:42
 - Hypotheses H-GS-7 (bruto < kosten), H-GS-10 (vrijdagsluiting, toets 16-10). Geen release.
 
 laatste ronde: 12-10 11:40, gemeten t/m 12-10 11:45
+
+## 12-10 15:40 · tussenronde
+- **Strategiewissel (chatsessie, besluit Ruud):** 2.0.0 daghandel (L-GS-014) 14:43, 2.0.1 15:00, **2.1.0 combinatie daghandel + scalpen** (L-GS-015) 15:42, 2.1.1 15:56 (nog niet actief). Run 101 afgesloten 15:04 → runs 102-104 → **run 105 sinds 15:46**. Hervatten-knop om 15:09 gebruikt (niet door deze ronde); logregel "Handmatige hervatting na: None" mist de reden.
+- **Slot run 101 (scalpen):** 128 trades, netto −196,66 (−1,54/trade); 11:45-14:41 nog 14 trades, netto −40,72 (−2,91/trade). H-GS-7 (bruto < kosten) bevestigd en gesloten met de strategie.
+- Run 105 t/m 15:55: 3 scalptrades (netto −0,99, bruto +1,10, kosten 2,09), 0 daghandeltrades, 1 scalppositie open. Geen oordeel. Toetsregel daghandel: ≥ 100 trades en t ≥ 2 over handelsdagen → bij 1-3 per dag ~35-100 handelsdagen. De oordeeltekst noemt nog "sub-minuut handel" (scalpwoorden).
+- **Gevonden:** de optie *Piramide* staat aan (WARNING bij elke start, ook 15:46). Bij daghandel genegeerd, bij de combinatie weer actief voor scalpposities, terwijl bijkopen niet in administratie/afstemming komt → **L-GS-016 (open)**: optie uit.
+- Afstemming `in_orde`, drawdown 0,0 %, noodstop/dataprobleem uit, demo. Latency p99 736 ms (herstarts). 0 Gold Scalper-fouten.
+- **L-GS-011** opnieuw op 2.1.1 gezet (conflict met 1.11.0 opgelost); volledige suite 2077 groen, 5 skipped; release als 2.1.2 in de dagafsluiting van 13-10.
+- Hypotheses: H-GS-10 (vrijdagsluiting, toets 16-10); nieuw **H-GS-11**: daghandelkosten ≈ 20 % van de beweging (backtest) → per daghandeltrade kosten/ATR meten. Geen release (chatsessie releaset vandaag al 4×).
+
+laatste ronde: 12-10 15:40, gemeten t/m 12-10 15:55

@@ -81,7 +81,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Meten na bouw: 0 "Unexpected error fetching gold_scalper" in system_log; time-outs zichtbaar als warning/telling.
 
 ## L-GS-011 · verdwenen positie: sluitmoment van de broker, niet het moment van ontdekken
-- Status: **gepland (zelf bouwen: meetfout)** — gebouwd en getest 12-10 03:40 als patch (`analyse/2026-10-12-L-GS-011/sluitmoment.patch`, past op main 7cc5f95; suite 2036 groen, 5 skipped; 4 nieuwe tests in `tests/test_release_1104.py`, falen op 1.10.3). Niet gereleased: vandaag al 1.10.3, niet acuut. Release als 1.10.4 in de dagafsluiting van 13-10 (versie in manifest/const + CHANGELOG nog toevoegen).
+- Status: **gepland (zelf bouwen: meetfout)** — 12-10 15:40 opnieuw op main d7f488d (2.1.1) gezet: `analyse/2026-10-12-L-GS-011/sluitmoment-2.1.1.patch` (conflict met 1.11.0 opgelost: de aanroep staat nu binnen de per-trade-`try`); release als **2.1.2** in de dagafsluiting van 13-10, mits de chatsessie dan niet net gereleased heeft. Eerder: gebouwd en getest 12-10 03:40 als patch (`analyse/2026-10-12-L-GS-011/sluitmoment.patch`, past op main 7cc5f95; suite 2036 groen, 5 skipped; 4 nieuwe tests in `tests/test_release_1104.py`, falen op 1.10.3). Niet gereleased: vandaag al 1.10.3, niet acuut. Release als 1.10.4 in de dagafsluiting van 13-10 (versie in manifest/const + CHANGELOG nog toevoegen).
 - Onderbouwing: 12-10 trade 78 (geopend 02:19:12): IG sloot hem ~02:21:50 (open posities → onbeschikbaar 02:21:52); door de storing (1.10.3) pas om 03:21:54 afgerekend. Sluittijd = 03:21:54, looptijd ~62 min i.p.v. ~2,5 min; cluster 8 duur 66,9 min; gem. looptijd run 101 323,7 s is daardoor ~45 s te hoog (1 van 78). Oorzaak: `_settle_vanished_positions` → `_record_broker_close` zet `close_time = now`; het transactieoverzicht levert `closed_at` (`dateUtc`), dat alleen `_boek_brokerprijs` (latere correctie) overneemt. Ook na elke HA-herstart met een in de tussentijd gesloten positie.
 - Bouw: `broker_sluitmoment(werkelijk, open_time, now)` (alleen met tijd, niet vóór opening, niet > now+1 min); `_record_broker_close(..., gesloten_om=)` gebruikt dat voor sluittijd en looptijd. Activiteitsdatum bewust niet (tijdzone van IG v3 niet eenduidig). Geen handelslogica, risico of stop/doel geraakt.
 - Verwacht effect: sluittijd en looptijd van laat afgerekende trades gelijk aan de broker (±10 s); clusters niet meer kunstmatig verlengd.
@@ -93,3 +93,18 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Voorstel: in `_settle_vanished_positions` per trade een onverwachte fout afvangen, éénmaal met traceback loggen, die trade voorlopig laten staan (herkansing volgende cyclus) en de rest van de cyclus doorlaten; na N cycli op rij voor dezelfde trade een reparatiemelding. Geen instap in een cyclus waarin de afwikkeling faalde (conservatief).
 - Verwacht effect: een afwikkelfout kost één trade vertraging, niet het beheer van alle posities.
 - Meten: 0 "Unexpected error fetching gold_scalper" door afwikkelfouten; open posities blijven beheerd (tijdstops vuren) tijdens zo'n fout.
+
+## L-GS-014 · van scalpen naar daghandel
+- Status: **gebouwd 2.0.0/2.0.1** (12-10 14:43/15:00, chatsessie; besluit Ruud 12-10). Opgevolgd door L-GS-015 (combinatie) in 2.1.0. Toetsregel vooraf (CHANGELOG 2.0.0): na ≥ 100 daghandeltrades netto > 0 met t ≥ 2 over handelsdagen; anders geen voordeel. Leerronde meet per strategie (`per_strategie` op sensor Trades).
+- Afsluiting run 101 (scalpen, 12-10 15:04): 128 trades, netto −196,66 USD (−1,54/trade); t_cluster −3,34 bij 10 clusters (11:45). H-GS-7 (bruto < kosten bij scalpen) daarmee bevestigd en gesloten.
+
+## L-GS-015 · combinatie daghandel + scalpen
+- Status: **gebouwd 2.1.0/2.1.1** (12-10 15:42/15:56, chatsessie; besluit Ruud 12-10). Run 105 sinds 15:46 (`combinatie-1.0.0`).
+- Meten: per strategie trades, netto/bruto/kosten per trade, kosten/ATR per daghandeltrade (backtest ~20 % van de beweging), t over handelsdagen. Bij ~1-3 daghandeltrades per dag zijn ≥ 100 trades pas na ~35-100 handelsdagen bereikt: tot die tijd geen oordeel.
+
+## L-GS-016 · piramide-instelling uit zolang bijkopen niet in de administratie komt
+- Status: **open** (instelling = risico/handelslogica: Ruud beslist; zelf zet de leerronde niets om).
+- Onderbouwing: de log meldt bij elke start "Piramide staat aan, maar bijkopen wordt nog niet vastgelegd in de administratie of de afstemming" (12-10 15:08, 15:11, 15:46). In 2.0.x (alleen daghandel) werd de optie genegeerd; sinds 2.1.0 (combinatie) geldt hij weer voor scalpposities (`coordinator.py` r. 3085). Elke toevoeging wordt dan bij de afstemming een onbekende positie: de administratie en de per-strategie-meting van run 105 kloppen dan niet meer, en dat is precies wat het onderzoek moet meten.
+- Voorstel: zet in de opties *Piramide* uit (of: de code negeert de optie zolang bijkopen niet wordt vastgelegd, zoals bij daghandel).
+- Verwacht effect: 0 onbekende posities door bijkopen; afstemming blijft `in_orde`.
+- Meten: WARNING "Piramide staat aan" verdwijnt bij de volgende start; afstemming `afwijkingen` 0; geen posities zonder trade-rij.

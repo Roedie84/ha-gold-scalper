@@ -267,3 +267,8 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-12 11:45,TUSSEN,gs_latency_p99_ms,790.9,2000,"p50 215; max 5591; 7 HA-herstarts 08:26-10:53"
 2026-10-12 11:45,TUSSEN,gs_tijdstop_240_overeenkomst_pct,96.9,64,"8 uurblokken; 720 vs 240 -0.19/trade (t -0.26), geen tijdstop -0.69 (t -0.88); geen oordeel (<20)"
 2026-10-12 11:45,TUSSEN,gs_afstemming,in_orde,114,"sluitreden onbekend 0.0; 0 fouten; 0 voorcheck-time-outs"
+2026-10-12 15:55,TUSSEN,gs_run101_netto_usd,-196.66,128,"slot run 101 (scalpen) 15:04; -1.54/trade; 11:45-14:41 14 trades -40.72"
+2026-10-12 15:55,TUSSEN,gs_run105_scalp_netto_usd,-0.99,3,"combinatie sinds 15:46; bruto +1.10, kosten 2.09; 0 daghandeltrades"
+2026-10-12 15:55,TUSSEN,gs_latency_p99_ms,735.6,2000,"6 HA-herstarts 12:38-15:43"
+2026-10-12 15:55,TUSSEN,gs_afstemming,in_orde,0,"run 105: nog geen gesloten trades af te stemmen; sluitreden onbekend 0.0"
+2026-10-12 15:55,TUSSEN,gs_piramide_optie_aan,1,3,"WARNING 15:08, 15:11, 15:46; actief voor scalp bij combinatie -> L-GS-016"
