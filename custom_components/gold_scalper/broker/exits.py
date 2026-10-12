@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,6 +78,10 @@ class ExitConfig:
 
     #: Harde bovengrens op de positieduur, ongeacht resultaat.
     max_hold_seconds: int = 900
+
+    #: 2.0.0 (daghandel): sluit vanaf dit uur (UTC, decimaal: 20.75 = 20:45)
+    #: en elke positie die op een eerdere UTC-dag opende. None: uit.
+    sluit_om_uur_utc: float | None = None
 
 
 @dataclass(slots=True)
@@ -137,6 +141,24 @@ class ExitManager:
         profit_per_oz = (exit_price - open_price) * direction
         profit_atr = profit_per_oz / atr
         age = (now - opened_at).total_seconds()
+
+        # --- 2.0.0: einde handelsdag -------------------------------------------
+        if self.config.sluit_om_uur_utc is not None:
+            nu_utc = now.astimezone(timezone.utc) if now.tzinfo else now
+            open_utc = (
+                opened_at.astimezone(timezone.utc) if opened_at.tzinfo else opened_at
+            )
+            uur = nu_utc.hour + nu_utc.minute / 60.0
+            if uur >= self.config.sluit_om_uur_utc or open_utc.date() < nu_utc.date():
+                return ExitAction(
+                    "close",
+                    reason=(
+                        "einde handelsdag: daghandel sluit uiterlijk om "
+                        f"{int(self.config.sluit_om_uur_utc):02d}:"
+                        f"{round(self.config.sluit_om_uur_utc % 1 * 60):02d} UTC, bij "
+                        f"{profit_per_oz:+.3f} USD/oz"
+                    ),
+                )
 
         # --- Harde tijdslimiet ------------------------------------------------
         if age >= self.config.max_hold_seconds:

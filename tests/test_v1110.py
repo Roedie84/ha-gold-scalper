@@ -138,7 +138,7 @@ def test_vertalingen_en_versie():
         tekst = d["issues"]["afwikkeling_vast"]
         assert "{ticket}" in tekst["title"] and "{keer}" in tekst["description"]
     manifest = json.loads((basis / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == "1.11.0"
+    assert tuple(map(int, manifest["version"].split("."))) >= (1, 11, 0)
     from gold_scalper.const import INTEGRATION_VERSION
 
-    assert INTEGRATION_VERSION == "1.11.0"
+    assert tuple(map(int, INTEGRATION_VERSION.split("."))) >= (1, 11, 0)

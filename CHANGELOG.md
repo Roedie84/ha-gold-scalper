@@ -1,5 +1,35 @@
 # Changelog — Gold Scalper
 
+## 2.0.0
+
+* **Van scalpen naar daghandel (L-GS-014, besluit Ruud 12-10-2026).** Nieuwe
+  instelling *Strategie*, standaard **daghandel**; *scalpen* blijft kiesbaar.
+  Een andere strategie is een andere opzet en start dus een nieuwe run
+  (`strategy_version` `daghandel-1.0.0`).
+* **Waarom.** De scalper verloor ~1,5 USD/oz per trade (run 101: 126 trades,
+  bruto +7, kosten 192): bij trades van vier minuten zijn de kosten even
+  groot als de beweging. Vijf vooraf vastgelegde daghandelopzetten getoetst
+  op 2011-2018 (Dukascopy, 160.000 kwartierbars) en IG juni-oktober 2026.
+  De beste, trendvolgend op uurbasis: netto +0,10 / +0,17 / -0,02 ATR(15m)
+  per trade (2011-14 / 2015-18 / IG 2026). Kosten ~20% van de beweging in
+  plaats van ~100%. **Geen aantoonbaar voordeel** (t < 1): dit draait op
+  demo om het te meten; de livepoort blijft dicht.
+* **Regels** (`strategy/daghandel.py`, gelijk aan de backtest; 89 van 91
+  signalen identiek op feb-apr 2016):
+  * richting: uur-EMA20 boven/onder EMA50 (alleen afgesloten uren);
+  * instap: slot door het hoog/laag van de 80 kwartierbars ervóór, alleen
+    07:00-17:00 UTC, hooguit één positie, 15 min wachten na een instap;
+  * stop 4 x ATR(15m), geen doel;
+  * uitstap: volgstop 6 x ATR vanaf 2 x ATR winst, geen tijdstop, geen
+    break-even, uiterlijk **20:45 UTC dicht** (ook elke positie van een
+    eerdere dag): geen nachtkosten, geen gat over de dagpauze.
+* `ExitConfig.sluit_om_uur_utc` (nieuw, standaard uit voor scalpen).
+* Bij daghandel geen tijdstopvarianten (er is geen tijdstop) en geen
+  pyramiden.
+* Toetsregel vooraf: na >= 100 trades netto > 0 met t >= 2 over handelsdagen;
+  anders heeft ook deze opzet geen voordeel.
+* Tests: `test_v200_daghandel.py` (16).
+
 ## 1.11.0
 
 * **Geen strategiewijziging; foutafhandeling (L-GS-012).** Instapsignalen,

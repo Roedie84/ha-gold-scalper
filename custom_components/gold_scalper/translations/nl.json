@@ -123,7 +123,11 @@
           "pyramid_trigger_atr": "Bijkopen vanaf winst in ATR",
           "pyramid_max_additions": "Maximaal aantal toevoegingen",
           "use_schedule": "Handelstijden controleren tegen een eigen rooster",
-          "close_buffer_minutes": "Geen nieuwe posities zoveel minuten voor sluiting"
+          "close_buffer_minutes": "Geen nieuwe posities zoveel minuten voor sluiting",
+          "strategie": "Strategie"
+        },
+        "data_description": {
+          "strategie": "Daghandel: uitbraak uit het kanaal van 20 uur in de richting van de uurtrend, stop 4 x ATR, volgstop, uiterlijk om 20:45 UTC dicht. Scalpen: de oorspronkelijke strategie. Een andere keuze start een nieuwe run."
         }
       }
     },
@@ -159,6 +163,12 @@
         "ig": "IG (account nodig, kan echt handelen)",
         "capital": "Capital.com (account nodig, kan echt handelen)",
         "oanda": "OANDA (account nodig, EU-toegang onzeker)"
+      }
+    },
+    "strategie": {
+      "options": {
+        "daghandel": "Daghandel (trend op uurbasis, dicht om 20:45 UTC)",
+        "scalp": "Scalpen (minuten, tijdstop)"
       }
     }
   },

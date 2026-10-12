@@ -42,7 +42,7 @@ from .const import (
     TRADING_VENUES, VENUE_CAPITAL, VENUE_IG,
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
     DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUES,
-    VENUE_OANDA, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
+    VENUE_OANDA, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_STRATEGIE, DEFAULT_STRATEGIE, STRATEGIEEN, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
     CONF_MAX_CONSECUTIVE_LOSSES, CONF_MAX_DAILY_LOSS_PCT, CONF_MAX_RESUMES_PER_DAY, CONF_MAX_SPREAD, CONF_MAX_SPREAD_ATR,
     CONF_MAX_TRADES_PER_DAY, CONF_MAX_UNITS, CONF_MIN_EDGE_MULTIPLE, CONF_MODE,
     CONF_STARTING_BALANCE, CONF_SYMBOL, CONF_TIMEFRAME, CONF_TOKEN,
@@ -781,6 +781,13 @@ class GoldScalperOptionsFlow(OptionsFlow):
             vol.Required(CONF_MIN_EDGE_MULTIPLE,
                          default=default(CONF_MIN_EDGE_MULTIPLE, 2.0)):
                 _number(1.0, 6.0, 0.1, slider=True),
+            # 2.0.0 (L-GS-014): daghandel of scalpen. Een andere keuze is een
+            # andere opzet en dus een nieuwe run.
+            vol.Required(CONF_STRATEGIE, default=default(CONF_STRATEGIE, DEFAULT_STRATEGIE)):
+                SelectSelector(SelectSelectorConfig(
+                    options=list(STRATEGIEEN), mode=SelectSelectorMode.LIST,
+                    translation_key="strategie",
+                )),
             vol.Required(CONF_ENTRY_THRESHOLD, default=default(CONF_ENTRY_THRESHOLD, 0.45)):
                 _number(0.1, 0.95, 0.05, slider=True),
             # Standaard uit: handelen wanneer de markt open is. Zie de

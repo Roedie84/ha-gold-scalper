@@ -91,6 +91,7 @@ def build_status(d: dict) -> tuple[str, str]:
             "outside_hours": "Buiten het ingestelde handelsvenster.",
             "spread_too_wide": "Spread te breed om winstgevend te kunnen handelen.",
             "score_below_threshold": "Signaal te zwak; wachten op een betere kans.",
+            "geen_uitbraak": "Daghandel: wachten op een uitbraak in de richting van de uurtrend.",
             "edge_below_cost": "Verwachte beweging dekt de kosten niet.",
             "cooldown": "Wachttijd na de vorige trade.",
             "volatility_regime": "Volatiliteit ongeschikt om te handelen.",

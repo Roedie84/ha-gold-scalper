@@ -262,6 +262,7 @@ def build_overview(
         "max_positions_zelfde_richting": "limiet zelfde richting bereikt",
         "max_positions_geen_signaal": "positie open, geen signaal",
         "score_below_threshold": "signaal te zwak",
+        "geen_uitbraak": "geen uitbraak",
         "spread_too_wide": "spread te breed",
         "edge_below_cost": "beweging dekt de kosten niet",
         "volatility_regime": "te weinig beweging",

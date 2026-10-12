@@ -16,6 +16,7 @@ Alles draait binnen HA. Er is geen tweede proces, geen bridge, geen Windows.
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
 import json
 import logging
@@ -73,7 +74,7 @@ from .const import (
     CONF_REGIME_SWITCHING, DEFAULT_ASSUMED_SPREAD, VENUE_PUBLIC,
     VENUE_STOOQ,
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
-    DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
+    CONF_STRATEGIE, DEFAULT_STRATEGIE, STRATEGIE_DAGHANDEL, DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
     CONF_MAX_CONSECUTIVE_LOSSES, CONF_MAX_DAILY_LOSS_PCT, CONF_MAX_RESUMES_PER_DAY, CONF_MAX_SPREAD, CONF_MAX_SPREAD_ATR,
     CONF_MAX_TRADES_PER_DAY, CONF_MAX_UNITS, CONF_MIN_EDGE_MULTIPLE, CONF_MODE,
     CONF_STARTING_BALANCE, CONF_SYMBOL, CONF_TIMEFRAME, CONF_TOKEN,
@@ -101,6 +102,7 @@ from .storage.latency import (
     LATENCY_VENSTER, LatencyBudget, LatencyTracker, install_buffered_signals,
 )
 from .strategy.scalping import STRATEGY_VERSION, ScalpConfig, evaluate
+from .strategy import daghandel as daghandel_mod
 from .strategy.aggregator import BAR_SECONDS
 from .strategy.posities import (
     marge_en_vloer_ok, netting_uit_posities, richting_van, spreiding_ok,
@@ -283,6 +285,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 max_units=options.get(CONF_MAX_UNITS, DEFAULT_MAX_UNITS),
             )
 
+        #: 2.0.0 (L-GS-014): daghandel of scalpen.
+        self._strategie: str = options.get(CONF_STRATEGIE, DEFAULT_STRATEGIE)
         self.strategy_cfg = ScalpConfig(
             max_spread=options.get(CONF_MAX_SPREAD, 3.00),
             max_spread_atr_ratio=options.get(CONF_MAX_SPREAD_ATR, 0.35),
@@ -479,7 +483,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.executor_notes: list[str] = []
 
         self.lifecycle = LifecycleController(DrainPolicy.WAIT_THEN_CLOSE)
-        self.exits = ExitManager(ExitConfig())
+        self.exits = ExitManager(
+            daghandel_mod.exit_config() if self.daghandel else ExitConfig()
+        )
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
         # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
         # bepaalde één uitschieter de p99.
@@ -766,7 +772,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 )
 
             self.run_id = await self.hass.async_add_executor_job(
-                self.db.start_run, self.mode.value, STRATEGY_VERSION,
+                self.db.start_run, self.mode.value, self.strategie_versie,
                 self.symbol, config, self.starting_balance, None, fingerprint,
             )
             await self._record_opening_equity()
@@ -1145,6 +1151,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     _OPTION_FOR = {
         "mode": "mode",
         "entry_threshold": "entry_threshold",
+        "strategy": CONF_STRATEGIE,
         "regime_switching": "regime_switching",
         "min_edge_multiple": "min_edge_multiple",
         "max_spread": "max_spread",
@@ -1225,7 +1232,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         return {
             "symbol": self.symbol, "timeframe": self.timeframe,
             "mode": self.mode.value, "units": self.units,
-            "strategy": STRATEGY_VERSION,
+            "strategy": self.strategie_versie,
             "venue": self.venue.name,
             # Provenance: welke software, welk uitvoeringsgedrag, welke bron.
             "integration_version": INTEGRATION_VERSION,
@@ -1258,6 +1265,25 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "account_currency": self.conversion.account,
             "conversion_rate": self.conversion.rate,
         }
+
+    # -- 2.0.0: strategiekeuze ------------------------------------------------ #
+
+    @property
+    def daghandel(self) -> bool:
+        return self._strategie == STRATEGIE_DAGHANDEL
+
+    @property
+    def strategie_versie(self) -> str:
+        """Komt in runs.strategy_version en in de vingerafdruk: een andere
+        strategie is altijd een nieuwe run."""
+        return daghandel_mod.STRATEGIE_VERSIE if self.daghandel else STRATEGY_VERSION
+
+    def _beslisser(self, now: datetime):
+        if not self.daghandel:
+            return evaluate
+        return functools.partial(
+            daghandel_mod.evaluate_daghandel, minuut_utc=now.astimezone(timezone.utc).minute,
+        )
 
     def _fingerprint_material(self, config: dict) -> dict:
         """Hash van alles wat het handelsgedrag bepaalt.
@@ -1744,7 +1770,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         fingerprint = self._hash_material(materiaal)
 
         self.run_id = await self.hass.async_add_executor_job(
-            self.db.start_run, self.mode.value, STRATEGY_VERSION,
+            self.db.start_run, self.mode.value, self.strategie_versie,
             self.symbol, config, self.starting_balance,
             note or "handmatig gestart", fingerprint,
         )
@@ -2259,7 +2285,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         per_richting = tel_per_richting(open_positions, pending)
         if self._candles is not None and len(self._candles) >= 60:
             signal = await self.hass.async_add_executor_job(
-                evaluate, self._candles, quote.bid, quote.ask, self.strategy_cfg,
+                self._beslisser(now), self._candles, quote.bid, quote.ask, self.strategy_cfg,
                 now.hour, aantal_open,
                 now.timestamp() - self._last_entry_ts, 0, per_richting,
             )
@@ -2910,7 +2936,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
             # Pyramiden vóór de exitacties: bijkopen bij bevestiging is een
             # aparte beslissing van de vraag of je moet sluiten.
-            if self.pyramid.enabled and action.kind in ("hold", "modify_stop"):
+            if (self.pyramid.enabled and not self.daghandel
+                    and action.kind in ("hold", "modify_stop")):
                 await self._consider_pyramid(position, quote, ticket)
 
             if action.is_noop:
@@ -3297,7 +3324,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         units, signal, now: datetime,
     ) -> None:
         """Vier tijdstopvarianten voor een zojuist geopende echte positie."""
-        if self.db is None or not ref:
+        if self.db is None or not ref or self.daghandel:
+            # 2.0.0: daghandel heeft geen tijdstop; de varianten meten niets.
             return
         self.varianten.exits = self.exits
         try:

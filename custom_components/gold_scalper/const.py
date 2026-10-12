@@ -45,6 +45,13 @@ CONF_STOP_LOSS_USD: Final = "stop_loss_usd"
 CONF_TAKE_PROFIT_ATR: Final = "take_profit_atr"
 CONF_STOP_LOSS_ATR: Final = "stop_loss_atr"
 CONF_ENTRY_THRESHOLD: Final = "entry_threshold"
+#: 2.0.0 (L-GS-014): welke strategie beslist over instappen.
+CONF_STRATEGIE: Final = "strategie"
+STRATEGIE_DAGHANDEL: Final = "daghandel"
+STRATEGIE_SCALP: Final = "scalp"
+STRATEGIEEN: Final = (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP)
+#: Besluit Ruud 12-10-2026: van scalpen naar daghandel.
+DEFAULT_STRATEGIE: Final = STRATEGIE_DAGHANDEL
 CONF_REGIME_SWITCHING: Final = "regime_switching"
 #: Bars opbouwen uit live koersen in plaats van historie opvragen.
 #:
@@ -208,7 +215,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "1.11.0"
+INTEGRATION_VERSION: Final = "2.0.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

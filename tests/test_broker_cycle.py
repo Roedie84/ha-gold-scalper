@@ -322,6 +322,9 @@ def _coordinator(venue, tmp_path, monkeypatch):
         options = {
             "mode": "demo", "units": 10.0, "starting_balance": 10000.0,
             "update_seconds": 20,
+            # 2.0.0: deze lustests gaan over het scalpmechanisme (tijdstop,
+            # meerdere posities); daghandel heeft eigen tests.
+            "strategie": "scalp",
         }
 
     hass = FakeHass()
