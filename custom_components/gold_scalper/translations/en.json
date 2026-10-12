@@ -174,5 +174,11 @@
         "name": "Resultaat per periode"
       }
     }
+  },
+  "issues": {
+    "afwikkeling_vast": {
+      "title": "Gold Scalper: settling trade {ticket} keeps failing",
+      "description": "Settling trade {ticket} has failed {keer} cycles in a row ({fout}). The rest of the cycle keeps running (exit management, time stops), but no new positions are opened while this lasts. Check the log for the first error with traceback. This notice clears itself once settling works again."
+    }
   }
 }

@@ -1,5 +1,22 @@
 # Changelog — Gold Scalper
 
+## 1.11.0
+
+* **Geen strategiewijziging; foutafhandeling (L-GS-012).** Instapsignalen,
+  uitstappen, ordergrootte en risico zijn niet aangeraakt.
+* **Een afwikkelfout bij één trade legt de cyclus niet meer stil.** Op 12-10
+  02:21-03:21 faalde elke cyclus een uur lang op één verdwenen trade; ook het
+  exitbeheer en de tijdstops van andere posities stonden dan stil. Nu wordt
+  een onverwachte fout per trade afgevangen: die trade blijft staan en wordt
+  de volgende cyclus opnieuw geprobeerd, de rest van de cyclus loopt door.
+  De fout komt één keer met traceback in het log.
+* **Geen instap in een cyclus waarin een afwikkeling mislukte** (eerst de
+  boekhouding rond). Reden in de diagnostiek: "afwikkeling van een trade
+  mislukt: geen instap deze cyclus".
+* **Reparatiemelding** in Home Assistant als dezelfde trade 10 cycli op rij
+  niet af te wikkelen is; verdwijnt vanzelf als het weer lukt.
+* Tests: `test_v1110.py` (7).
+
 ## 1.10.3
 
 * **Geen strategiewijziging; foutafhandeling.** Instappen, uitstappen,

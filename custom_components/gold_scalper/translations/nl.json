@@ -174,5 +174,11 @@
         "name": "Resultaat per periode"
       }
     }
+  },
+  "issues": {
+    "afwikkeling_vast": {
+      "title": "Gold Scalper: afwikkeling van trade {ticket} lukt niet",
+      "description": "De afwikkeling van trade {ticket} is {keer} cycli op rij mislukt ({fout}). De rest van de cyclus loopt gewoon door (exitbeheer, tijdstops), maar er worden geen nieuwe posities geopend zolang dit duurt. Kijk in het log naar de eerste foutmelding met traceback. De melding verdwijnt vanzelf zodra de afwikkeling weer lukt."
+    }
   }
 }

@@ -82,6 +82,7 @@ from .const import (
     DEFAULT_STARTING_BALANCE, DEFAULT_SYMBOL, DEFAULT_TIMEFRAME, DEFAULT_UNITS,
     DEFAULT_UPDATE_SECONDS, DOMAIN, MIN_UPDATE_SECONDS, MIN_WARMUP_CANDLES,
     WARMUP_CANDLES, KOERS_HOUD_MAX_MISLUKT, KOERS_HOUD_MAX_SECONDEN,
+    AFWIKKELFOUT_MELDING,
 )
 from .learning.analysis import evaluate_threshold, measure_execution, regime_performance
 from .learning.postmortem import analyse_losses
@@ -442,6 +443,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: 1.7.3: verse schattingen die nog kort bij de broker worden
         #: nagevraagd: ``ticket -> {"pogingen", "sinds"}``.
         self._herkansingen: dict = {}
+        # 1.11.0 (L-GS-012): afwikkelfouten per ticket (cycli op rij) en of
+        # de afwikkeling in deze cyclus faalde (dan geen instap).
+        self._afwikkelfouten: dict[str, int] = {}
+        self._afwikkeling_mislukt = False
         self.backtest: dict = {}
         self.audit: dict = {}
         self._use_schedule: bool = options.get(CONF_USE_SCHEDULE, True)
@@ -2024,6 +2029,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         budget = LatencyBudget()
         budget.mark("start")
         self._positions_cache = None
+        self._afwikkeling_mislukt = False  # 1.11.0 (L-GS-012)
         self._geopend_in_cyclus = 0
 
         try:
@@ -2274,6 +2280,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             elif not self._enabled:
                 reject_reason = "handel staat uit"
                 schaduw_reden = "handel_uit"
+            elif self._afwikkeling_mislukt:
+                # 1.11.0 (L-GS-012): conservatief; eerst de boekhouding rond.
+                reject_reason = "afwikkeling van een trade mislukt: geen instap deze cyclus"
             elif self.mode.places_orders and self.executor.has_pending:
                 reject_reason = "onbevestigde order: eerst terugvinden"
                 schaduw_reden = "onbevestigde_order"
@@ -4258,147 +4267,218 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         }
         open_trades = await self._managed_open_trades(live_tickets)
 
+        fout_nu: set[str] = set()
         for trade in open_trades:
-            if not trade.broker_ticket:
-                continue
-            if str(trade.broker_ticket) in live_tickets:
-                continue
+            # 1.11.0 (L-GS-012): een onverwachte fout bij één trade mag de
+            # cyclus niet stilleggen. Op 12-10 02:21-03:21 faalde zo elke
+            # cyclus een uur lang (360x) op één verdwenen trade, en stond het
+            # exitbeheer van eventuele andere posities stil. Nu: die trade
+            # blijft staan (herkansing volgende cyclus), de rest loopt door,
+            # en in deze cyclus geen nieuwe instap.
+            try:
+                if not trade.broker_ticket:
+                    continue
+                if str(trade.broker_ticket) in live_tickets:
+                    continue
 
-            # De reden is niet met zekerheid vast te stellen; de broker vertelt
-            # niet waarom hij sloot. Afleiden uit waar de koers staat ten
-            # opzichte van stop en doel is het beste dat mogelijk is, en dat
-            # wordt als zodanig gemarkeerd.
-            reason = "broker_gesloten"
-            long = trade.side == "buy"
-            price = quote.bid if long else quote.ask
-            level: float | None = None
+                # De reden is niet met zekerheid vast te stellen; de broker vertelt
+                # niet waarom hij sloot. Afleiden uit waar de koers staat ten
+                # opzichte van stop en doel is het beste dat mogelijk is, en dat
+                # wordt als zodanig gemarkeerd.
+                reason = "broker_gesloten"
+                long = trade.side == "buy"
+                price = quote.bid if long else quote.ask
+                level: float | None = None
 
-            if trade.stop_loss and (
-                (long and price <= trade.stop_loss)
-                or (not long and price >= trade.stop_loss)
-            ):
-                reason, level = "stop_loss", trade.stop_loss
-            elif trade.take_profit and (
-                (long and price >= trade.take_profit)
-                or (not long and price <= trade.take_profit)
-            ):
-                reason, level = "take_profit", trade.take_profit
+                if trade.stop_loss and (
+                    (long and price <= trade.stop_loss)
+                    or (not long and price >= trade.stop_loss)
+                ):
+                    reason, level = "stop_loss", trade.stop_loss
+                elif trade.take_profit and (
+                    (long and price >= trade.take_profit)
+                    or (not long and price <= trade.take_profit)
+                ):
+                    reason, level = "take_profit", trade.take_profit
 
-            # Afrekenen op het niveau waarop de broker sloot, niet op de koers
-            # van het moment waarop wij het ontdekken.
-            #
-            # Die twee lopen uiteen: de lus draait elke twintig seconden, en in
-            # die tijd zakt de koers verder door. Op de latere koers afrekenen
-            # boekt dat extra stuk als "kosten", waardoor de kostprijs per trade
-            # opliep tot ruim het dubbele van de spread - een meetfout die
-            # eruitziet als slippage.
-            # Eerst de broker vragen wat de werkelijke uitstapprijs was.
-            #
-            # Afrekenen op de ontdekkingskoers werkt niet: de lus merkt pas na
-            # een cyclus dat een positie weg is, en in die tijd loopt de koers
-            # verder. Bij shorts die op hun doel sloten gaf dat verschillen van
-            # tien dollar per trade - de eigen administratie meldde een verlies
-            # van 4,83 waar de broker een winst van 28,58 euro boekte.
-            werkelijk = None
-            zoek = getattr(self.venue, "closed_deal", None)
-            if zoek is not None:
-                try:
-                    # De instapprijs meegeven: daarop wordt gezocht, want het
-                    # ticketnummer komt niet overeen met de verwijzing in het
-                    # transactieoverzicht van de broker.
-                    # Richting meegeven: twee transacties met bijna dezelfde
-                    # instapprijs zijn alleen op hun richting te scheiden.
-                    # Hier is het sluitmoment nu, dus het standaardvenster
-                    # rond het huidige tijdstip is juist.
-                    werkelijk = await zoek(
-                        str(trade.broker_ticket), trade.open_price, trade.side,
-                        None, trade.volume * CONTRACT_SIZE, trade.open_time,
+                # Afrekenen op het niveau waarop de broker sloot, niet op de koers
+                # van het moment waarop wij het ontdekken.
+                #
+                # Die twee lopen uiteen: de lus draait elke twintig seconden, en in
+                # die tijd zakt de koers verder door. Op de latere koers afrekenen
+                # boekt dat extra stuk als "kosten", waardoor de kostprijs per trade
+                # opliep tot ruim het dubbele van de spread - een meetfout die
+                # eruitziet als slippage.
+                # Eerst de broker vragen wat de werkelijke uitstapprijs was.
+                #
+                # Afrekenen op de ontdekkingskoers werkt niet: de lus merkt pas na
+                # een cyclus dat een positie weg is, en in die tijd loopt de koers
+                # verder. Bij shorts die op hun doel sloten gaf dat verschillen van
+                # tien dollar per trade - de eigen administratie meldde een verlies
+                # van 4,83 waar de broker een winst van 28,58 euro boekte.
+                werkelijk = None
+                zoek = getattr(self.venue, "closed_deal", None)
+                if zoek is not None:
+                    try:
+                        # De instapprijs meegeven: daarop wordt gezocht, want het
+                        # ticketnummer komt niet overeen met de verwijzing in het
+                        # transactieoverzicht van de broker.
+                        # Richting meegeven: twee transacties met bijna dezelfde
+                        # instapprijs zijn alleen op hun richting te scheiden.
+                        # Hier is het sluitmoment nu, dus het standaardvenster
+                        # rond het huidige tijdstip is juist.
+                        werkelijk = await zoek(
+                            str(trade.broker_ticket), trade.open_price, trade.side,
+                            None, trade.volume * CONTRACT_SIZE, trade.open_time,
+                        )
+                    except VenueError as err:
+                        _LOGGER.debug(
+                            "Uitstapprijs van %s niet op te halen: %s",
+                            trade.broker_ticket, err,
+                        )
+
+                # 1.7.3: staat hij (nog) niet in het transactieoverzicht, dan het
+                # activiteitenoverzicht en de bevestiging proberen. Dat overzicht
+                # loopt uren achter; de activiteit van een sluiting op stop of doel
+                # staat er binnen seconden. Op 8 oktober werden zo vier trades op
+                # een schatting afgerekend die de broker allang kende.
+                bron = "broker_transactions"
+                if not (werkelijk and werkelijk.get("exit_price")):
+                    activiteit = await self._zoek_activiteit(trade)
+                    if activiteit:
+                        werkelijk = activiteit
+                        bron = activiteit.get("source") or "broker_activity"
+
+                if werkelijk and werkelijk.get("exit_price"):
+                    exit_price = float(werkelijk["exit_price"])
+                    half = quote.spread / 2.0
+                    settle = VenueQuote(
+                        bid=exit_price if long else exit_price - 2 * half,
+                        ask=exit_price + 2 * half if long else exit_price,
+                        time=quote.time, tradeable=quote.tradeable,
                     )
-                except VenueError as err:
-                    _LOGGER.debug(
-                        "Uitstapprijs van %s niet op te halen: %s",
-                        trade.broker_ticket, err,
+                    if reason == "broker_gesloten":
+                        reason = "broker_gesloten_gemeten"
+
+                    # De winst in accountvaluta die de broker meldt, geeft ook de
+                    # wisselkoers - preciezer dan de afleiding uit een open positie.
+                    winst = werkelijk.get("profit_account")
+                    if winst and self.conversion.needed:
+                        beweging = (
+                            (exit_price - trade.open_price)
+                            * (1.0 if long else -1.0)
+                            * trade.volume * CONTRACT_SIZE
+                        )
+                        if abs(beweging) > 1.0:
+                            koers = winst / beweging
+                            if 0.1 < koers < 10.0 and \
+                                    self._apply_rate(koers, "broker_settlement"):
+                                _LOGGER.info(
+                                    "Wisselkoers %s/%s uit een afgerekende trade: "
+                                    "%.4f", self.conversion.instrument,
+                                    self.conversion.account, koers,
+                                )
+                elif level is not None:
+                    half = quote.spread / 2.0
+                    settle = VenueQuote(
+                        bid=level if long else level - 2 * half,
+                        ask=level + 2 * half if long else level,
+                        time=quote.time, tradeable=quote.tradeable,
                     )
+                else:
+                    # Geen gemeten prijs en geen niveau: de ontdekkingskoers is het
+                    # beste dat er is, maar dan wél als schatting gemarkeerd.
+                    settle = quote
+                    reason = "broker_gesloten_geschat"
+                    # 1.7.3: voorlopig. De komende minuten wordt de uitstapprijs
+                    # nog een paar keer bij de broker nagevraagd
+                    # (:meth:`_herkans_voorlopige_afwikkelingen`); daarna neemt de
+                    # gewone correctie en de afstemming het over.
+                    self._herkansingen[str(trade.broker_ticket)] = {
+                        "pogingen": 0, "sinds": now,
+                    }
 
-            # 1.7.3: staat hij (nog) niet in het transactieoverzicht, dan het
-            # activiteitenoverzicht en de bevestiging proberen. Dat overzicht
-            # loopt uren achter; de activiteit van een sluiting op stop of doel
-            # staat er binnen seconden. Op 8 oktober werden zo vier trades op
-            # een schatting afgerekend die de broker allang kende.
-            bron = "broker_transactions"
-            if not (werkelijk and werkelijk.get("exit_price")):
-                activiteit = await self._zoek_activiteit(trade)
-                if activiteit:
-                    werkelijk = activiteit
-                    bron = activiteit.get("source") or "broker_activity"
+                    # En luid melden. Een schatting die stil doorgaat, produceert
+                    # cijfers die eruitzien als metingen - dat is precies hoe de
+                    # fout van 28 euro per middag onopgemerkt bleef.
+                    self._geschatte_afwikkelingen += 1
+                    if self._geschatte_afwikkelingen in (1, 5, 20, 50):
+                        _LOGGER.warning(
+                            "%d trade(s) afgerekend op een geschatte uitstapprijs "
+                            "omdat de werkelijke niet bij de broker op te halen "
+                            "was. Die cijfers zijn onbetrouwbaar: bij een trade "
+                            "die op zijn doel sloot en daarna terugveerde, kan het "
+                            "verschil tien dollar per trade zijn.",
+                            self._geschatte_afwikkelingen,
+                        )
 
-            if werkelijk and werkelijk.get("exit_price"):
-                exit_price = float(werkelijk["exit_price"])
-                half = quote.spread / 2.0
-                settle = VenueQuote(
-                    bid=exit_price if long else exit_price - 2 * half,
-                    ask=exit_price + 2 * half if long else exit_price,
-                    time=quote.time, tradeable=quote.tradeable,
+                await self._record_broker_close(
+                    _TicketOnly(str(trade.broker_ticket)), settle, reason, now,
+                    bron=bron,
                 )
-                if reason == "broker_gesloten":
-                    reason = "broker_gesloten_gemeten"
-
-                # De winst in accountvaluta die de broker meldt, geeft ook de
-                # wisselkoers - preciezer dan de afleiding uit een open positie.
-                winst = werkelijk.get("profit_account")
-                if winst and self.conversion.needed:
-                    beweging = (
-                        (exit_price - trade.open_price)
-                        * (1.0 if long else -1.0)
-                        * trade.volume * CONTRACT_SIZE
-                    )
-                    if abs(beweging) > 1.0:
-                        koers = winst / beweging
-                        if 0.1 < koers < 10.0 and \
-                                self._apply_rate(koers, "broker_settlement"):
-                            _LOGGER.info(
-                                "Wisselkoers %s/%s uit een afgerekende trade: "
-                                "%.4f", self.conversion.instrument,
-                                self.conversion.account, koers,
-                            )
-            elif level is not None:
-                half = quote.spread / 2.0
-                settle = VenueQuote(
-                    bid=level if long else level - 2 * half,
-                    ask=level + 2 * half if long else level,
-                    time=quote.time, tradeable=quote.tradeable,
-                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as err:  # noqa: BLE001 - zie hierboven
+                self._afwikkelfout(str(trade.broker_ticket), err)
+                fout_nu.add(str(trade.broker_ticket))
             else:
-                # Geen gemeten prijs en geen niveau: de ontdekkingskoers is het
-                # beste dat er is, maar dan wél als schatting gemarkeerd.
-                settle = quote
-                reason = "broker_gesloten_geschat"
-                # 1.7.3: voorlopig. De komende minuten wordt de uitstapprijs
-                # nog een paar keer bij de broker nagevraagd
-                # (:meth:`_herkans_voorlopige_afwikkelingen`); daarna neemt de
-                # gewone correctie en de afstemming het over.
-                self._herkansingen[str(trade.broker_ticket)] = {
-                    "pogingen": 0, "sinds": now,
-                }
+                self._afwikkeling_gelukt(str(trade.broker_ticket or ""))
+        # Tickets die niet meer fout gaan (of niet meer open staan) vrijgeven
+        for ticket in list(self._afwikkelfouten):
+            if ticket not in fout_nu:
+                self._afwikkeling_gelukt(ticket)
 
-                # En luid melden. Een schatting die stil doorgaat, produceert
-                # cijfers die eruitzien als metingen - dat is precies hoe de
-                # fout van 28 euro per middag onopgemerkt bleef.
-                self._geschatte_afwikkelingen += 1
-                if self._geschatte_afwikkelingen in (1, 5, 20, 50):
-                    _LOGGER.warning(
-                        "%d trade(s) afgerekend op een geschatte uitstapprijs "
-                        "omdat de werkelijke niet bij de broker op te halen "
-                        "was. Die cijfers zijn onbetrouwbaar: bij een trade "
-                        "die op zijn doel sloot en daarna terugveerde, kan het "
-                        "verschil tien dollar per trade zijn.",
-                        self._geschatte_afwikkelingen,
-                    )
+    def _afwikkelfout(self, ticket: str, err: Exception) -> None:
+        """Een afwikkelfout voor één trade noteren (1.11.0, L-GS-012).
 
-            await self._record_broker_close(
-                _TicketOnly(str(trade.broker_ticket)), settle, reason, now,
-                bron=bron,
+        De eerste keer met traceback, daarna stil tot de herstelmelding. Na
+        AFWIKKELFOUT_MELDING cycli op rij voor hetzelfde ticket komt er een
+        reparatiemelding in Home Assistant.
+        """
+        self._afwikkeling_mislukt = True
+        keer = self._afwikkelfouten.get(ticket, 0) + 1
+        self._afwikkelfouten[ticket] = keer
+        if keer == 1:
+            _LOGGER.error(
+                "Afwikkeling van trade %s mislukt; die trade blijft staan en "
+                "wordt volgende cyclus opnieuw geprobeerd, de rest van de "
+                "cyclus loopt door (geen nieuwe instap)",
+                ticket, exc_info=err,
             )
+        else:
+            _LOGGER.debug("Afwikkeling van trade %s mislukt (%dx op rij): %s",
+                          ticket, keer, err)
+        if keer == AFWIKKELFOUT_MELDING:
+            self._afwikkel_melding(ticket, keer, err)
+
+    def _afwikkeling_gelukt(self, ticket: str) -> None:
+        if self._afwikkelfouten.pop(ticket, None) is None:
+            return
+        _LOGGER.info("Afwikkeling van trade %s lukt weer", ticket)
+        try:
+            import homeassistant.helpers.issue_registry as ir
+
+            ir.async_delete_issue(self.hass, DOMAIN, f"afwikkeling_vast_{ticket}")
+        except Exception:  # noqa: BLE001 - melding opruimen is bijzaak
+            pass
+
+    def _afwikkel_melding(self, ticket: str, keer: int, err: Exception) -> None:
+        try:
+            import homeassistant.helpers.issue_registry as ir
+
+            ir.async_create_issue(
+                self.hass, DOMAIN, f"afwikkeling_vast_{ticket}",
+                is_fixable=False, is_persistent=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="afwikkeling_vast",
+                translation_placeholders={
+                    "ticket": ticket, "keer": str(keer),
+                    "fout": f"{type(err).__name__}: {err}"[:200],
+                },
+            )
+        except Exception as fout:  # noqa: BLE001 - melden mag de lus niet slopen
+            _LOGGER.warning("Reparatiemelding voor trade %s niet gemaakt: %s",
+                            ticket, fout)
 
     async def _zoek_activiteit(self, trade) -> dict | None:
         """Uitstapprijs uit het activiteitenoverzicht van de broker (1.7.3).
