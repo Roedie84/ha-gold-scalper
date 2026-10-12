@@ -147,6 +147,11 @@ class ScalpConfig:
     atr_correction: float = 1.0
     #: Drempel voor de samengestelde scalpscore.
     entry_threshold: float = 0.45
+    #: 1.12.0 (L-GS-013): signalen tussen deze ondergrens en de instapdrempel
+    #: worden volledig berekend (kostenpoort, stop, doel) maar niet
+    #: uitgevoerd: ze worden schaduwtrades. Zo blijft meetbaar wat een lagere
+    #: drempel had opgeleverd. None of niet lager dan de drempel: uit.
+    schaduw_drempel: float | None = None
     #: Kies per marktregime tussen trendvolgend en contrair, in plaats van
     #: beide op te tellen.
     #:
@@ -499,11 +504,17 @@ def evaluate(
     if structure_read is not None and structure_read.character_change:
         confidence *= 0.6
 
-    if abs(score) < cfg.entry_threshold:
+    # 1.12.0: tussen schaduwdrempel en instapdrempel doorrekenen als
+    # schaduwkandidaat; daaronder gewoon weigeren.
+    ondergrens = cfg.entry_threshold
+    if cfg.schaduw_drempel is not None and cfg.schaduw_drempel < ondergrens:
+        ondergrens = cfg.schaduw_drempel
+    if abs(score) < ondergrens:
         return reject(
             "score_below_threshold",
             f"Score {score:+.3f} onder drempel {cfg.entry_threshold:.2f}",
         )
+    onder_drempel = abs(score) < cfg.entry_threshold
 
     # --- De kostenpoort ------------------------------------------------------
     a = atr(candles, 14)
@@ -634,6 +645,15 @@ def evaluate(
         expected_cost=expected_cost,
         components=components,
     )
+    if onder_drempel:
+        # 1.12.0: geldig, maar te zwak voor een echte instap: schaduwtrade.
+        signaal.should_trade = False
+        signaal.reject_reason = "score_below_threshold"
+        signaal.reason = (
+            f"Score {score:+.3f} onder drempel {cfg.entry_threshold:.2f}; "
+            "alleen als schaduwtrade gevolgd."
+        )
+        return signaal
     if not per_richting:
         return signaal
 

@@ -63,6 +63,8 @@ SCHADUW_REDENEN = {
     "onbevestigde_order": "eerst een onbevestigde order terugvinden",
     "wisselkoers": "geen bruikbare wisselkoers",
     "per_cyclus": "al een positie geopend in deze cyclus",
+    # 1.12.0 (L-GS-013)
+    "onder_drempel": "signaal tussen schaduwdrempel en instapdrempel",
 }
 
 #: Na zoveel seconden zonder bijwerking is een open schaduwtrade niet eerlijk

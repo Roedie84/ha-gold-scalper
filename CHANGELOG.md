@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 1.12.0
+
+* **Schaduwtrades onder de instapdrempel (L-GS-013).** Uit 562 trades
+  (runs 97-101): sterke signalen (|score| >= 0,70) vangen duidelijk meer
+  beweging dan zwakke, maar dekken in de nieuwste helft nog maar ~2/3 van de
+  kosten. Besluit Ruud 12-10: instapdrempel naar 0,70 als vooraf vastgelegde
+  toets. Toetsregel: na >= 100 trades over >= 10 handelsdagen netto > 0 met
+  t >= 2, anders heeft dit signaal op deze horizon geen voordeel.
+* Signalen tussen 0,45 (`SCHADUW_DREMPEL`, de oude drempel) en de
+  instapdrempel worden volledig berekend (kostenpoort, stop, doel) en als
+  schaduwtrade gevolgd met reden `onder_drempel`. Zo blijft meetbaar wat de
+  oude drempel had opgeleverd. Staat de drempel op 0,45 of lager, dan
+  verandert er niets.
+* Tests: `test_v1120.py`.
+
 ## 1.11.0
 
 * **Geen strategiewijziging; foutafhandeling (L-GS-012).** Instapsignalen,

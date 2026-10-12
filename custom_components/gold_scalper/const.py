@@ -208,7 +208,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "1.11.0"
+INTEGRATION_VERSION: Final = "1.12.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
@@ -247,3 +247,8 @@ EXIT_REGIME_GRENS_UTC: Final = "2026-10-08T10:16:00+00:00"
 # 1.11.0 (L-GS-012): na zoveel cycli op rij met een afwikkelfout voor dezelfde
 # trade komt er een reparatiemelding (bij 20 s per cyclus ruim 3 minuten).
 AFWIKKELFOUT_MELDING: Final = 10
+
+#: 1.12.0 (L-GS-013): signalen vanaf deze sterkte maar onder de instapdrempel
+#: worden schaduwtrades. Dit is de oude instapdrempel; zo blijft meetbaar wat
+#: die had opgeleverd naast de strengere drempel.
+SCHADUW_DREMPEL: Final = 0.45

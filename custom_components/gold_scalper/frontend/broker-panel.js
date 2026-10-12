@@ -1093,7 +1093,7 @@ ${tl}
       (s.open ? `<span class="chip">${fmt(s.open, 0)} open</span>` : "") +
       (s.vervallen ? `<span class="chip neutraal" title="Niet eerlijk te volgen door een gat in de koersdata; telt niet mee">${fmt(s.vervallen, 0)} vervallen</span>` : "");
     if (!s.trades && !s.open) { el.innerHTML = '<div class="leeg">Nog geen schaduwtrades.</div>'; return; }
-    const LBL = { positielimiet: "positielimiet", cooldown: "cooldown", marge: "marge", vloer: "vloer", netting: "netting", risico: "risicolimiet", handel_uit: "handel uit", levenscyclus: "levenscyclus", onbevestigde_order: "onbevestigde order", wisselkoers: "wisselkoers", per_cyclus: "1 per cyclus" };
+    const LBL = { positielimiet: "positielimiet", cooldown: "cooldown", marge: "marge", vloer: "vloer", netting: "netting", risico: "risicolimiet", handel_uit: "handel uit", levenscyclus: "levenscyclus", onbevestigde_order: "onbevestigde order", wisselkoers: "wisselkoers", per_cyclus: "1 per cyclus", onder_drempel: "onder drempel" };
     const redenen = Object.entries(s.per_reden || {}).sort((a, b) => b[1] - a[1])
       .map(([k, v]) => `<span class="chip neutraal">${esc(LBL[k] || k)} <b>${fmt(v, 0)}</b></span>`).join("");
     el.innerHTML = `<div class="kv drie">` +

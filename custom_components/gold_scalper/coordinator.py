@@ -73,7 +73,7 @@ from .const import (
     CONF_REGIME_SWITCHING, DEFAULT_ASSUMED_SPREAD, VENUE_PUBLIC,
     VENUE_STOOQ,
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
-    DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
+    SCHADUW_DREMPEL, DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
     CONF_MAX_CONSECUTIVE_LOSSES, CONF_MAX_DAILY_LOSS_PCT, CONF_MAX_RESUMES_PER_DAY, CONF_MAX_SPREAD, CONF_MAX_SPREAD_ATR,
     CONF_MAX_TRADES_PER_DAY, CONF_MAX_UNITS, CONF_MIN_EDGE_MULTIPLE, CONF_MODE,
     CONF_STARTING_BALANCE, CONF_SYMBOL, CONF_TIMEFRAME, CONF_TOKEN,
@@ -288,6 +288,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             max_spread_atr_ratio=options.get(CONF_MAX_SPREAD_ATR, 0.35),
             min_edge_multiple=options.get(CONF_MIN_EDGE_MULTIPLE, 2.0),
             entry_threshold=options.get(CONF_ENTRY_THRESHOLD, 0.45),
+            schaduw_drempel=SCHADUW_DREMPEL,
             take_profit_atr=options.get(CONF_TAKE_PROFIT_ATR, 1.5),
             stop_loss_atr=options.get(CONF_STOP_LOSS_ATR, 1.0),
             take_profit_usd=options.get(CONF_TAKE_PROFIT_USD, 0.0),
@@ -2292,6 +2293,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     schaduw_reden = "positielimiet"
                 elif signal.reject_reason == "cooldown":
                     schaduw_reden = "cooldown"
+                elif (signal.reject_reason == "score_below_threshold"
+                      and signal.geldig):
+                    # 1.12.0 (L-GS-013): wat de oude drempel had opgeleverd.
+                    schaduw_reden = "onder_drempel"
             else:
                 fx_ok, fx_reden = self.conversion.usable_for_entry(now)
                 allowed, why = self.risk.can_open(
