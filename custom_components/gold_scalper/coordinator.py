@@ -102,7 +102,7 @@ from .storage.state import ResultsStore, RuntimeState, StateStore
 from .storage.latency import (
     LATENCY_VENSTER, LatencyBudget, LatencyTracker, install_buffered_signals,
 )
-from .strategy.scalping import STRATEGY_VERSION, ScalpConfig, evaluate
+from .strategy.scalping import STRATEGY_VERSION, ScalpConfig, ScalpSignal, evaluate
 from .strategy import combinatie as combinatie_mod
 from .strategy import daghandel as daghandel_mod
 from .strategy.aggregator import BAR_SECONDS
@@ -377,14 +377,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         )
         #: Per ticket: hoeveel toevoegingen en op welke prijs de laatste.
         self._pyramid_state: dict[str, dict] = {}
-        if self.pyramid.enabled:
-            # Bekende beperking (5.7): bijkopen wordt niet in de administratie
-            # vastgelegd; elke toevoeging wordt bij de afstemming een
-            # onbekende positie. De instelling wordt bewust niet gewijzigd.
-            _LOGGER.warning(
-                "Piramide staat aan, maar bijkopen wordt nog niet vastgelegd in de "
-                "administratie of de afstemming. Zet het uit tot dat is opgelost."
-            )
+        #: 2.2.0: tickets die zelf een bijkoop zijn (die piramiden niet verder).
+        self._bijkopen: set[str] = set()
         #: Per ticket de uiterste mee- en tegenbeweging sinds de instap.
         #:
         #: Bij brokertrades werden die niet bijgehouden, terwijl de
@@ -3056,7 +3050,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # Pyramiden vóór de exitacties: bijkopen bij bevestiging is een
             # aparte beslissing van de vraag of je moet sluiten.
             if (self.pyramid.enabled and strategie == STRATEGIE_SCALP
-                    and action.kind in ("hold", "modify_stop")):
+                    and action.kind in ("hold", "modify_stop")
+                    and not await self._is_bijkoop(ticket)):
                 await self._consider_pyramid(position, quote, ticket)
 
             if action.is_noop:
@@ -4840,6 +4835,17 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         ongelijk krijgt, hier alleen een die gelijk krijgt. De stop schuift bij
         elke toevoeging mee, zodat het totale risico niet groeit.
         """
+        if ticket not in self._pyramid_state and self.db is not None:
+            # 2.2.0: na een herstart de toevoegingen uit de administratie halen,
+            # anders begint de telling opnieuw en wordt er te veel bijgekocht.
+            eerder = await self.hass.async_add_executor_job(
+                self.db.bijkopen_van, str(ticket)
+            )
+            self._pyramid_state[ticket] = {
+                "additions": len(eerder),
+                "last_price": eerder[-1].open_price if eerder else None,
+                "original": None,
+            }
         state = self._pyramid_state.setdefault(
             ticket, {"additions": 0, "last_price": None, "original": None}
         )
@@ -4869,34 +4875,74 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if not decision.add:
             return
 
+        if not self.mode.places_orders:
+            return
+        side = getattr(position, "side", "buy")
+        now = datetime.now(timezone.utc)
+        strategie = await self._strategie_van(position)
+        # 2.2.0: een signaal voor de administratie: zelfde strategie, de
+        # nieuwe stop, en herkenbaar als bijkoop van de oorspronkelijke positie.
+        bijkoop_signaal = ScalpSignal(
+            direction=1 if long else -1, score=0.0, confidence=0.0,
+            should_trade=True, reject_reason=None,
+            reason=f"bijkoop van {ticket}: {decision.reason}"[:200],
+            stop_loss=decision.new_stop,
+            take_profit=getattr(position, "take_profit", None),
+            components={"strategie": strategie, "open_reason": f"pyramide van {ticket}"},
+            geldig=True,
+        )
         try:
             # Eerst de stop verplaatsen, dan pas bijkopen. Andersom sta je
             # kortstondig met een grotere positie achter een te ruime stop, en
             # precies dan kan de verbinding wegvallen.
-            await self.venue.modify_stop(
+            verplaatst = await self.venue.modify_stop(
                 ticket, decision.new_stop,
                 take_profit=getattr(position, "take_profit", None),
             )
+            if getattr(verplaatst, "success", False):
+                await self._sync_trade_stop(ticket, decision.new_stop)
             result, notes = await self.executor.open_protected(
-                self.symbol,
-                getattr(position, "side", "buy"),
-                decision.units,
-                quote.mid,
+                self.symbol, side, decision.units, quote.mid,
                 stop_loss=decision.new_stop,
                 take_profit=getattr(position, "take_profit", None),
+                context=(bijkoop_signaal, quote, side, now),
             )
         except VenueError as err:
             _LOGGER.warning("Bijkopen mislukte: %s", err)
             return
 
+        self._positions_cache = None
+        if result.unconfirmed:
+            # Wordt teruggezocht en dan vastgelegd met dezelfde context.
+            state["additions"] += 1
+            state["last_price"] = price
+            _LOGGER.warning("Bijkoop onbevestigd: %s", result.error)
+            return
         if not result.success:
             _LOGGER.warning("Bijkopen niet geplaatst: %s", result.error)
             return
 
+        # 2.2.0: vastleggen als eigen trade, zodat resultaat, kosten en de
+        # afstemming met de broker kloppen.
+        await self._record_broker_open(result, bijkoop_signaal, quote, side, now)
+        if result.ticket:
+            self._bijkopen.add(str(result.ticket))
+        self.risk.record_open()
         state["additions"] += 1
         state["last_price"] = price
-        self._positions_cache = None
         _LOGGER.info("Bijgekocht: %s", decision.reason)
+
+    async def _is_bijkoop(self, ticket: str) -> bool:
+        """2.2.0: is deze positie zelf een bijkoop? Die piramidet niet verder."""
+        if ticket in self._bijkopen:
+            return True
+        if self.db is None:
+            return False
+        trade = await self._open_trade_by_ticket(ticket)
+        if trade is not None and str(trade.open_reason or "").startswith("pyramide van "):
+            self._bijkopen.add(ticket)
+            return True
+        return False
 
     async def _record_partial(
         self, ticket: str, units: float, reason: str, now: datetime
@@ -5017,6 +5063,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             strategie=(
                 (signal.components or {}).get("strategie") if self.combinatie else None
             ),
+            # 2.2.0: "pyramide van <ticket>" bij een bijkoop.
+            open_reason=(signal.components or {}).get("open_reason"),
         )
         await self.hass.async_add_executor_job(self.db.insert_trade, trade)
         if result.ticket and trade.strategie:

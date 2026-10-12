@@ -831,6 +831,14 @@ class TradeDatabase:
                 laatste = moment
         return laatste
 
+    def bijkopen_van(self, ticket: str) -> list[Trade]:
+        """2.2.0: bijkopen (pyramide) van een positie, oudste eerst."""
+        rows = self.conn.execute(
+            "SELECT * FROM trades WHERE open_reason = ? ORDER BY id",
+            (f"pyramide van {ticket}",),
+        ).fetchall()
+        return [self._row_to_trade(r) for r in rows]
+
     def open_trades_by_tickets(self, tickets) -> list[Trade]:
         """Open trades met deze tickets, in welke run ook.
 

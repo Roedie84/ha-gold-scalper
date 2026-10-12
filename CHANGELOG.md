@@ -1,5 +1,25 @@
 # Changelog — Gold Scalper
 
+## 2.2.0
+
+* **Pyramiden volwaardig (besluit Ruud 12-10: "moet actief zijn").** Tot nu
+  toe werd een bijkoop wel bij de broker geplaatst maar nergens vastgelegd:
+  geen resultaat, geen kosten, en bij de afstemming een onbekende positie.
+  Nu:
+  * elke bijkoop is een eigen trade met `open_reason` "pyramide van
+    <ticket>" en de strategie van de oorspronkelijke positie;
+  * de verplaatste stop van de oorspronkelijke positie gaat ook in de eigen
+    administratie;
+  * een bijkoop piramidet zelf niet verder (anders stapelden toevoegingen
+    zich op toevoegingen);
+  * na een herstart telt het aantal toevoegingen door uit de administratie;
+  * een onbevestigde bijkoop wordt teruggezocht en dan vastgelegd, zoals een
+    gewone order.
+* Bij de combinatie piramidet alleen de scalp (de daghandel is zonder
+  bijkopen getoetst). De waarschuwing "bijkopen wordt nog niet vastgelegd"
+  is weg.
+* Tests: `test_v220_pyramide.py`.
+
 ## 2.1.1
 
 * Status en *Open posities*: bij de combinatie telde "long/short" alleen de

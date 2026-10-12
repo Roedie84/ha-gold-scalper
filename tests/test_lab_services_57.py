@@ -617,5 +617,7 @@ def test_ig_request_counts_never_invent_an_allowance():
 
 def test_pyramiding_warning_is_documented_and_setting_untouched():
     bron = (PKG / "coordinator.py").read_text(encoding="utf-8")
-    assert "Piramide staat aan, maar bijkopen wordt nog niet vastgelegd" in bron
+    # 2.2.0: bijkopen wordt nu vastgelegd; de waarschuwing is weg.
+    assert "Piramide staat aan, maar bijkopen wordt nog niet vastgelegd" not in bron
+    assert 'open_reason=(signal.components or {}).get("open_reason")' in bron
     assert "CONF_PYRAMID_ENABLED, False" in bron.replace("options.get(", "")
