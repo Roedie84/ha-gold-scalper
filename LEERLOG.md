@@ -352,3 +352,13 @@ laatste ronde: 12-10 11:40, gemeten t/m 12-10 11:45
 - Hypotheses: H-GS-10 (vrijdagsluiting, toets 16-10); nieuw **H-GS-11**: daghandelkosten ≈ 20 % van de beweging (backtest) → per daghandeltrade kosten/ATR meten. Geen release (chatsessie releaset vandaag al 4×).
 
 laatste ronde: 12-10 15:40, gemeten t/m 12-10 15:55
+
+## 12-10 19:40 · tussenronde
+- **2.2.0 (16:10) en 2.2.1 (18:31) door de chatsessie**, geïnstalleerd (actief 2.2.1, herstarts 16:12 en 18:35). 2.2.0 legt bijkopen vast als eigen trade ("pyramide van <ticket>", besluit Ruud: "moet actief zijn"); WARNING "Piramide staat aan…" sinds 16:11 weg → **L-GS-016 vervallen** (Ruud koos vastleggen i.p.v. uitzetten).
+- Run 105 (combinatie) t/m 19:46: **35 trades, alle scalp, 0 daghandel** ("wachten op een uitbraak in de richting van de uurtrend"). Sinds 15:55 32 trades: netto −19,67. Run 105: netto −20,66 = bruto +1,14 − kosten 21,80 → per trade −0,59 / +0,03 / **0,62** (run 101: 1,36/trade; kleinere scalpgrootte 1 oz). PF 0,459, winst 34,3 %, t per trade −1,52, t_cluster −1,76 (3 clusters), 4 uurblokken t_netto −1,92 / t_bruto 0,21. Geen oordeel (n te klein); ook met de halve kosten blijft bruto ≈ 0 → hetzelfde beeld als H-GS-7.
+- Sluitredenen: tijdstop 29, take-profit 2, stop 2, broker gemeten 2; sluitreden onbekend 0,0 %, afstemming `in_orde`, drawdown 0,0 %, noodstop/dataprobleem uit, demo. Geen knoppen gebruikt.
+- Broker: 2× HTTP 403 `api-key-invalid` (17:22 positie-opvraging, 19:06 koers), elk 1 van 3 en direct hersteld → IG-demo-hapering, geen actie. 19:00 broker meldt markt gesloten binnen het rooster (één keer; 12-10 = Columbus Day) → rooster kent de Amerikaanse kalender niet, de code volgt terecht de broker.
+- Latency p99 702 ms (2 herstarts). 0 Gold Scalper-fouten (ERROR).
+- H-GS-11 (daghandelkosten ≈ 20 % van de beweging): 0 daghandeltrades → nog niet meetbaar. H-GS-10 (vrijdagsluiting) toets 16-10. L-GS-011 klaar voor 13-10 (rebase op 2.2.1 nodig). Geen release.
+
+laatste ronde: 12-10 19:40, gemeten t/m 12-10 19:46
