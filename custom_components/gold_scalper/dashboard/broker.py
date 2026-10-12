@@ -162,7 +162,7 @@ _TRADE_KOLOMMEN = (
 
 #: 1.10.0: optioneel, alleen als de kolom er al is (een database die nog
 #: niet door deze versie is geopend, heeft ze niet).
-_TRADE_KOLOMMEN_EXTRA = ("looptijd_s", "close_reason_source", "strategie")
+_TRADE_KOLOMMEN_EXTRA = ("looptijd_s", "close_reason_source", "strategie", "open_reason")
 
 
 def _kolommen(conn: sqlite3.Connection) -> str:
@@ -299,6 +299,8 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> li
         daghandel = strategie == "daghandel"
         uit.append({
             "strategie": strategie,
+            # 2.2.1: bijkoop (pyramide) van een andere positie.
+            "bijkoop": str(db.get("open_reason") or "").startswith("pyramide van "),
             "ticket": ticket,
             "richting": "long" if side == "buy" else "short",
             "units": _num(units, 2),

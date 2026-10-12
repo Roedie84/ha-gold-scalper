@@ -1,5 +1,12 @@
 # Changelog — Gold Scalper
 
+## 2.2.1
+
+* Paneel, tabel *Open posities*: kolom **Strategie** (Daghandel/Scalp) met
+  "+ bijkoop" bij een pyramide-toevoeging. Alle open posities stonden er al in
+  (en in de grafiek elk met instap-, stop- en doellijn); nu zie je per regel
+  welke strategie hem opende.
+
 ## 2.2.0
 
 * **Pyramiden volwaardig (besluit Ruud 12-10: "moet actief zijn").** Tot nu

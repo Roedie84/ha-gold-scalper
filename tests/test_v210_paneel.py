@@ -55,3 +55,14 @@ def test_js_uurgrafiek_en_letters():
     assert "3600 / base" in JS
     assert 'dh ? "D" : "S"' in JS and 'class="strat' in JS
     assert "strategie" in B._TRADE_KOLOMMEN_EXTRA
+
+
+def test_v221_strategiekolom_en_bijkoop():
+    assert "<th>Strategie</th>" in JS and "+ bijkoop" in JS
+    assert "open_reason" in B._TRADE_KOLOMMEN_EXTRA
+    pos = SimpleNamespace(ticket="T9", side="sell", units=0.5, open_price=4100.0,
+                          stop_loss=4105.0, take_profit=None, open_time=None)
+    db = [{"broker_ticket": "T9", "open_time": "2026-10-12T10:00:00+00:00",
+           "strategie": "scalp", "open_reason": "pyramide van T1"}]
+    rij = B._position_rows({"open_positions": [pos]}, db, {}, SimpleNamespace(bid=4099.0, ask=4099.6))[0]
+    assert rij["bijkoop"] is True and rij["strategie"] == "scalp"
