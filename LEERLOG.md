@@ -310,3 +310,14 @@ laatste ronde: 11-10 19:40, gemeten t/m 11-10 19:45
 - Hypotheses H-GS-7 (bruto < kosten), H-GS-10 (vrijdagsluiting, toets 16-10) ongewijzigd. Geen release.
 
 laatste ronde: 11-10 23:40, gemeten t/m 11-10 23:45
+
+## 12-10 03:40 · dagafsluiting 11-10
+- Zondag 11-10 (lokaal): markt dicht, 0 trades, 40 HA-herstarts; afstemming `in_orde`, drawdown 0,0 %, sluitreden onbekend 0,0 % over alle herstarts. 0 Gold Scalper-fouten. Geen knoppen gebruikt. Geïnstalleerd nu **1.10.3** (03:33; release van een andere sessie 03:31).
+- **Eerste handelsnacht (ma 00:15-02:19):** 14 trades, netto −17,28 = bruto +8,21 − kosten 25,49 → per trade −1,23 / +0,59 / 1,82 (7d: −1,13 / +0,37 / 1,50). Run 101: 78 trades / 8 clusters, netto −97,38, PF 0,472, t_cluster −2,86 (bruto +0,99); 10 uurblokken t_netto −2,08, t_bruto +0,70 → ~83 blokken voor een bruto-toets.
+- **Storing 02:21:52-03:21:44:** 360× "Unexpected error" (TypeError in `sort()` bij twee transacties met gelijk openLevel, terwijl het overzicht trade 78 nog niet had). Integratie 60 min onbeschikbaar: geen instap, geen positiebeheer. Enige open positie (78) was al door IG gesloten → geen onbewaakte positie. Hield op toen IG de transactie toonde; fix 1.10.3 (andere sessie).
+- **Gevonden (meetfout):** trade 78 kreeg als sluittijd het moment van ontdekken (03:21:54) i.p.v. de brokertijd (~02:21:50): looptijd ~62 min i.p.v. ~2,5 min, cluster 8 66,9 min. `_settle_vanished_positions` → `_record_broker_close` gebruikt `now`; `dateUtc` uit het transactieoverzicht wordt alleen bij latere correcties gebruikt. → **L-GS-011** gebouwd en getest (suite 2036 groen, 4 nieuwe tests), niet gereleased (al een release vandaag; niet acuut). Patch `analyse/2026-10-12-L-GS-011/sluitmoment.patch`; bewerken van de main-checkout werd door de toestemmingscontrole geweigerd → gebouwd in een kopie.
+- L-GS-010: 0 voorcheck-time-outs in de nacht → nog niet getoetst. Nieuw voorstel **L-GS-012** (open): een fout in de afwikkeling van één trade legt nu de hele cyclus stil (zoals 02:21-03:21).
+- Tijdstopvarianten: 4 blokken, 240-overeenkomst 92,9 %; 720 s +1,10/trade (t 0,94) → geen oordeel (<20). Latency p99 667 / p50 188 ms (handel + herstart).
+- H-GS-7 (bruto < kosten) houdt (0,59 tegen 1,82). H-GS-10 (vrijdagsluiting) toets 16-10. Geen release.
+
+laatste ronde: 12-10 03:40, gemeten t/m 12-10 03:45

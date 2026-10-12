@@ -1,0 +1,190 @@
+diff --git a/custom_components/gold_scalper/coordinator.py b/custom_components/gold_scalper/coordinator.py
+index ad31f25..0db60ed 100644
+--- a/custom_components/gold_scalper/coordinator.py
++++ b/custom_components/gold_scalper/coordinator.py
+@@ -145,6 +145,33 @@ def _as_datetime(value, fallback: datetime) -> datetime:
+     return fallback
+ 
+ 
++def broker_sluitmoment(werkelijk, open_time, nu: datetime) -> datetime | None:
++    """Het sluitmoment dat de broker noemt, als het bruikbaar is (1.10.4).
++
++    Uit het transactieoverzicht (``closed_at`` = ``dateUtc``). Alleen met een
++    tijd erin (een kale datum zou middernacht worden), niet vóór de opening en
++    niet meer dan een minuut na nu. Anders None: dan blijft het moment van
++    ontdekken staan.
++    """
++    gemeld = (werkelijk or {}).get("closed_at")
++    if not gemeld:
++        return None
++    try:
++        moment = datetime.fromisoformat(str(gemeld))
++    except (TypeError, ValueError):
++        return None
++    if not (moment.hour or moment.minute or moment.second):
++        return None
++    if moment.tzinfo is None:
++        moment = moment.replace(tzinfo=timezone.utc)
++    opende = _as_datetime(open_time, None) if open_time else None
++    if opende is not None and moment < opende:
++        return None
++    if moment > nu + timedelta(minutes=1):
++        return None
++    return moment
++
++
+ def _veilig_utc(waarde) -> datetime | None:
+     """Een bewaarde tijd als UTC, of None als hij ontbreekt of onleesbaar is."""
+     if not waarde:
+@@ -4395,9 +4422,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+                         self._geschatte_afwikkelingen,
+                     )
+ 
++            # 1.10.4: het sluitmoment van de broker, niet het moment van
++            # ontdekken. Op 12-10 sloot de broker een positie om 02:21; door
++            # een storing werd hij pas om 03:21 afgerekend en stond hij een
++            # uur te lang open in de administratie.
++            gesloten_om = broker_sluitmoment(werkelijk, trade.open_time, now)
+             await self._record_broker_close(
+                 _TicketOnly(str(trade.broker_ticket)), settle, reason, now,
+-                bron=bron,
++                bron=bron, gesloten_om=gesloten_om,
+             )
+ 
+     async def _zoek_activiteit(self, trade) -> dict | None:
+@@ -4778,9 +4810,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+     async def _record_broker_close(
+         self, position, quote: VenueQuote, reason: str, now: datetime,
+         bron: str = "broker_transactions",
++        gesloten_om: datetime | None = None,
+     ) -> None:
+         """Werk de open trade bij tot een gesloten trade.
+ 
++        ``gesloten_om`` (1.10.4): het sluitmoment volgens de broker. Gegeven,
++        dan bepaalt dat sluittijd en looptijd; anders het moment ``now``.
++
+         Zonder dit blijft de rij eeuwig open staan en telt hij nergens in mee:
+         de bewijsfase kijkt naar gesloten trades.
+         """
+@@ -4801,14 +4837,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
+         direction = 1.0 if long else -1.0
+         units = trade.volume * CONTRACT_SIZE
+ 
+-        trade.close_time = now.isoformat()
++        moment = gesloten_om or now
++        trade.close_time = moment.isoformat()
+         trade.close_price = exit_price
+         trade.close_mid = quote.mid
+         trade.close_spread = quote.spread
+         trade.close_reason = reason
+-        trade.duration_seconds = int(
+-            (now - _as_datetime(trade.open_time, now)).total_seconds()
+-        )
++        trade.duration_seconds = max(0, int(
++            (moment - _as_datetime(trade.open_time, moment)).total_seconds()
++        ))
+         # Bruto op de mids: dat is de beweging die de strategie ving.
+         # Uitersten meenemen. Zonder deze twee kan de verliesanalyse niet
+         # vaststellen of een verlies aan het ontwerp lag of aan de markt.
+diff --git a/tests/test_release_1104.py b/tests/test_release_1104.py
+new file mode 100644
+index 0000000..e94540d
+--- /dev/null
++++ b/tests/test_release_1104.py
+@@ -0,0 +1,96 @@
++"""1.10.4: een verdwenen positie krijgt het sluitmoment van de broker.
++
++12-10 02:21 sloot IG een positie (geopend 02:19). Door een storing in de
++afwikkeling (1.10.3) werd hij pas om 03:21:54 afgerekend. De sluittijd werd
++het moment van ontdekken: looptijd 62 minuten in plaats van 2,5, en het
++cluster liep een uur te lang door. Het transactieoverzicht noemde het echte
++moment (``dateUtc``) wel; dat werd alleen gebruikt bij een latere correctie.
++"""
++
++from __future__ import annotations
++
++import asyncio
++from datetime import datetime, timedelta, timezone
++
++from test_broker_cycle import NOW, ScriptedVenue, _coordinator  # noqa: F401
++
++from gold_scalper.coordinator import broker_sluitmoment
++
++
++OPEN = NOW - timedelta(minutes=65)
++
++
++def test_broker_moment_is_used_when_it_has_a_time():
++    moment = broker_sluitmoment(
++        {"closed_at": "2026-09-15T10:57:30"}, OPEN.isoformat(), NOW,
++    )
++    assert moment == datetime(2026, 9, 15, 10, 57, 30, tzinfo=timezone.utc)
++
++
++def test_unusable_broker_moments_are_ignored():
++    # Geen tijd (kale datum), vóór de opening, in de toekomst, onleesbaar, leeg.
++    for waarde in ("2026-09-15", "2026-09-15T10:00:00", "2026-09-15T12:05:00",
++                   "gisteren", None):
++        assert broker_sluitmoment(
++            {"closed_at": waarde}, OPEN.isoformat(), NOW,
++        ) is None, waarde
++    assert broker_sluitmoment(None, OPEN.isoformat(), NOW) is None
++
++
++def test_a_late_settlement_keeps_the_broker_close_time(tmp_path, monkeypatch):
++    """Het scenario van 12-10: afgerekend een uur na de echte sluiting."""
++    from gold_scalper.storage.database import Trade
++
++    venue = ScriptedVenue()
++    coordinator, _ = _coordinator(venue, tmp_path, monkeypatch)
++    coordinator.db.insert_trade(Trade(
++        run_id=coordinator.run_id, mode="demo", symbol="GOLD", side="buy",
++        volume=0.10, open_time=OPEN.isoformat(), open_price=4400.30,
++        open_mid=4400.0, open_spread=0.60, stop_loss=4393.0,
++        take_profit=4411.0, broker_ticket="T42",
++    ))
++    echt = OPEN + timedelta(minutes=2, seconds=30)
++
++    async def closed_deal(*_args, **_kwargs):
++        return {
++            "exit_price": 4393.0,
++            "profit_account": None,
++            "closed_at": echt.strftime("%Y-%m-%dT%H:%M:%S"),
++        }
++
++    venue.closed_deal = closed_deal
++    asyncio.run(coordinator._settle_vanished_positions(
++        asyncio.run(venue.quote()), NOW
++    ))
++
++    gesloten = coordinator.db.closed_trades(coordinator.run_id)
++    assert len(gesloten) == 1
++    trade = gesloten[0]
++    assert datetime.fromisoformat(trade.close_time) == echt
++    assert trade.duration_seconds == 150
++
++
++def test_without_a_broker_moment_the_discovery_time_stays(tmp_path, monkeypatch):
++    """Zonder bruikbaar moment van de broker verandert er niets."""
++    from gold_scalper.storage.database import Trade
++
++    venue = ScriptedVenue()
++    coordinator, _ = _coordinator(venue, tmp_path, monkeypatch)
++    coordinator.db.insert_trade(Trade(
++        run_id=coordinator.run_id, mode="demo", symbol="GOLD", side="buy",
++        volume=0.10, open_time=OPEN.isoformat(), open_price=4400.30,
++        open_mid=4400.0, open_spread=0.60, stop_loss=4393.0,
++        take_profit=4411.0, broker_ticket="T43",
++    ))
++
++    async def closed_deal(*_args, **_kwargs):
++        return {"exit_price": 4393.0, "closed_at": "2026-09-15"}
++
++    venue.closed_deal = closed_deal
++    asyncio.run(coordinator._settle_vanished_positions(
++        asyncio.run(venue.quote()), NOW
++    ))
++
++    trade = coordinator.db.closed_trades(coordinator.run_id)[0]
++    assert datetime.fromisoformat(trade.close_time) == NOW
++    assert trade.duration_seconds == 65 * 60

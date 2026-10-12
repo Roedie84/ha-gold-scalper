@@ -22,3 +22,7 @@
 | Handelsweek 06-10..09-10 per trade | netto −1,13 · bruto +0,37 · kosten 1,50 USD (kosten/bruto 4,1) | 303 trades (run 100: 16 clusters, t −3,28; run 101: 6, t −2,34) | 11-10 03:40 |
 | Run 101 uurblokken nodig | t_bruto 2 bij ~73 blokken (bruto +2,58/blok, sd 10,97); kosten 14,0/blok | 7 blokken | 11-10 03:40 |
 | Latency gesloten markt p50 / p99 | 183 / 253 ms (geen handelscycli; geen referentie voor handel) | n=2000 | 11-10 03:40 |
+| Run 101 uurblokken (10) | t_netto −2,08 (lag1 −0,02), t_bruto +0,70 (lag1 −0,30); bruto +2,63/blok, sd 11,9 → ~83 blokken voor t=2; kosten 12,4/blok | 78 trades | 12-10 03:40 |
+| Run 101 totaal | 78 trades / 8 clusters: netto −97,38 · bruto +26,30 · kosten 123,68 (per trade −1,25 / +0,34 / 1,59); PF 0,472; t_cluster −2,86 | t/m 12-10 03:45 | 12-10 03:40 |
+| Handelsnacht ma 00:15-02:19 per trade | netto −1,23 · bruto +0,59 · kosten 1,82 USD | 14 trades | 12-10 03:40 |
+| Latency handel p50 / p99 | 188 / 667 ms (incl. herstart 03:33) | n=2000 | 12-10 03:40 |
