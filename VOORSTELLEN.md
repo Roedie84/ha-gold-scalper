@@ -108,3 +108,17 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Voorstel: zet in de opties *Piramide* uit (of: de code negeert de optie zolang bijkopen niet wordt vastgelegd, zoals bij daghandel).
 - Verwacht effect: 0 onbekende posities door bijkopen; afstemming blijft `in_orde`.
 - Meten: WARNING "Piramide staat aan" verdwijnt bij de volgende start; afstemming `afwijkingen` 0; geen posities zonder trade-rij.
+
+## L-GS-017 · onderzoek: archiefbars en trades exporteren
+- Status: **gebouwd 2.3.0** (12-10 19:51, chatsessie; opdracht Ruud 12-10). Actie `gold_scalper.export_data` (alleen lezen). Onderzoek 6.048 varianten op 1m-30m met kosten 1,4 USD/oz: bruto ~0, geen vooraf-winnaar (CHANGELOG 2.4.0). Vastgelegd door de leerronde 12-10 23:40.
+
+## L-GS-018 · veldproef: 45 opzetten op 1m-30m met echte demo-orders
+- Status: **gebouwd 2.4.0/2.4.1** (12-10 20:36 / 23:15, chatsessie; opdracht Ruud 12-10). Run 107 sinds 22:41. Vastgelegd door de leerronde 12-10 23:40.
+- Meten: per opzet en tijdvak trades, bruto, kosten, netto per trade; orderafwijzingen per tijdvak (2.4.1: 0 herhalingen per cyclus verwacht); afstemming. Geen oordeel per opzet onder ~30 trades; meervoudig toetsen (45 opzetten) → een t van ~3 is pas iets, niet 2.
+- 12-10 23:40: 7 open, 0 gesloten; 41 afwijzingen 22:40-22:50 (vóór 2.4.1).
+
+## L-GS-019 · open posities: opzet/strategie per positie als attribuut
+- Status: **gepland (zelf bouwen: meetbaarheid/diagnose)** — dagafsluiting, niet vóór de L-GS-011-release van 13-10 (één release per dag; samen meenemen).
+- Onderbouwing (12-10 23:40): bij 7 open veldproefposities (4 long/3 short) is via HA niet te zien welke opzet elke positie opende of of hij in de administratie staat; `positions` heeft alleen ticket/side/units/prijzen. Het paneel toont de strategie al (2.2.1), de sensor niet. Daardoor las de uuranalyse de posities als dubbele orders en limietoverschrijding.
+- Bouw: per positie `strategie` (incl. `vp:<familie>:<tijdvak>`) en `in_administratie` (bool), plus telling `per_strategie_open`. Geen gedragswijziging.
+- Meten na bouw: elke open positie heeft een strategie; `in_administratie` false = afstemmingsfout.

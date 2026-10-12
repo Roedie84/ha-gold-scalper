@@ -362,3 +362,13 @@ laatste ronde: 12-10 15:40, gemeten t/m 12-10 15:55
 - H-GS-11 (daghandelkosten ≈ 20 % van de beweging): 0 daghandeltrades → nog niet meetbaar. H-GS-10 (vrijdagsluiting) toets 16-10. L-GS-011 klaar voor 13-10 (rebase op 2.2.1 nodig). Geen release.
 
 laatste ronde: 12-10 19:40, gemeten t/m 12-10 19:46
+
+## 12-10 23:40 · tussenronde
+- Chatsessie: **2.3.0** (19:51, `export_data`, L-GS-017), **2.4.0** (20:36, veldproef 45 opzetten op 1m-30m met echte demo-orders, L-GS-018, opdracht Ruud), **2.4.1** (21:15 UTC = 23:15, minimale stop 1 USD, afgewezen order niet elke cyclus herhalen). Actief 2.4.1 (herstart 23:18). Run 105 → 106 (22:38) → **run 107 sinds 22:41**.
+- **Slot run 105** (combinatie): 19:46-22:39 0 nieuwe trades (Columbus Day; broker meldde 19:00 markt dicht). Eind: 35 trades, alle scalp, netto −20,55 = bruto +1,25 − kosten 21,79 (0,62/trade), winst 34,3 %, t/trade −1,51, 0 daghandeltrades. Geen oordeel (n te klein); beeld = H-GS-7.
+- **Run 107 (veldproef):** 39 acties, 7 posities open (4 long/3 short, elk 1 oz, broker-stops aanwezig), 0 gesloten trades. 4 long boven `limiet_per_richting` 3 is volgens ontwerp (2.4.0: één positie per opzet bovenop de scalplimiet; `max_open_positions` + 1 + aantal opzetten, coordinator r. 341-348). Gelijke stop/doel bij twee posities past bij twee opzetten op dezelfde signaalbar (stop uit de bar, niet uit de vulprijs); niet te toetsen: het attribuut `positions` noemt geen opzet → **L-GS-019** (meetbaarheid).
+- **Orderafwijzingen:** 41× ATTACHED_ORDER_LEVEL_ERROR 22:40-22:50, ~2 per 10-s-cyclus (1m-stop 0,56 USD, elke cyclus opnieuw) = wat 2.4.1 oplost; sinds 23:18 0, maar markt dicht 23:00-00:00 → toets in de ronde van 03:40.
+- 1× HTTP 403 api-key-invalid (22:29, 1 van 3, hersteld). Latency p99 895 ms (6 herstarts, p50 208). Afstemming `in_orde`, noodstop/dataprobleem uit, demo. Geen knoppen gebruikt.
+- Hypotheses: H-GS-10 (vrijdagsluiting, toets 16-10), H-GS-11 (daghandelkosten ≈ 20 % van de beweging: nog 0 daghandeltrades). Nieuw meetdoel veldproef: per opzet en tijdvak trades, bruto/kosten; per opzet zijn ≥ 30 trades nodig voor een ruwe toets, bij 45 opzetten dus ≥ 1.350 trades vóór een eerste vergelijking. Geen release. L-GS-011 moet nu op 2.4.1 worden gezet (dagafsluiting 13-10).
+
+laatste ronde: 12-10 23:40, gemeten t/m 12-10 23:43
