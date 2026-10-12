@@ -208,6 +208,9 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 
 /* positie-kaart */
 .pk-kop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.strat { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; border: 1px solid currentColor; }
+.strat.daghandel { color: var(--goud); }
+.strat.scalp { color: var(--tekst2); }
 .zijde { padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 12px; letter-spacing: .12em; }
 .zijde.long { background: rgba(93, 173, 226, .16); color: var(--blauw); border: 1px solid rgba(93, 173, 226, .45); }
 .zijde.short { background: rgba(251, 146, 60, .14); color: var(--oranje); border: 1px solid rgba(251, 146, 60, .45); }
@@ -835,7 +838,9 @@ class GoldScalperBrokerPanel extends HTMLElement {
     const base = (this._data && this._data.instrument.tf_s) || 60;
     const lab = (s) => (s < 3600 ? `${s / 60}m` : `${s / 3600}u`);
     const opts = [1, 5, 15].map((m) => ({ m, s: base * m })).filter((o) => o.s <= 3600);
-    if (base >= 300) return [1, 3, 12].map((m) => ({ m, s: base * m, l: lab(base * m) }));
+    // 2.1.0: ook een uurgrafiek (bij 15m: 15m, 45m, 1u, 3u).
+    if (base >= 300) return [...new Set([1, 3, 3600 / base, 12])].filter((m) => Number.isInteger(m) && m >= 1)
+      .sort((a, b) => a - b).map((m) => ({ m, s: base * m, l: lab(base * m) }));
     return opts.map((o) => ({ ...o, l: lab(o.s) }));
   }
   _renderTf() {
@@ -881,7 +886,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     }
     const afstand = (x) => (isNum(x) && isNum(p.koers) ? fmtS(x - p.koers) : "—");
     el.innerHTML =
-      `<div class="pk-kop"><span class="zijde ${p.richting}">${p.richting.toUpperCase()}</span><b class="num">${fmt(p.units)} oz</b><span class="ticket">${esc(p.ticket)}</span></div>` +
+      `<div class="pk-kop"><span class="zijde ${p.richting}">${p.richting.toUpperCase()}</span>${p.strategie ? `<span class="strat ${esc(p.strategie)}">${p.strategie === "daghandel" ? "Daghandel" : "Scalp"}</span>` : ""}<b class="num">${fmt(p.units)} oz</b><span class="ticket">${esc(p.ticket)}</span></div>` +
       `<div><div class="pk-pnl ${toon(pnl)}">${fmtS(pnl)}<small>${esc(pv || "")}</small>${p.live ? '<span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}</div>` +
       (p.live && isNum(p.pnl_broker) ? `<div class="pk-sub">broker (per cyclus): ${fmtS(p.pnl_broker)} ${esc(vl || "")}</div>` : "") +
       `<div class="pk-sub"><span class="${toon(p.punten)}">${fmtS(p.punten, 2)} pt</span> · instap ${fmt(p.instap)} → ${fmt(p.koers)}</div></div>` +
@@ -1276,12 +1281,19 @@ ${tl}
         g.beginPath(); g.moveTo(xt(m.o_t), y(m.instap)); g.lineTo(xt(m.s_t), y(m.uitstap)); g.stroke(); g.setLineDash([]);
       }
       if (inO && isNum(m.instap)) {
+        // 2.1.0: daghandel groter met een gouden rand en "D", scalp "S".
         const xx = xt(m.o_t), yy = y(m.instap), lg = m.richting === "long";
-        g.fillStyle = lg ? KLEUR.long : KLEUR.short; g.strokeStyle = "#071017"; g.lineWidth = 1.2;
+        const dh = m.strategie === "daghandel", w = dh ? 7.5 : 5.5, h = dh ? 15 : 12;
+        g.fillStyle = lg ? KLEUR.long : KLEUR.short; g.strokeStyle = dh ? KLEUR.goud : "#071017"; g.lineWidth = dh ? 2 : 1.2;
         g.beginPath();
-        if (lg) { g.moveTo(xx, yy + 3); g.lineTo(xx - 5.5, yy + 12); g.lineTo(xx + 5.5, yy + 12); }
-        else { g.moveTo(xx, yy - 3); g.lineTo(xx - 5.5, yy - 12); g.lineTo(xx + 5.5, yy - 12); }
+        if (lg) { g.moveTo(xx, yy + 3); g.lineTo(xx - w, yy + h); g.lineTo(xx + w, yy + h); }
+        else { g.moveTo(xx, yy - 3); g.lineTo(xx - w, yy - h); g.lineTo(xx + w, yy - h); }
         g.closePath(); g.fill(); g.stroke();
+        if (m.strategie) {
+          g.fillStyle = dh ? KLEUR.goud : KLEUR.tekst2; g.font = font(10, 700); g.textAlign = "center";
+          g.textBaseline = lg ? "top" : "bottom";
+          g.fillText(dh ? "D" : "S", xx, lg ? yy + h + 2 : yy - h - 2);
+        }
       }
       if (inS && isNum(m.uitstap)) {
         g.fillStyle = win ? KLEUR.tp : KLEUR.sl; g.strokeStyle = "#071017"; g.lineWidth = 1.5;
@@ -1322,7 +1334,7 @@ ${tl}
       if (l.t === "entry") {
         const pnl = isNum(p.pnl_account) ? p.pnl_account : p.pnl;
         const v = isNum(p.pnl_account) ? (d.account.valuta || "") : iv;
-        tekst = `${p.richting.toUpperCase()} ${fmt(p.units)} @ ${fmt(p.instap)}   ${fmtS(pnl)} ${v}`;
+        tekst = `${p.strategie === "daghandel" ? "D " : p.strategie === "scalp" ? "S " : ""}${p.richting.toUpperCase()} ${fmt(p.units)} @ ${fmt(p.instap)}   ${fmtS(pnl)} ${v}`;
       } else if (l.t === "sl") tekst = `SL ${fmt(l.v)}  (${fmtS((p.richting === "long" ? l.v - p.instap : p.instap - l.v) * p.units)} ${iv})`;
       else tekst = `TP ${fmt(l.v)}  (${fmtS((p.richting === "long" ? l.v - p.instap : p.instap - l.v) * p.units)} ${iv})`;
       // labels niet over elkaar

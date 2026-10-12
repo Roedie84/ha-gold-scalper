@@ -74,7 +74,8 @@ from .const import (
     CONF_REGIME_SWITCHING, DEFAULT_ASSUMED_SPREAD, VENUE_PUBLIC,
     VENUE_STOOQ,
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
-    CONF_STRATEGIE, DEFAULT_STRATEGIE, STRATEGIE_DAGHANDEL, DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
+    CONF_STRATEGIE, DEFAULT_STRATEGIE, STRATEGIE_DAGHANDEL, STRATEGIE_SCALP, STRATEGIE_COMBINATIE,
+    CONF_SCALP_UNITS, DEFAULT_SCALP_UNITS, DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
     CONF_MAX_CONSECUTIVE_LOSSES, CONF_MAX_DAILY_LOSS_PCT, CONF_MAX_RESUMES_PER_DAY, CONF_MAX_SPREAD, CONF_MAX_SPREAD_ATR,
     CONF_MAX_TRADES_PER_DAY, CONF_MAX_UNITS, CONF_MIN_EDGE_MULTIPLE, CONF_MODE,
     CONF_STARTING_BALANCE, CONF_SYMBOL, CONF_TIMEFRAME, CONF_TOKEN,
@@ -102,6 +103,7 @@ from .storage.latency import (
     LATENCY_VENSTER, LatencyBudget, LatencyTracker, install_buffered_signals,
 )
 from .strategy.scalping import STRATEGY_VERSION, ScalpConfig, evaluate
+from .strategy import combinatie as combinatie_mod
 from .strategy import daghandel as daghandel_mod
 from .strategy.aggregator import BAR_SECONDS
 from .strategy.posities import (
@@ -287,6 +289,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         #: 2.0.0 (L-GS-014): daghandel of scalpen.
         self._strategie: str = options.get(CONF_STRATEGIE, DEFAULT_STRATEGIE)
+        #: 2.1.0: vaste grootte van scalptrades bij de combinatie.
+        self._scalp_units: float = float(options.get(CONF_SCALP_UNITS, DEFAULT_SCALP_UNITS))
+        #: 2.1.0: laatste instap per strategie (cooldown per strategie).
+        self._laatste_instap: dict[str, float] = {}
+        #: 2.1.0: strategie per ticket (cache van trades.strategie).
+        self._strategie_per_ticket: dict[str, str] = {}
+        #: 2.1.0: laatste signaal per strategie en resultaat per strategie.
+        self._signalen: dict[str, object] = {}
+        self._per_strategie: dict = {}
         self.strategy_cfg = ScalpConfig(
             max_spread=options.get(CONF_MAX_SPREAD, 3.00),
             max_spread_atr_ratio=options.get(CONF_MAX_SPREAD_ATR, 0.35),
@@ -327,7 +338,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 ),
                 # 1.9.0: de limiet per richting staat in de strategie; hier
                 # het totaal als vangnet (long en short samen).
-                max_open_positions=2 * self.strategy_cfg.max_positions_per_richting,
+                # 2.1.0: bij de combinatie komt er één daghandelpositie bij.
+                max_open_positions=2 * self.strategy_cfg.max_positions_per_richting
+                + (1 if options.get(CONF_STRATEGIE) == STRATEGIE_COMBINATIE else 0),
             ),
             self.starting_balance,
         )
@@ -484,8 +497,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         self.lifecycle = LifecycleController(DrainPolicy.WAIT_THEN_CLOSE)
         self.exits = ExitManager(
-            daghandel_mod.exit_config() if self.daghandel else ExitConfig()
+            daghandel_mod.exit_config()
+            if self._strategie in (STRATEGIE_DAGHANDEL, STRATEGIE_COMBINATIE)
+            else ExitConfig()
         )
+        #: 2.1.0: het scalpexitbeheer voor scalpposities bij de combinatie.
+        self._exits_scalp = ExitManager(ExitConfig())
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
         # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
         # bepaalde één uitschieter de p99.
@@ -1154,6 +1171,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         "mode": "mode",
         "entry_threshold": "entry_threshold",
         "strategy": CONF_STRATEGIE,
+        "scalp_units": CONF_SCALP_UNITS,
         "regime_switching": "regime_switching",
         "min_edge_multiple": "min_edge_multiple",
         "max_spread": "max_spread",
@@ -1275,13 +1293,64 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         return self._strategie == STRATEGIE_DAGHANDEL
 
     @property
+    def combinatie(self) -> bool:
+        return self._strategie == STRATEGIE_COMBINATIE
+
+    @property
+    def primaire_strategie(self) -> str:
+        """Bij de combinatie en daghandel: daghandel; anders scalp."""
+        return STRATEGIE_SCALP if self._strategie == STRATEGIE_SCALP else STRATEGIE_DAGHANDEL
+
+    def _telt_voor_reeks(self, trade) -> bool:
+        """2.1.0: bij de combinatie telt alleen de daghandel voor de
+        verliesreeks."""
+        if not self.combinatie:
+            return True
+        return combinatie_mod.strategie_van_trade(
+            trade, None, self.primaire_strategie) != STRATEGIE_SCALP
+
+    def _exits_voor(self, strategie: str | None) -> ExitManager:
+        if self.combinatie and strategie == STRATEGIE_SCALP:
+            return self._exits_scalp
+        return self.exits
+
+    async def _strategie_van(self, position) -> str:
+        """2.1.0: welke strategie opende deze positie? Eigen veld (paper),
+        cache, database; anders de primaire strategie."""
+        if not self.combinatie:
+            return self.primaire_strategie
+        eigen = getattr(position, "strategie", None)
+        if eigen in (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP):
+            return eigen
+        ticket = str(getattr(position, "ticket", None) or getattr(position, "id", ""))
+        if ticket in self._strategie_per_ticket:
+            return self._strategie_per_ticket[ticket]
+        gevonden = None
+        if self.db is not None and ticket:
+            try:
+                trades = await self.hass.async_add_executor_job(
+                    self.db.open_trades_by_tickets, [ticket]
+                )
+                if trades:
+                    gevonden = getattr(trades[0], "strategie", None)
+            except Exception as err:  # noqa: BLE001 - alleen een opzoeking
+                _LOGGER.debug("Strategie van %s niet op te zoeken: %s", ticket, err)
+        strategie = gevonden if gevonden in (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP) \
+            else self.primaire_strategie
+        self._strategie_per_ticket[ticket] = strategie
+        return strategie
+
+    @property
     def strategie_versie(self) -> str:
         """Komt in runs.strategy_version en in de vingerafdruk: een andere
         strategie is altijd een nieuwe run."""
+        if self.combinatie:
+            return combinatie_mod.COMBINATIE_VERSIE
         return daghandel_mod.STRATEGIE_VERSIE if self.daghandel else STRATEGY_VERSION
 
-    def _beslisser(self, now: datetime):
-        if not self.daghandel:
+    def _beslisser(self, now: datetime, strategie: str | None = None):
+        strategie = strategie or self.primaire_strategie
+        if strategie == STRATEGIE_SCALP:
             return evaluate
         return functools.partial(
             daghandel_mod.evaluate_daghandel, minuut_utc=now.astimezone(timezone.utc).minute,
@@ -1307,6 +1376,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "assumed_spread": config["assumed_spread"],
             "units": config["units"],
             "entry_threshold": self.strategy_cfg.entry_threshold,
+            # 2.1.0: de scalpgrootte hoort bij de opzet van de combinatie.
+            "scalp_units": (
+                getattr(self, "_scalp_units", None)
+                if getattr(self, "_strategie", None) == STRATEGIE_COMBINATIE else None
+            ),
             "regime_switching": self.strategy_cfg.regime_switching,
             "min_edge_multiple": self.strategy_cfg.min_edge_multiple,
             "enforce_hours": self.strategy_cfg.enforce_trading_hours,
@@ -2276,7 +2350,6 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if self._build_from_quotes and self._aggregator is not None:
             self.strategy_cfg.atr_correction = self._aggregator.correction
 
-        signal = None
         # 1.9.0: telling per richting (onbevestigde orders inbegrepen). De
         # limiet geldt per richting; een tegengesteld signaal blokkeert niets
         # en sluit ook niets.
@@ -2284,129 +2357,157 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             list(self.executor.pending.values())
             if self.mode.places_orders else []
         )
-        per_richting = tel_per_richting(open_positions, pending)
-        if self._candles is not None and len(self._candles) >= 60:
-            signal = await self.hass.async_add_executor_job(
-                self._beslisser(now), self._candles, quote.bid, quote.ask, self.strategy_cfg,
-                now.hour, aantal_open,
-                now.timestamp() - self._last_entry_ts, 0, per_richting,
-            )
-            self._last_signal = signal
-        budget.mark("signal")
-
-        # -- mag er gehandeld worden? ---------------------------------------- #
+        # 2.1.0: per strategie beslissen. Bij één strategie is dit één ronde
+        # met alle posities, precies als voorheen.
+        if self.combinatie:
+            posities_per_strategie: dict[str, list] = {}
+            for p in open_positions:
+                posities_per_strategie.setdefault(
+                    await self._strategie_van(p), []).append(p)
+        else:
+            posities_per_strategie = {self.primaire_strategie: list(open_positions)}
+        signal = None
         reject_reason = None
-        #: 1.9.0: categorie voor de schaduwtrade als een geldig signaal niet
-        #: wordt uitgevoerd (zie strategy/schaduw.SCHADUW_REDENEN). None: geen
-        #: schaduwtrade (signaalfilter, markt dicht, koers verouderd ...).
-        schaduw_reden: str | None = None
-        uitgevoerd = False
-        if signal is not None:
-            if not self.lifecycle.accepts_new_positions:
-                reject_reason = f"levenscyclus: {self.lifecycle.state.value}"
-                schaduw_reden = "levenscyclus"
-            elif not self._enabled:
-                reject_reason = "handel staat uit"
-                schaduw_reden = "handel_uit"
-            elif self._afwikkeling_mislukt:
-                # 1.11.0 (L-GS-012): conservatief; eerst de boekhouding rond.
-                reject_reason = "afwikkeling van een trade mislukt: geen instap deze cyclus"
-            elif self.mode.places_orders and self.executor.has_pending:
-                reject_reason = "onbevestigde order: eerst terugvinden"
-                schaduw_reden = "onbevestigde_order"
-            elif not signal.should_trade:
-                reject_reason = signal.reject_reason
-                if signal.reject_reason == "max_positions_zelfde_richting":
-                    schaduw_reden = "positielimiet"
-                elif signal.reject_reason == "cooldown":
-                    schaduw_reden = "cooldown"
-            else:
-                fx_ok, fx_reden = self.conversion.usable_for_entry(now)
-                allowed, why = self.risk.can_open(
-                    now=now, balance=balance, equity=equity,
-                    starting_balance=self.starting_balance,
-                    open_positions=aantal_open,
-                    volume=self.units / CONTRACT_SIZE,
-                    spread=quote.spread, last_tick_age=tick_age,
-                    market_open=tradeable,
-                    atr=self.state.atr.value,
-                    opening_equity=self.opening_equity,
-                )
-                reject_reason = None if allowed else f"risico: {why}"
-                if not allowed:
-                    # Markt dicht of dode data: geen betrouwbare instapprijs,
-                    # dus ook geen schaduwtrade.
-                    schaduw_reden = (
-                        None if why in ("markt gesloten", "dataverbinding dood")
-                        else "risico"
-                    )
-
-                # Geen nieuwe positie zonder bruikbare wisselkoers wanneer er
-                # omgerekend moet worden: de positiegrootte is dan niet te
-                # garanderen. Alleen nieuwe posities - exitbeheer, afstemming
-                # en veiligheid lopen gewoon door.
-                if allowed and not fx_ok:
-                    allowed = False
-                    reject_reason = f"wisselkoers: {fx_reden}"
-                    schaduw_reden = "wisselkoers"
-                    if self._fx_block_reason != fx_reden:
-                        self._fx_block_reason = fx_reden
-                        _LOGGER.warning(
-                            "Geen nieuwe posities: %s (bron %s).",
-                            fx_reden, self.conversion.rate_source or "geen",
-                        )
-                elif fx_ok:
-                    self._fx_block_reason = None
-
-                # Kort voor sluiting geen nieuwe posities. Een trade met een
-                # tijdslimiet van vijf minuten die om 22:58 opengaat, wordt door
-                # de sluiting overvallen: je zit dan tot de volgende sessie
-                # vast, en die opent met een gat waar geen stop tussen zit.
-                if allowed and self._use_schedule and self._close_buffer > 0:
-                    resterend = minutes_until_close(SPOT_GOLD, now)
-                    if resterend is not None and resterend <= self._close_buffer:
-                        allowed = False
-                        schaduw_reden = None
-                        reject_reason = (
-                            f"nog {resterend:.0f} minuten tot sluiting; een "
-                            "nieuwe positie zou door de sluiting worden "
-                            "overvallen"
-                        )
-
-                # 1.9.0: extra posities. Netting, spreiding, marge en vloer.
-                if allowed:
-                    blok, blok_reden = await self._toets_extra_positie(
-                        signal, quote, now, open_positions, equity,
-                    )
-                    if blok:
-                        allowed = False
-                        reject_reason = blok_reden
-                        schaduw_reden = blok if blok in SCHADUW_REDENEN else None
-
-            if reject_reason is None and signal.should_trade:
-                if self._geopend_in_cyclus >= 1:
-                    # 1.9.0: hooguit één nieuwe positie per cyclus.
-                    reject_reason = "al een positie geopend in deze cyclus"
-                    schaduw_reden = "per_cyclus"
-                else:
-                    uitgevoerd = await self._open_position(
-                        signal, quote, now, gelijktijdig_open=aantal_open,
-                    )
-
-            # 1.9.0: geldig signaal, niet uitgevoerd: schaduwtrade.
-            if (schaduw_reden and not uitgevoerd and quote.tradeable
-                    and not self.koers_verouderd):
-                await self._open_schaduw(
-                    signal, quote, now, schaduw_reden, reject_reason,
-                    open_positions, equity,
-                )
-
-            await self.hass.async_add_executor_job(
-                self.db.log_signal, self.run_id, signal.score, signal.confidence,
-                "buy" if signal.direction > 0 else "sell" if signal.direction < 0 else "flat",
-                None, quote.spread, reject_reason is None and signal.should_trade,
-                reject_reason, signal.components,
+        per_richting = tel_per_richting(open_positions, pending)
+        for ronde, strategie in enumerate(combinatie_mod.strategieen(self._strategie)):
+            eigen = posities_per_strategie.get(strategie, [])
+            eigen_richting = tel_per_richting(eigen, pending)
+            eigen_open = len(eigen) + (len(pending) if self.mode.places_orders else 0)
+            laatste_instap = (
+                self._laatste_instap.get(strategie, 0.0) if self.combinatie
+                else self._last_entry_ts
             )
+            r_signal = None
+            if self._candles is not None and len(self._candles) >= 60:
+                r_signal = await self.hass.async_add_executor_job(
+                    self._beslisser(now, strategie), self._candles, quote.bid, quote.ask,
+                    self.strategy_cfg, now.hour, eigen_open,
+                    now.timestamp() - laatste_instap, 0, eigen_richting,
+                )
+                if r_signal is not None and self.combinatie:
+                    r_signal.components = {**(r_signal.components or {}), "strategie": strategie}
+                self._signalen[strategie] = r_signal
+            if ronde == 0:
+                signal = r_signal
+                self._last_signal = r_signal
+                per_richting = eigen_richting if self.combinatie else per_richting
+                budget.mark("signal")
+            r_reject = None
+            #: 1.9.0: categorie voor de schaduwtrade als een geldig signaal niet
+            #: wordt uitgevoerd (zie strategy/schaduw.SCHADUW_REDENEN). None: geen
+            #: schaduwtrade (signaalfilter, markt dicht, koers verouderd ...).
+            schaduw_reden: str | None = None
+            uitgevoerd = False
+            if r_signal is not None:
+                if not self.lifecycle.accepts_new_positions:
+                    r_reject = f"levenscyclus: {self.lifecycle.state.value}"
+                    schaduw_reden = "levenscyclus"
+                elif not self._enabled:
+                    r_reject = "handel staat uit"
+                    schaduw_reden = "handel_uit"
+                elif self._afwikkeling_mislukt:
+                    # 1.11.0 (L-GS-012): conservatief; eerst de boekhouding rond.
+                    r_reject = "afwikkeling van een trade mislukt: geen instap deze cyclus"
+                elif self.mode.places_orders and self.executor.has_pending:
+                    r_reject = "onbevestigde order: eerst terugvinden"
+                    schaduw_reden = "onbevestigde_order"
+                elif not r_signal.should_trade:
+                    r_reject = r_signal.reject_reason
+                    if r_signal.reject_reason == "max_positions_zelfde_richting":
+                        schaduw_reden = "positielimiet"
+                    elif r_signal.reject_reason == "cooldown":
+                        schaduw_reden = "cooldown"
+                else:
+                    fx_ok, fx_reden = self.conversion.usable_for_entry(now)
+                    allowed, why = self.risk.can_open(
+                        now=now, balance=balance, equity=equity,
+                        starting_balance=self.starting_balance,
+                        open_positions=aantal_open,
+                        volume=self.units / CONTRACT_SIZE,
+                        spread=quote.spread, last_tick_age=tick_age,
+                        market_open=tradeable,
+                        atr=self.state.atr.value,
+                        opening_equity=self.opening_equity,
+                    )
+                    r_reject = None if allowed else f"risico: {why}"
+                    if not allowed:
+                        # Markt dicht of dode data: geen betrouwbare instapprijs,
+                        # dus ook geen schaduwtrade.
+                        schaduw_reden = (
+                            None if why in ("markt gesloten", "dataverbinding dood")
+                            else "risico"
+                        )
+
+                    # Geen nieuwe positie zonder bruikbare wisselkoers wanneer er
+                    # omgerekend moet worden: de positiegrootte is dan niet te
+                    # garanderen. Alleen nieuwe posities - exitbeheer, afstemming
+                    # en veiligheid lopen gewoon door.
+                    if allowed and not fx_ok:
+                        allowed = False
+                        r_reject = f"wisselkoers: {fx_reden}"
+                        schaduw_reden = "wisselkoers"
+                        if self._fx_block_reason != fx_reden:
+                            self._fx_block_reason = fx_reden
+                            _LOGGER.warning(
+                                "Geen nieuwe posities: %s (bron %s).",
+                                fx_reden, self.conversion.rate_source or "geen",
+                            )
+                    elif fx_ok:
+                        self._fx_block_reason = None
+
+                    # Kort voor sluiting geen nieuwe posities. Een trade met een
+                    # tijdslimiet van vijf minuten die om 22:58 opengaat, wordt door
+                    # de sluiting overvallen: je zit dan tot de volgende sessie
+                    # vast, en die opent met een gat waar geen stop tussen zit.
+                    if allowed and self._use_schedule and self._close_buffer > 0:
+                        resterend = minutes_until_close(SPOT_GOLD, now)
+                        if resterend is not None and resterend <= self._close_buffer:
+                            allowed = False
+                            schaduw_reden = None
+                            r_reject = (
+                                f"nog {resterend:.0f} minuten tot sluiting; een "
+                                "nieuwe positie zou door de sluiting worden "
+                                "overvallen"
+                            )
+
+                    # 1.9.0: extra posities. Netting, spreiding, marge en vloer.
+                    if allowed:
+                        blok, blok_reden = await self._toets_extra_positie(
+                            r_signal, quote, now, open_positions, equity,
+                            eigen=eigen,
+                        )
+                        if blok:
+                            allowed = False
+                            r_reject = blok_reden
+                            schaduw_reden = blok if blok in SCHADUW_REDENEN else None
+
+                if r_reject is None and r_signal.should_trade:
+                    if self._geopend_in_cyclus >= 1:
+                        # 1.9.0: hooguit één nieuwe positie per cyclus.
+                        r_reject = "al een positie geopend in deze cyclus"
+                        schaduw_reden = "per_cyclus"
+                    else:
+                        uitgevoerd = await self._open_position(
+                            r_signal, quote, now, gelijktijdig_open=aantal_open,
+                        )
+
+                # 1.9.0: geldig signaal, niet uitgevoerd: schaduwtrade.
+                if (schaduw_reden and not uitgevoerd and quote.tradeable
+                        and not self.koers_verouderd):
+                    await self._open_schaduw(
+                        r_signal, quote, now, schaduw_reden, r_reject,
+                        open_positions, equity,
+                    )
+
+                await self.hass.async_add_executor_job(
+                    self.db.log_signal, self.run_id, r_signal.score, r_signal.confidence,
+                    "buy" if r_signal.direction > 0 else "sell" if r_signal.direction < 0 else "flat",
+                    None, quote.spread, r_reject is None and r_signal.should_trade,
+                    r_reject, r_signal.components,
+                )
+
+            if ronde == 0:
+                reject_reason = r_reject
 
         # 1.10.1: alleen een gemeten equity in de equitycurve. De terugval op
         # de startbalans (opvraging mislukt) is geen meting; hij gaf op 10-10
@@ -2452,6 +2553,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             stats = await self.hass.async_add_executor_job(
                 performance.compute_for_run, self.db, self.run_id, closed,
                 self.account_drawdown or None,
+            )
+            # 2.1.0: resultaat per strategie (alleen zinvol bij de combinatie).
+            self._per_strategie = (
+                combinatie_mod.per_strategie(closed, self.primaire_strategie)
+                if self.combinatie else {}
             )
 
         # 1.9.5: statistiek van de tijdstopvarianten.
@@ -2518,7 +2624,17 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "schaduw": self._schaduw_stats,
             # 1.9.5: tijdstopvarianten (gesimuleerd, alleen meting).
             "tijdstopvarianten": self._varianten_stats,
-            "stats": stats,
+            "stats": {**stats, "per_strategie": self._per_strategie} if self.combinatie else stats,
+            # 2.1.0: strategiekeuze (paneel: markers, uitstap per positie).
+            "strategie_keuze": self._strategie,
+            "primaire_strategie": self.primaire_strategie,
+            # 2.1.0: laatste signaal per strategie (bij de combinatie).
+            "signalen": {
+                k: {"richting": getattr(v, "direction", 0), "score": getattr(v, "score", None),
+                    "reden": getattr(v, "reject_reason", None),
+                    "uitleg": getattr(v, "reason", None)}
+                for k, v in self._signalen.items() if v is not None
+            } if self.combinatie else {},
             "gate": self.gate,
             "risk": self.risk.as_dict(),
             "lifecycle": {
@@ -2900,7 +3016,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             size = getattr(position, "units", None)
             if size is None:
                 size = (getattr(position, "volume", 0) or 0) * CONTRACT_SIZE
-            action = self.exits.evaluate(
+            # 2.1.0: de uitstapregels van de strategie die de positie opende.
+            strategie = await self._strategie_van(position)
+            action = self._exits_voor(strategie).evaluate(
                 side=position.side,
                 volume=size,
                 open_price=position.open_price,
@@ -2938,7 +3056,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
             # Pyramiden vóór de exitacties: bijkopen bij bevestiging is een
             # aparte beslissing van de vraag of je moet sluiten.
-            if (self.pyramid.enabled and not self.daghandel
+            if (self.pyramid.enabled and strategie == STRATEGIE_SCALP
                     and action.kind in ("hold", "modify_stop")):
                 await self._consider_pyramid(position, quote, ticket)
 
@@ -3035,13 +3153,22 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 if self.paper else self.starting_balance
             )
             entry_price = quote.ask if side == "buy" else quote.bid
-            sized = position_size(
-                self.sizing, equity, entry_price, signal.stop_loss,
-                signal.score, self.strategy_cfg.entry_threshold,
-            )
-            units = sized.units
-            self.last_sizing = sized.as_dict()
-            _LOGGER.debug("Ordergrootte: %s", sized.reason)
+            if self._scalp_vast(signal):
+                units = float(min(self._scalp_units, self.sizing.max_units))
+                self.last_sizing = {
+                    "units": units, "reason": "combinatie: vaste scalpgrootte",
+                    "risk_amount": round(units * abs(entry_price - (signal.stop_loss or entry_price)), 2),
+                }
+            else:
+                sized = position_size(
+                    self.sizing, equity, entry_price, signal.stop_loss,
+                    signal.score, self.strategy_cfg.entry_threshold,
+                )
+                units = sized.units
+                self.last_sizing = sized.as_dict()
+            _LOGGER.debug("Ordergrootte: %s", self.last_sizing.get("reason"))
+            strategie = (getattr(signal, "components", None) or {}).get(
+                "strategie", self.primaire_strategie)
 
             if self.mode.places_orders:
                 # De poort geldt alleen voor echt geld. Op demo is er niets te
@@ -3071,6 +3198,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         "Order onbevestigd: %s Nieuwe orders wachten.", result.error,
                     )
                     self._last_entry_ts = now.timestamp()
+                    self._laatste_instap[strategie] = now.timestamp()
                     self._geopend_in_cyclus += 1
                     return True
                 if not result.success:
@@ -3104,6 +3232,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     signal.score, signal.confidence, None, signal.reason,
                 )
                 trade.gelijktijdig_open = gelijktijdig_open
+                trade.strategie = strategie if self.combinatie else None
                 await self.hass.async_add_executor_job(self.db.update_trade, trade)
                 # 1.9.5: tijdstopvarianten van deze positie (alleen meting).
                 await self._open_varianten(
@@ -3113,6 +3242,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 )
             self.risk.record_open()
             self._last_entry_ts = now.timestamp()
+            self._laatste_instap[strategie] = now.timestamp()
             self._geopend_in_cyclus += 1
             return True
         except (ModeLockedError, VenueError) as err:
@@ -3132,6 +3262,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         koers = self.conversion.risk_rate or self.conversion.rate
         return bedrag * koers if koers else bedrag
 
+    def _scalp_vast(self, signal) -> bool:
+        """2.1.0: bij de combinatie krijgen scalptrades een vaste grootte."""
+        return self.combinatie and (
+            (getattr(signal, "components", None) or {}).get("strategie") == STRATEGIE_SCALP
+        )
+
     def _grootte(self, signal, quote: VenueQuote, equity: float | None) -> float:
         """Ordergrootte zoals ``_open_position`` hem zou bepalen (ounces).
 
@@ -3144,6 +3280,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         """
         side = "buy" if signal.direction == 1 else "sell"
         entry_price = quote.ask if side == "buy" else quote.bid
+        if self._scalp_vast(signal):
+            return float(min(self._scalp_units, self.sizing.max_units))
         try:
             basis = (
                 self.paper.equity(self._paper_quote(quote))
@@ -3159,7 +3297,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     async def _toets_extra_positie(
         self, signal, quote: VenueQuote, now: datetime, open_positions: list,
-        equity: float | None,
+        equity: float | None, eigen: list | None = None,
     ) -> tuple[str | None, str | None]:
         """Mag dit signaal naast de open posities een positie openen?
 
@@ -3168,8 +3306,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         strategy/schaduw.SCHADUW_REDENEN); 'spreiding' hoort daar niet bij.
         """
         richting = 1 if signal.direction == 1 else -1
+        # 2.1.0: spreiding alleen tegen posities van dezelfde strategie; marge
+        # en vloer hieronder over alles samen.
         zelfde = [
-            p for p in open_positions
+            p for p in (open_positions if eigen is None else eigen)
             if richting_van(getattr(p, "side", "buy")) == richting
         ]
         tegen = [
@@ -3326,10 +3466,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         units, signal, now: datetime,
     ) -> None:
         """Vier tijdstopvarianten voor een zojuist geopende echte positie."""
-        if self.db is None or not ref or self.daghandel:
+        strategie = (getattr(signal, "components", None) or {}).get(
+            "strategie", self.primaire_strategie)
+        if self.db is None or not ref or strategie != STRATEGIE_SCALP:
             # 2.0.0: daghandel heeft geen tijdstop; de varianten meten niets.
             return
-        self.varianten.exits = self.exits
+        self.varianten.exits = self._exits_voor(STRATEGIE_SCALP)
         try:
             nieuw = self.varianten.openen(
                 run_id=self.run_id, trade_ref=ref, side=side,
@@ -3371,7 +3513,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if not self.varianten.open_trades or self.db is None or self.koers_verouderd:
             return
         # Alleen een verwijzing: de configuratie wordt gelezen, nooit gewijzigd.
-        self.varianten.exits = self.exits
+        self.varianten.exits = self._exits_voor(STRATEGIE_SCALP)
         try:
             atr = self.state.atr.value or 0.0
             if atr <= 0:
@@ -3629,6 +3771,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 uitstap = activiteit.get("exit_price")
             if uitstap is None:
                 uitstap = trade.close_price
+            # 2.1.0: de uitstapregels van de strategie van deze trade.
+            cfg = self._exits_voor(combinatie_mod.strategie_van_trade(
+                trade, None, self.primaire_strategie)).config
             # Zonder tijdstop (uitstapregime van vóór 1.7.6) is een sluiting
             # na de tijdstopduur geen tijdslimiet.
             tijdstop = (
@@ -4791,6 +4936,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             stop_loss=trade.stop_loss, take_profit=trade.take_profit,
             signal_score=trade.signal_score, regime=trade.regime,
             broker_ticket=f"{ticket}-deel",
+            strategie=trade.strategie,
             execution_semantics=trade.execution_semantics,
             exit_regime=trade.exit_regime,
             mfe=(self._excursions.get(str(ticket), {}).get("mfe", 0.0)) * units,
@@ -4809,7 +4955,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         trade.volume = max(0.0, trade.volume - closed_lots)
         await self.hass.async_add_executor_job(self.db.update_trade, trade)
 
-        self.risk.record_close(part.net_pnl or 0.0, now)
+        self.risk.record_close(part.net_pnl or 0.0, now,
+                               telt_voor_reeks=self._telt_voor_reeks(trade))
         _LOGGER.info(
             "Deel genomen: %.2f oz, netto %.2f. %s",
             units, part.net_pnl or 0.0, reason,
@@ -4866,8 +5013,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             entry_cci=(signal.components or {}).get("cci"),
             broker_ticket=str(result.ticket) if result.ticket else None,
             gelijktijdig_open=gelijktijdig_open,
+            # 2.1.0: welke strategie opende de positie (alleen bij de
+            # combinatie; anders volgt het uit de run).
+            strategie=(
+                (signal.components or {}).get("strategie") if self.combinatie else None
+            ),
         )
         await self.hass.async_add_executor_job(self.db.insert_trade, trade)
+        if result.ticket and trade.strategie:
+            self._strategie_per_ticket[str(result.ticket)] = trade.strategie
 
         # Meteen een beginwaarde zetten. Een positie die tussen twee cycli
         # opent en sluit, of die de broker sluit voordat de lus hem ziet, werd
@@ -4986,7 +5140,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             trade.close_reason_source = "own_order"
 
         await self.hass.async_add_executor_job(self.db.update_trade, trade)
-        self.risk.record_close(trade.net_pnl, now)
+        self.risk.record_close(trade.net_pnl, now,
+                               telt_voor_reeks=self._telt_voor_reeks(trade))
         _LOGGER.info(
             "Trade gesloten: %s, bruto %.2f, kosten %.2f, netto %.2f",
             reason, trade.gross_pnl, trade.total_cost, trade.net_pnl,

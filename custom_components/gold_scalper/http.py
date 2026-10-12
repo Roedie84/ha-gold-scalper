@@ -324,6 +324,11 @@ class GoldScalperBrokerView(HomeAssistantView):
             and places_orders
         )
         exits = getattr(getattr(coordinator, "exits", None), "config", None)
+        # 2.1.0: de scalpregels voor scalpposities (daghandel krijgt in het
+        # model zijn eigen uitstap tot 20:45 UTC).
+        voor = getattr(coordinator, "_exits_voor", None)
+        if callable(voor):
+            exits = getattr(voor("scalp"), "config", exits)
         exit_cfg = {
             k: getattr(exits, k, None)
             for k in ("time_stop_seconds", "time_stop_deadzone_atr", "max_hold_seconds")

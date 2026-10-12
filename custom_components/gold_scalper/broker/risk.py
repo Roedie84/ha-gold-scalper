@@ -371,8 +371,14 @@ class RiskManager:
     def record_open(self) -> None:
         self.state.trades_today += 1
 
-    def record_close(self, net_pnl: float, now: datetime) -> None:
+    def record_close(self, net_pnl: float, now: datetime,
+                     telt_voor_reeks: bool = True) -> None:
+        """``telt_voor_reeks`` (2.1.0): bij de combinatie tellen scalptrades
+        niet mee voor de verliesreeks; anders legt een gewone scalpreeks ook
+        de daghandel stil."""
         self.sluitingen += 1
+        if not telt_voor_reeks:
+            return
         if net_pnl < 0:
             self.state.consecutive_losses += 1
             if self.state.consecutive_losses >= self.limits.max_consecutive_losses:

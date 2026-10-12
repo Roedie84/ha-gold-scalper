@@ -162,7 +162,7 @@ _TRADE_KOLOMMEN = (
 
 #: 1.10.0: optioneel, alleen als de kolom er al is (een database die nog
 #: niet door deze versie is geopend, heeft ze niet).
-_TRADE_KOLOMMEN_EXTRA = ("looptijd_s", "close_reason_source")
+_TRADE_KOLOMMEN_EXTRA = ("looptijd_s", "close_reason_source", "strategie")
 
 
 def _kolommen(conn: sqlite3.Connection) -> str:
@@ -295,7 +295,10 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> li
         db = per_ticket.get(ticket, {})
         geopend = _epoch(getattr(p, "open_time", None)) or _epoch(db.get("open_time"))
         regime = db.get("exit_regime")
+        strategie = _strategie(db, data)
+        daghandel = strategie == "daghandel"
         uit.append({
+            "strategie": strategie,
             "ticket": ticket,
             "richting": "long" if side == "buy" else "short",
             "units": _num(units, 2),
@@ -308,9 +311,13 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> li
             "pnl_account": _num(getattr(p, "unrealised_pnl", None), 2),
             "geopend": geopend,
             "regime": regime,
-            "tijdstop_s": exit_cfg.get("time_stop_seconds") if regime != "zonder_tijdstop" else None,
-            "dode_zone_atr": exit_cfg.get("time_stop_deadzone_atr"),
-            "max_duur_s": exit_cfg.get("max_hold_seconds"),
+            # 2.1.0: daghandel heeft geen tijdstop; "max. duur" is dan de tijd
+            # tot 20:45 UTC, wanneer hij dicht gaat.
+            "tijdstop_s": None if daghandel or regime == "zonder_tijdstop"
+            else exit_cfg.get("time_stop_seconds"),
+            "dode_zone_atr": None if daghandel else exit_cfg.get("time_stop_deadzone_atr"),
+            "max_duur_s": _sluit_daghandel_s(geopend) if daghandel
+            else exit_cfg.get("max_hold_seconds"),
         })
     return uit
 
@@ -349,7 +356,39 @@ def _trade_rows(rijen: list[dict]) -> list[dict]:
     return uit
 
 
-def _markers(rijen: list[dict], vanaf: int | None) -> list[dict]:
+def _strategie(rij: dict, data: dict) -> str:
+    """2.1.0: strategie van een trade; zonder eigen veld die van de run."""
+    eigen = rij.get("strategie")
+    if eigen in ("daghandel", "scalp"):
+        return eigen
+    return data.get("primaire_strategie") or "scalp"
+
+
+def _sluit_daghandel_s(geopend: int | None) -> int | None:
+    """Seconden van de opening tot 20:45 UTC op die dag (daghandel)."""
+    if geopend is None:
+        return None
+    from datetime import datetime, timezone
+
+    o = datetime.fromtimestamp(geopend, timezone.utc)
+    sluit = o.replace(hour=20, minute=45, second=0, microsecond=0)
+    return max(0, int((sluit - o).total_seconds()))
+
+
+def _open_markers(rijen: list[dict], data: dict) -> list[dict]:
+    """2.1.0: instapmarkers van de open posities (nog zonder uitstap)."""
+    uit = []
+    for r in rijen:
+        uit.append({
+            "o_t": _epoch(r.get("open_time")), "s_t": None,
+            "richting": "long" if r.get("side") == "buy" else "short",
+            "instap": _num(r.get("open_price")), "uitstap": None, "pnl": None,
+            "strategie": _strategie(r, data), "open": True,
+        })
+    return uit
+
+
+def _markers(rijen: list[dict], vanaf: int | None, data: dict | None = None) -> list[dict]:
     uit = []
     for r in rijen[:MARKER_TRADES]:
         o = _epoch(r.get("open_time"))
@@ -362,6 +401,7 @@ def _markers(rijen: list[dict], vanaf: int | None) -> list[dict]:
             "instap": _num(r.get("open_price")),
             "uitstap": _num(r.get("close_price")),
             "pnl": _num(r.get("net_pnl"), 2),
+            "strategie": _strategie(r, data or {}),
         })
     uit.reverse()
     return uit
@@ -533,7 +573,10 @@ def build_payload(
             "rijen": db.get("equity_rijen", 0),
         },
         "trades": _trade_rows(db["gesloten"]),
-        "markers": _markers(db["gesloten"], candles["t"][0] if candles else None),
+        "markers": _markers(db["gesloten"], candles["t"][0] if candles else None, data)
+        + _open_markers(db["open"], data),
+        # 2.1.0: strategiekeuze voor de grafieklegenda.
+        "strategie": data.get("strategie_keuze") or data.get("primaire_strategie"),
         "stats": {
             "trades": stats.get("trades") or 0,
             "winst": stats.get("wins"),

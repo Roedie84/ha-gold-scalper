@@ -49,7 +49,12 @@ CONF_ENTRY_THRESHOLD: Final = "entry_threshold"
 CONF_STRATEGIE: Final = "strategie"
 STRATEGIE_DAGHANDEL: Final = "daghandel"
 STRATEGIE_SCALP: Final = "scalp"
-STRATEGIEEN: Final = (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP)
+#: 2.1.0: beide tegelijk, elke positie met haar eigen strategie.
+STRATEGIE_COMBINATIE: Final = "combinatie"
+STRATEGIEEN: Final = (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP, STRATEGIE_COMBINATIE)
+#: 2.1.0: vaste grootte van scalptrades bij de combinatie (ounce).
+CONF_SCALP_UNITS: Final = "scalp_units"
+DEFAULT_SCALP_UNITS: Final = 1.0
 #: Besluit Ruud 12-10-2026: van scalpen naar daghandel.
 DEFAULT_STRATEGIE: Final = STRATEGIE_DAGHANDEL
 CONF_REGIME_SWITCHING: Final = "regime_switching"
@@ -215,7 +220,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.0.1"
+INTEGRATION_VERSION: Final = "2.1.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

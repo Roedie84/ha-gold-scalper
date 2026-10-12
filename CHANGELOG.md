@@ -1,5 +1,39 @@
 # Changelog — Gold Scalper
 
+## 2.1.0
+
+* **Combinatie van daghandel en scalpen, beide met echte orders (L-GS-015,
+  besluit Ruud 12-10-2026).** Nieuwe keuze *Combinatie* bij *Strategie*.
+  Elke positie draagt de strategie die haar opende (`trades.strategie`, nieuwe
+  kolom) en houdt haar eigen regels:
+  * daghandel: risicogestuurde grootte, hooguit één positie, volgstop, dicht
+    om 20:45 UTC;
+  * scalp: vaste grootte *Scalpgrootte bij combinatie* (standaard 1 oz), de
+    limiet per richting, het oorspronkelijke exitbeheer met tijdstop,
+    tijdstopvarianten en (indien aan) pyramiden.
+* Spreiding en cooldown per strategie; marge, vloer, daglimiet en het totaal
+  aantal posities over alles samen (totaal +1 voor de daghandelpositie).
+* De verliesreeks telt bij de combinatie alleen de daghandel: een gewone
+  scalpreeks legt de daghandel niet meer stil.
+* Resultaat per strategie in de sensor *Trades* (`per_strategie`) en het
+  signaal per strategie in de sensor *Signaal* (`per_strategie`).
+* Een andere keuze of scalpgrootte is een andere opzet: nieuwe run
+  (`combinatie-1.0.0`).
+* *Startbalans papermodus* heet nu *Startbalans (basis voor positiegrootte en
+  limieten)*, met uitleg: het geldt ook op de IG-demo.
+* **Daghandel: winst eerder veiligstellen (Ruud: "winst veilig stellen met
+  trailing stops").** Volgstop 4 x ATR(15m) vanaf 2 x ATR winst (was 6 x ATR).
+  Backtest 2011-2018 (zelfde signalen): netto +0,20 tegen +0,12 ATR per
+  trade, beter in beide helften. Krapper (2 x ATR) of een break-evenstop
+  deed het slechter (-0,10 / -0,03): een trend wordt dan te vroeg
+  afgebroken. Scalpen houdt break-even bij 0,8 x ATR en de volgstop van
+  1,2 x ATR vanaf 1,5 x ATR.
+* **Paneel**: uurgrafiek erbij (15m · 45m · 1u · 3u); instapmarkers van open
+  en gesloten posities met de strategie (D = daghandel, groter met gouden
+  rand; S = scalp), het label ook bij de instaplijn en op de positiekaart;
+  bij daghandel telt *Max. duur* af tot 20:45 UTC in plaats van een tijdstop.
+* Tests: `test_v210_combinatie.py`, `test_v210_paneel.py`.
+
 ## 2.0.1
 
 * **Een andere strategie start altijd een nieuwe run.** In 2.0.0 werd run 101

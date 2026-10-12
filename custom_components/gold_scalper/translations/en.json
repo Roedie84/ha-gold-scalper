@@ -91,7 +91,7 @@
           "update_seconds": "Verversingsinterval",
           "units": "Positiegrootte (ounce)",
           "max_units": "Maximale positiegrootte",
-          "starting_balance": "Startbalans papermodus",
+          "starting_balance": "Starting balance (basis for position size and limits)",
           "max_spread": "Absolute spreadlimiet (vangnet)",
           "min_edge_multiple": "Vereiste marge boven de kosten",
           "entry_threshold": "Instapdrempel",
@@ -124,10 +124,13 @@
           "pyramid_max_additions": "Maximaal aantal toevoegingen",
           "use_schedule": "Handelstijden controleren tegen een eigen rooster",
           "close_buffer_minutes": "Geen nieuwe posities zoveel minuten voor sluiting",
-          "strategie": "Strategy"
+          "strategie": "Strategy",
+          "scalp_units": "Scalp size in combination (ounce)"
         },
         "data_description": {
-          "strategie": "Day trading: breakout of the 20-hour channel in the direction of the hourly trend, stop 4 x ATR, trailing stop, flat by 20:45 UTC. Scalping: the original strategy. Changing this starts a new run."
+          "strategie": "Day trading: breakout of the 20-hour channel in the direction of the hourly trend, stop 4 x ATR, trailing stop, flat by 20:45 UTC. Scalping: the original strategy. Changing this starts a new run. Combination: both at once, each position with its own rules; scalp trades at a fixed size.",
+          "scalp_units": "Only for the Combination strategy: fixed size of each scalp trade. Day trading keeps the risk-based size.",
+          "starting_balance": "Gold Scalper does not use the broker balance but this amount: risk per trade, daily loss limit and equity floor are percentages of it (the daily limit of the smaller of this amount and the day-start balance). On a multi-million demo this decides how large it trades."
         }
       }
     },
@@ -168,7 +171,8 @@
     "strategie": {
       "options": {
         "daghandel": "Day trading (hourly trend, flat by 20:45 UTC)",
-        "scalp": "Scalping (minutes, time stop)"
+        "scalp": "Scalping (minutes, time stop)",
+        "combinatie": "Combination (day trading + scalping, both live)"
       }
     }
   },

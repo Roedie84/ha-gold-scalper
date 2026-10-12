@@ -121,9 +121,11 @@ def test_geen_tijdstop_en_geen_break_even():
     assert _uit(T + timedelta(hours=3), bid=4008.0).kind == "hold"  # 1,6 x ATR
 
 
-def test_volgstop_vanaf_2_atr_op_6_atr():
+def test_volgstop_vanaf_2_atr_op_4_atr():
+    """2.1.0: 4 x ATR (was 6)."""
     a = _uit(T + timedelta(hours=1), bid=4015.0)  # 3 x ATR winst
-    assert a.kind == "modify_stop" and a.new_stop == 4015.0 - 30.0
+    assert a.kind == "modify_stop" and a.new_stop == 4015.0 - 20.0
+    assert _uit(T + timedelta(hours=1), bid=4009.0).kind == "hold"  # 1,8 x ATR
 
 
 def test_dicht_om_2045_utc_en_na_een_dagwissel():
@@ -145,7 +147,7 @@ def test_scalpconfig_ongewijzigd():
 
 def test_standaard_daghandel_en_keuze():
     assert DEFAULT_STRATEGIE == STRATEGIE_DAGHANDEL
-    assert set(STRATEGIEEN) == {"daghandel", "scalp"}
+    assert {"daghandel", "scalp"} <= set(STRATEGIEEN)
     for taal in ("nl", "en"):
         d = json.loads((PKG / "translations" / f"{taal}.json").read_text(encoding="utf-8"))
         assert d["options"]["step"]["init"]["data"][CONF_STRATEGIE]
@@ -154,12 +156,12 @@ def test_standaard_daghandel_en_keuze():
 
 def test_coordinator_kiest_beslisser_uitstap_en_nieuwe_run():
     bron = (PKG / "coordinator.py").read_text(encoding="utf-8")
-    assert "self._beslisser(now), self._candles" in bron
-    assert "daghandel_mod.exit_config() if self.daghandel else ExitConfig()" in bron
+    assert "self._beslisser(now, strategie), self._candles" in bron
+    assert "daghandel_mod.exit_config()\n            if self._strategie in (STRATEGIE_DAGHANDEL, STRATEGIE_COMBINATIE)" in bron
     assert '"strategy": self.strategie_versie,' in bron
     assert bron.count("self.db.start_run, self.mode.value, self.strategie_versie,") == 2
-    assert "if self.db is None or not ref or self.daghandel:" in bron
-    assert "self.pyramid.enabled and not self.daghandel" in bron
+    assert "if self.db is None or not ref or strategie != STRATEGIE_SCALP:" in bron
+    assert "self.pyramid.enabled and strategie == STRATEGIE_SCALP" in bron
     assert D.STRATEGIE_VERSIE.startswith("daghandel-")
 
 

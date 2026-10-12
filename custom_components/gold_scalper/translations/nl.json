@@ -91,7 +91,7 @@
           "update_seconds": "Verversingsinterval",
           "units": "Positiegrootte (ounce)",
           "max_units": "Maximale positiegrootte",
-          "starting_balance": "Startbalans papermodus",
+          "starting_balance": "Startbalans (basis voor positiegrootte en limieten)",
           "max_spread": "Absolute spreadlimiet (vangnet)",
           "min_edge_multiple": "Vereiste marge boven de kosten",
           "entry_threshold": "Instapdrempel",
@@ -124,10 +124,13 @@
           "pyramid_max_additions": "Maximaal aantal toevoegingen",
           "use_schedule": "Handelstijden controleren tegen een eigen rooster",
           "close_buffer_minutes": "Geen nieuwe posities zoveel minuten voor sluiting",
-          "strategie": "Strategie"
+          "strategie": "Strategie",
+          "scalp_units": "Scalpgrootte bij combinatie (ounce)"
         },
         "data_description": {
-          "strategie": "Daghandel: uitbraak uit het kanaal van 20 uur in de richting van de uurtrend, stop 4 x ATR, volgstop, uiterlijk om 20:45 UTC dicht. Scalpen: de oorspronkelijke strategie. Een andere keuze start een nieuwe run."
+          "strategie": "Daghandel: uitbraak uit het kanaal van 20 uur in de richting van de uurtrend, stop 4 x ATR, volgstop, uiterlijk om 20:45 UTC dicht. Scalpen: de oorspronkelijke strategie. Een andere keuze start een nieuwe run. Combinatie: beide tegelijk, elke positie met haar eigen regels; scalptrades op een vaste grootte.",
+          "scalp_units": "Alleen bij de strategie Combinatie: vaste grootte van elke scalptrade. De daghandel houdt de risicogestuurde grootte.",
+          "starting_balance": "Gold Scalper rekent niet met het saldo van de broker maar met dit bedrag: het risico per trade, de daglimiet en de verliesvloer zijn percentages hiervan (de daglimiet over het kleinste van dit bedrag en het dagstartsaldo). Op een demo van miljoenen bepaalt dit dus hoe groot er gehandeld wordt."
         }
       }
     },
@@ -168,7 +171,8 @@
     "strategie": {
       "options": {
         "daghandel": "Daghandel (trend op uurbasis, dicht om 20:45 UTC)",
-        "scalp": "Scalpen (minuten, tijdstop)"
+        "scalp": "Scalpen (minuten, tijdstop)",
+        "combinatie": "Combinatie (daghandel + scalpen, beide echt)"
       }
     }
   },

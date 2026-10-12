@@ -394,6 +394,9 @@ class Trade:
     #: ..."). De reden zelf is sindsdien een vaste soort (``tijdslimiet``);
     #: zie ``learning/sluitreden.py``.
     looptijd_s: int | None = None
+    #: 2.1.0: welke strategie de positie opende (daghandel/scalp). None =
+    #: van vóór 2.1.0 (dan volgt het uit runs.strategy_version).
+    strategie: str | None = None
     #: Ticketnummer bij de broker. Tekst, niet numeriek: IG gebruikt sleutels
     #: als 'DIAAAAYCJETQ7A8'.
     broker_ticket: str | None = None
@@ -517,6 +520,9 @@ class TradeDatabase:
         if "looptijd_s" not in trade_columns:
             self._conn.execute("ALTER TABLE trades ADD COLUMN looptijd_s INTEGER")
             _LOGGER.info("Database bijgewerkt: kolom 'looptijd_s' toegevoegd")
+        if "strategie" not in trade_columns:
+            self._conn.execute("ALTER TABLE trades ADD COLUMN strategie TEXT")
+            _LOGGER.info("Database bijgewerkt: kolom 'strategie' toegevoegd")
         self._backfill_exit_regime()
         self._migrate_close_reasons()
         self._normaliseer_sluitredenen()

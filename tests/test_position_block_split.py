@@ -156,7 +156,8 @@ def test_coordinator_passes_the_side():
     source = (Path(__file__).resolve().parent.parent / "custom_components"
               / "gold_scalper" / "coordinator.py").read_text(encoding="utf-8")
     assert "per_richting = tel_per_richting(open_positions, pending)" in source
-    assert "self._last_entry_ts, 0, per_richting," in source
+    # 2.1.0: per strategie; bij één strategie zijn dat alle posities.
+    assert "now.timestamp() - laatste_instap, 0, eigen_richting," in source
 
 
 def test_unknown_direction_is_not_guessed(market):

@@ -117,7 +117,8 @@ BRON = Path(coord_mod.__file__).read_text(encoding="utf-8")
 
 
 def test_geen_instap_in_een_cyclus_met_afwikkelfout():
-    i = BRON.index('reject_reason = "handel staat uit"')
+    # 2.1.0: de beslissing loopt per strategie (r_reject).
+    i = BRON.index('r_reject = "handel staat uit"')
     stuk = BRON[i:i + 600]
     assert "elif self._afwikkeling_mislukt:" in stuk
     assert "geen instap deze cyclus" in stuk

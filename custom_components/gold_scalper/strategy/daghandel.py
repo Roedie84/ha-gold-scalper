@@ -20,7 +20,7 @@ Regels (gelijk aan de backtest):
   hoogste hoog (long) of laagste laag (short) van de 80 bars ervóór (20 uur).
   Alleen tussen 07:00 en 17:00 UTC, hooguit één positie tegelijk.
 * **Stop**: 2 x ATR(1u) = 4 x ATR(15m) van de instap.
-* **Uitstap** (in ``broker/exits``): meelopende stop op 6 x ATR(15m) vanaf
+* **Uitstap** (in ``broker/exits``): meelopende stop op 4 x ATR(15m) vanaf
   2 x ATR winst, geen tijdstop, geen break-even; uiterlijk om 20:45 UTC
   dicht (geen nachtkosten, geen gat over de dagpauze).
 
@@ -43,7 +43,13 @@ KANAAL_BARS = 80
 EMA_SNEL = 20
 EMA_TRAAG = 50
 STOP_ATR15 = 4.0
-VOLGSTOP_ATR15 = 6.0
+#: 2.1.0 (Ruud: "winst veiligstellen met trailing stops"): 4 in plaats van
+#: 6 x ATR. Backtest 2011-2018: netto +0,20 tegen +0,12 ATR per trade, beter
+#: in beide helften (+0,27/+0,13 tegen +0,10/+0,13). Krapper (2 x ATR vanaf
+#: 1 x ATR) of een break-evenstop deden het slechter: dan stopt een trend
+#: te vroeg. Vanaf 2 x ATR winst ligt de stop op instap - 2 x ATR; vanaf
+#: 4 x ATR winst staat er winst vast.
+VOLGSTOP_ATR15 = 4.0
 VOLGSTOP_VANAF_ATR15 = 2.0
 INSTAP_VAN_UUR = 7.0
 INSTAP_TOT_UUR = 17.0
@@ -56,9 +62,8 @@ WACHT_SECONDEN = 900
 
 def exit_config() -> ExitConfig:
     """Uitstapregels van de backtest: geen tijdstop, geen break-even, geen
-    deelsluiting; volgstop 6 x ATR vanaf 2 x ATR winst (dan valt hij samen
-    met de beginstop van 4 x ATR); dicht om 20:45 UTC. ``max_hold_seconds``
-    is alleen een vangnet."""
+    deelsluiting; volgstop 4 x ATR vanaf 2 x ATR winst (2.1.0); dicht om
+    20:45 UTC. ``max_hold_seconds`` is alleen een vangnet."""
     return ExitConfig(
         breakeven_trigger_atr=1e9,
         enable_partial_close=False,
@@ -213,7 +218,7 @@ def evaluate_daghandel(
             f"Daghandel {kant}: slot {slot:.2f} door het kanaal van 20 uur "
             f"({s.kanaal_hoog:.2f}/{s.kanaal_laag:.2f}), uurtrend {kant}. "
             f"Stop {STOP_ATR15:g} x ATR ({STOP_ATR15 * s.atr15:.2f} USD/oz), "
-            f"volgstop {VOLGSTOP_ATR15:g} x ATR, dicht om 20:45 UTC"
+            f"volgstop {VOLGSTOP_ATR15:g} x ATR vanaf {VOLGSTOP_VANAF_ATR15:g} x ATR winst, dicht om 20:45 UTC"
         ),
         stop_loss=round(stop, 3),
         take_profit=None,

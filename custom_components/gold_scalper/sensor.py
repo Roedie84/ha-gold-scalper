@@ -91,6 +91,8 @@ SENSORS: tuple[ScalperSensor, ...] = (
             "reject_reason": d.get("reject_reason"),
             "expected_move": round(d["signal"].expected_move, 4) if d.get("signal") else None,
             "expected_cost": round(d["signal"].expected_cost, 4) if d.get("signal") else None,
+            # 2.1.0: bij de combinatie het signaal van elke strategie.
+            "per_strategie": d.get("signalen") or None,
             "disclaimer": DISCLAIMER,
         },
     ),
@@ -133,6 +135,8 @@ SENSORS: tuple[ScalperSensor, ...] = (
             "wins": _stats(d).get("wins"), "losses": _stats(d).get("losses"),
             "avg_duration_seconds": _stats(d).get("avg_duration_seconds"),
             "close_reasons": _stats(d).get("close_reasons"),
+            # 2.1.0: bij de combinatie het resultaat per strategie.
+            "per_strategie": _stats(d).get("per_strategie") or None,
         },
     ),
     ScalperSensor(
