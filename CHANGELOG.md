@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.4.1
+
+* **Veldproef: minimale stopafstand 1,0 USD.** IG wees de 1m-orders af met
+  `ATTACHED_ORDER_LEVEL_ERROR` (stop 0,56 USD bij 1,5 x ATR(1m)). Het doel
+  blijft 2 x de stopafstand.
+* Een afgewezen veldproeforder wordt niet elke cyclus opnieuw geprobeerd;
+  pas de volgende bar van dat tijdvak telt weer.
+* Tests: `test_v241.py`.
+
 ## 2.4.0
 
 * **Veldproef: alle opzetten op 1m, 3m, 5m, 15m en 30m met echte demo-orders

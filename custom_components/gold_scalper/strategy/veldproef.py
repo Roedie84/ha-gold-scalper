@@ -41,6 +41,9 @@ FAMILIES = (
     "structuur_hl", "momentum", "pullback", "inside",
 )
 STOP_ATR = 1.5
+#: 2.4.1: IG wees stops van ~0,56 USD af (ATTACHED_ORDER_LEVEL_ERROR, 1m);
+#: de stopafstand is minstens dit.
+MIN_STOP_USD = 1.0
 RR = 2.0
 HOLD_BARS = 48
 #: Minimaal aantal afgesloten bars voor een besluit.
@@ -309,7 +312,7 @@ def evalueer(
         return weiger("al_gebruikt", f"{naam}: signaal van deze bar al gebruikt", d, onderdelen)
 
     instap = ask if d == 1 else bid
-    afstand = STOP_ATR * k.atr
+    afstand = max(STOP_ATR * k.atr, MIN_STOP_USD)
     sig = ScalpSignal(
         direction=d, score=float(d), confidence=1.0, should_trade=True,
         reject_reason=None, geldig=True,
