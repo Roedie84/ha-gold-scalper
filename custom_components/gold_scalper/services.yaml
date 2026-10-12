@@ -118,6 +118,45 @@ validate_backtest:
     handelde en legt de uitkomsten naast elkaar. Alle hypothesen die je op historische
     data toetst rusten op de aanname dat de backtest de werkelijkheid nabootst; deze
     dienst controleert die aanname.
+export_data:
+  name: Gegevens exporteren
+  description: 'Geeft archiefbars of gesloten trades terug als antwoord, in pagina''s. Alleen
+    lezen; vraagt niets op bij de broker. Voor onderzoek buiten Home Assistant.'
+  fields:
+    kind:
+      name: Soort
+      description: bars, trades of available.
+      example: bars
+      selector:
+        select:
+          options: [bars, trades, available]
+    timeframe:
+      name: Tijdvak
+      description: Tijdvak in het archief (bijv. 15m). Leeg = het tijdvak van de strategie.
+      selector:
+        text: null
+    run_id:
+      name: Run
+      description: Alleen trades van deze run. Leeg = alle runs.
+      selector:
+        number:
+          min: 1
+          max: 100000
+          mode: box
+    offset:
+      name: Vanaf
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    limit:
+      name: Aantal
+      selector:
+        number:
+          min: 1
+          max: 5000
+          mode: box
 new_run:
   name: Nieuwe bewijsfase beginnen
   description: 'Sluit de huidige run af en begint een nieuwe, zonder iets aan de strategie

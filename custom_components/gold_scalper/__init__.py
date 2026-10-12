@@ -33,6 +33,7 @@ from .const import (
     SERVICE_CLOSE_ALL, SERVICE_GENERATE_REPORT, SERVICE_IMPORT_HISTORY,
     SERVICE_PREPARE_SHUTDOWN, SERVICE_RESET_DAY, SERVICE_RESUME,
     SERVICE_VALIDATE_BACKTEST,
+    SERVICE_EXPORT_DATA,
 )
 from .coordinator import GoldScalperCoordinator
 from .http import async_register_frontend, async_unregister_frontend
@@ -482,6 +483,66 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_VALIDATE_BACKTEST,
         _zeg_wat_er_misging("validate_backtest")(validate_backtest),
+    )
+
+    async def export_data(call: ServiceCall) -> ServiceResponse:
+        """Geef archiefbars of gesloten trades terug als antwoord (2.3.0).
+
+        Onderzoek buiten Home Assistant (L-GS-017): de bars staan in het
+        archief en de trades in de database, maar waren alleen binnen HA te
+        gebruiken. Alleen lezen; geen verzoek naar de broker. In pagina's,
+        zodat een antwoord klein blijft.
+        """
+        soort = call.data.get("kind", "bars")
+        offset = int(call.data.get("offset", 0))
+        limit = int(call.data.get("limit", 2000))
+        for coordinator in _coordinators():
+            if soort == "available":
+                if coordinator.archive is None:
+                    raise HomeAssistantError("Het archief is niet geopend.")
+                return {"available": await hass.async_add_executor_job(
+                    coordinator.archive.available)}
+            if soort == "bars":
+                if coordinator.archive is None:
+                    raise HomeAssistantError("Het archief is niet geopend.")
+                tf = call.data.get("timeframe", coordinator.timeframe)
+                c = await hass.async_add_executor_job(
+                    coordinator.archive.load, coordinator.symbol, tf)
+                n = len(c.timestamp)
+                sl = slice(offset, offset + limit)
+                return {
+                    "symbol": coordinator.symbol, "timeframe": tf, "total": n,
+                    "offset": offset, "columns": ["t", "o", "h", "l", "c", "v"],
+                    "rows": [list(r) for r in zip(
+                        c.timestamp[sl], c.open[sl], c.high[sl], c.low[sl],
+                        c.close[sl], c.volume[sl])],
+                }
+            if soort == "trades":
+                run = call.data.get("run_id")
+                trades = await hass.async_add_executor_job(
+                    coordinator.db.closed_trades, int(run) if run is not None else None)
+                velden = ("run_id", "side", "volume", "open_time", "open_price",
+                          "open_mid", "open_spread", "close_time", "close_price",
+                          "close_mid", "close_reason", "stop_loss", "take_profit",
+                          "total_cost", "gross_pnl", "net_pnl", "mae", "mfe",
+                          "duration_seconds", "signal_score", "entry_atr",
+                          "exit_regime")
+                rijen = [[getattr(t, v, None) for v in velden]
+                         for t in trades[offset:offset + limit]]
+                return {"total": len(trades), "offset": offset,
+                        "columns": list(velden), "rows": rijen}
+        raise HomeAssistantError(f"Onbekende soort of geen Gold Scalper: {soort}")
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_EXPORT_DATA, _zeg_wat_er_misging("export_data")(export_data),
+        schema=vol.Schema({
+            vol.Optional("kind", default="bars"): vol.In(["bars", "trades", "available"]),
+            vol.Optional("timeframe"): str,
+            vol.Optional("run_id"): vol.Coerce(int),
+            vol.Optional("offset", default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),
+            vol.Optional("limit", default=2000): vol.All(vol.Coerce(int), vol.Range(1, 5000)),
+        }),
+        supports_response=SupportsResponse.ONLY,
     )
 
     async def new_run(call: ServiceCall) -> None:

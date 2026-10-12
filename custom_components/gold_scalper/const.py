@@ -204,6 +204,7 @@ SERVICE_BACKTEST: Final = "backtest"
 SERVICE_RESET_DAY: Final = "reset_day"
 SERVICE_IMPORT_HISTORY: Final = "import_history"
 SERVICE_VALIDATE_BACKTEST: Final = "validate_backtest"
+SERVICE_EXPORT_DATA: Final = "export_data"
 # Experiment Lab (5.7). Alleen onderzoek: geen enkele raakt de handel.
 SERVICE_LAB_SNAPSHOT: Final = "lab_snapshot"
 SERVICE_LAB_CREATE_WALK_FORWARD: Final = "lab_create_walk_forward"
@@ -220,7 +221,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.2.1"
+INTEGRATION_VERSION: Final = "2.3.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

@@ -1,5 +1,16 @@
 # Changelog — Gold Scalper
 
+## 2.3.0
+
+* **Nieuwe actie `gold_scalper.export_data` (L-GS-017, onderzoek).** Geeft
+  archiefbars (`kind: bars`, per tijdvak), de inhoud van het archief
+  (`kind: available`) of gesloten trades (`kind: trades`, optioneel per run)
+  terug als antwoord, in pagina's (`offset`/`limit`, hooguit 5000). Alleen
+  lezen: geen verzoek naar de broker, de handel verandert niet. Bedoeld om
+  strategieën op 1m/5m/15m/30m buiten Home Assistant te toetsen (opdracht
+  Ruud 12-10: "de integratie moet winstgevend worden").
+* Tests: `test_v230_export.py`.
+
 ## 2.2.1
 
 * Paneel, tabel *Open posities*: kolom **Strategie** (Daghandel/Scalp) met
