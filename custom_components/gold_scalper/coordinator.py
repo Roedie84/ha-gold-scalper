@@ -1106,9 +1106,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # de bars meet iets anders, ook als de gebruiker niets koos. Zonder
             # deze twee zou een run als 97 - die twee gedragingen mengt - na de
             # update gewoon worden voortgezet.
+            # 2.0.1: een andere strategie (scalp -> daghandel) ook: in 2.0.0
+            # werd run 101 na de overstap gewoon voortgezet.
             structural = differences & {
                 "venue", "symbol", "timeframe", "simulated",
-                "execution_semantics", "candle_source",
+                "execution_semantics", "candle_source", "strategy",
             }
 
             if user_chosen or structural:

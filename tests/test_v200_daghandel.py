@@ -165,7 +165,8 @@ def test_coordinator_kiest_beslisser_uitstap_en_nieuwe_run():
 
 def test_versie():
     manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == INTEGRATION_VERSION == "2.0.0"
+    assert manifest["version"] == INTEGRATION_VERSION
+    assert tuple(map(int, INTEGRATION_VERSION.split("."))) >= (2, 0, 0)
 
 
 # --- de lus met daghandel ------------------------------------------------- #

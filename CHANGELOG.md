@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.0.1
+
+* **Een andere strategie start altijd een nieuwe run.** In 2.0.0 werd run 101
+  (scalpen) na de overstap op daghandel gewoon voortgezet: de strategie was
+  niet zelf ingesteld (standaardwaarde) en telde daarom niet als wijziging.
+  `strategy` hoort nu bij de structurele verschillen, net als bron en
+  tijdvak.
+* Tests: `test_v201.py`.
+
 ## 2.0.0
 
 * **Van scalpen naar daghandel (L-GS-014, besluit Ruud 12-10-2026).** Nieuwe
