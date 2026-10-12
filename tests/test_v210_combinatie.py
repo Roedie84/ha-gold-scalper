@@ -169,4 +169,6 @@ def test_bron_en_vertalingen():
         assert "combinatie" in d["selector"]["strategie"]["options"]
         assert d["options"]["step"]["init"]["data"][CONF_SCALP_UNITS]
     manifest = json.loads((PKG / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == "2.1.0"
+    assert tuple(map(int, manifest["version"].split("."))) >= (2, 1, 0)
+    # 2.1.1: de telling per richting voor status en sensor gaat over alles.
+    assert "per_richting = eigen_richting if self.combinatie" not in bron

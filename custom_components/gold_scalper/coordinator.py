@@ -2390,7 +2390,6 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if ronde == 0:
                 signal = r_signal
                 self._last_signal = r_signal
-                per_richting = eigen_richting if self.combinatie else per_richting
                 budget.mark("signal")
             r_reject = None
             #: 1.9.0: categorie voor de schaduwtrade als een geldig signaal niet

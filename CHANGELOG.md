@@ -1,5 +1,10 @@
 # Changelog — Gold Scalper
 
+## 2.1.1
+
+* Status en *Open posities*: bij de combinatie telde "long/short" alleen de
+  daghandelposities ("1 positie(s) open (0 long, 0 short)"). Nu alle posities.
+
 ## 2.1.0
 
 * **Combinatie van daghandel en scalpen, beide met echte orders (L-GS-015,
