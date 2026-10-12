@@ -240,6 +240,44 @@ class MeerTijdvakken:
         return nieuw
 
 
+def hersample(c: Candles, seconden: int) -> Candles:
+    """Bars samenvoegen tot een langer tijdvak (bijv. 15m naar 30m)."""
+    groepen: dict[int, list[int]] = {}
+    for i, t in enumerate(c.timestamp):
+        groepen.setdefault(int(t) // seconden * seconden, []).append(i)
+    ts = sorted(groepen)
+    return Candles(
+        timestamp=ts,
+        open=[c.open[groepen[k][0]] for k in ts],
+        high=[max(c.high[i] for i in groepen[k]) for k in ts],
+        low=[min(c.low[i] for i in groepen[k]) for k in ts],
+        close=[c.close[groepen[k][-1]] for k in ts],
+        volume=[float(len(groepen[k])) for k in ts],
+    )
+
+
+def bars_uit_koersen(punten: list[tuple[float, float]], seconden: int) -> Candles | None:
+    """Bars uit (tijd, koers)-punten; de lopende (laatste) bar valt weg."""
+    if not punten:
+        return None
+    rijen: dict[int, list[float]] = {}
+    for t, p in sorted(punten):
+        k = int(t) // seconden * seconden
+        r = rijen.get(k)
+        if r is None:
+            rijen[k] = [p, p, p, p, 1.0]
+        else:
+            r[1] = max(r[1], p); r[2] = min(r[2], p); r[3] = p; r[4] += 1
+    ts = sorted(rijen)[:-1]
+    if not ts:
+        return None
+    return Candles(
+        timestamp=ts, open=[rijen[k][0] for k in ts], high=[rijen[k][1] for k in ts],
+        low=[rijen[k][2] for k in ts], close=[rijen[k][3] for k in ts],
+        volume=[rijen[k][4] for k in ts],
+    )
+
+
 # -- besluit ------------------------------------------------------------------ #
 
 def evalueer(

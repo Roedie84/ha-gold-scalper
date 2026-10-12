@@ -172,7 +172,8 @@
       "options": {
         "daghandel": "Daghandel (trend op uurbasis, dicht om 20:45 UTC)",
         "scalp": "Scalpen (minuten, tijdstop)",
-        "combinatie": "Combinatie (daghandel + scalpen, beide echt)"
+        "combinatie": "Combinatie (daghandel + scalpen, beide echt)",
+        "alles": "Alles (daghandel + scalpen + veldproef op 1m-30m, alles echt op demo)"
       }
     }
   },

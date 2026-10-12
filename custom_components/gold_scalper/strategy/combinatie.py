@@ -21,7 +21,8 @@ from __future__ import annotations
 import math
 from typing import Iterable
 
-from ..const import STRATEGIE_COMBINATIE, STRATEGIE_DAGHANDEL, STRATEGIE_SCALP
+from ..const import STRATEGIE_ALLES, STRATEGIE_COMBINATIE, STRATEGIE_DAGHANDEL, STRATEGIE_SCALP
+from . import veldproef
 
 COMBINATIE_VERSIE = "combinatie-1.0.0"
 
@@ -32,6 +33,9 @@ def strategieen(keuze: str) -> tuple[str, ...]:
     aansluiten)."""
     if keuze == STRATEGIE_COMBINATIE:
         return (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP)
+    if keuze == STRATEGIE_ALLES:
+        # 2.4.0: daarna alle veldproefopzetten.
+        return (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP, *veldproef.namen())
     if keuze == STRATEGIE_SCALP:
         return (STRATEGIE_SCALP,)
     return (STRATEGIE_DAGHANDEL,)
@@ -41,7 +45,7 @@ def strategie_van_trade(trade, run_versie: str | None, standaard: str) -> str:
     """De strategie van een trade: het eigen veld, anders afgeleid uit de
     strategieversie van de run, anders de standaard."""
     eigen = getattr(trade, "strategie", None)
-    if eigen in (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP):
+    if eigen in (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP) or veldproef.is_veldproef(eigen):
         return eigen
     versie = str(run_versie or "")
     if versie.startswith("daghandel"):

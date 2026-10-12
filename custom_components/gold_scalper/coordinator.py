@@ -497,7 +497,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.lifecycle = LifecycleController(DrainPolicy.WAIT_THEN_CLOSE)
         self.exits = ExitManager(
             daghandel_mod.exit_config()
-            if self._strategie in (STRATEGIE_DAGHANDEL, STRATEGIE_COMBINATIE, STRATEGIE_ALLES)
+            if self._strategie in (STRATEGIE_DAGHANDEL, STRATEGIE_COMBINATIE)
+            or self._strategie == STRATEGIE_ALLES
             else ExitConfig()
         )
         #: 2.1.0: het scalpexitbeheer voor scalpposities bij de combinatie.
@@ -835,6 +836,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         await self._herstel_uit_run()
         await self._laad_schaduw()
         await self._laad_varianten()
+        await self._vp_opwarmen()
 
         # Historie opwarmen. Zonder dit begint elke herstart met een blinde
         # periode van 60 candles - bij 1m een heel uur.
@@ -1306,6 +1308,97 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         return self._strategie == STRATEGIE_ALLES
 
     @property
+    def _max_per_cyclus(self) -> int:
+        """2.4.0: nieuwe posities per cyclus; bij 'alles' meer, anders 1."""
+        return 6 if self.alles else 1
+
+    async def _vp_bijwerken(self, quote, now: datetime) -> None:
+        """2.4.0: koers in de bars van alle veldproeftijdvakken."""
+        try:
+            klaar = self.veldproef.voeg_toe(quote.mid, now, bool(quote.tradeable))
+        except Exception as err:  # noqa: BLE001 - meting, nooit de lus slopen
+            _LOGGER.debug("Veldproefbars niet bijgewerkt: %s", err)
+            return
+        if not klaar or self.archive is None:
+            return
+        for tf in klaar:
+            if tf == self.timeframe:
+                continue  # dat tijdvak archiveert de bestaande lus al
+            try:
+                c = self.veldproef.candles(tf)
+                if c is None:
+                    continue
+                laatste = Candles(
+                    timestamp=c.timestamp[-1:], open=c.open[-1:], high=c.high[-1:],
+                    low=c.low[-1:], close=c.close[-1:], volume=c.volume[-1:],
+                )
+                await self.hass.async_add_executor_job(
+                    self.archive.store, self.symbol, tf, laatste, "quotes")
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Veldproefbar %s niet gearchiveerd: %s", tf, err)
+
+    async def _vp_opwarmen(self) -> None:
+        """2.4.0: veldproefbars opwarmen uit het archief, en waar dat te weinig
+        heeft uit de koersgeschiedenis van Home Assistant (10-secondenkoersen)."""
+        nodig = veldproef_mod.MIN_BARS + 5
+        for tf in veldproef_mod.TIJDVAKKEN:
+            if self.archive is None:
+                break
+            try:
+                c = await self.hass.async_add_executor_job(
+                    functools.partial(self.archive.load, self.symbol, tf,
+                                      limit=veldproef_mod.MAX_BARS))
+                self.veldproef.vul(tf, c)
+            except Exception:  # noqa: BLE001 - leeg archief voor dit tijdvak
+                pass
+        # 30m uit de 15m van IG als het archief nog geen 30m heeft.
+        if self.veldproef.aantal().get("30m", 0) < nodig and self.archive is not None:
+            try:
+                c15 = await self.hass.async_add_executor_job(
+                    functools.partial(self.archive.load, self.symbol, "15m",
+                                      limit=2 * veldproef_mod.MAX_BARS))
+                self.veldproef.vul("30m", veldproef_mod.hersample(c15, 1800))
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("30m niet uit 15m op te bouwen: %s", err)
+        tekort = [tf for tf, n in self.veldproef.aantal().items() if n < nodig]
+        if tekort:
+            await self._vp_uit_recorder(tekort)
+        _LOGGER.info("Veldproefbars na opwarmen: %s", self.veldproef.aantal())
+
+    async def _vp_uit_recorder(self, tijdvakken: list[str]) -> None:
+        try:
+            from homeassistant.components.recorder import get_instance, history
+            from homeassistant.helpers import entity_registry as er
+
+            entity_id = er.async_get(self.hass).async_get_entity_id(
+                "sensor", DOMAIN, f"{self.entry.entry_id}_price")
+            if not entity_id:
+                return
+            start = datetime.now(timezone.utc) - timedelta(days=10)
+            uit = await get_instance(self.hass).async_add_executor_job(
+                history.state_changes_during_period, self.hass, start, None, entity_id)
+            punten = []
+            for st in uit.get(entity_id, []):
+                try:
+                    punten.append((st.last_changed.timestamp(), float(st.state)))
+                except (TypeError, ValueError):
+                    continue
+        except Exception as err:  # noqa: BLE001 - opwarmen is een gemak
+            _LOGGER.debug("Koersgeschiedenis niet te lezen: %s", err)
+            return
+        for tf in tijdvakken:
+            c = veldproef_mod.bars_uit_koersen(punten, BAR_SECONDS[tf])
+            if c is not None:
+                self.veldproef.vul(tf, c)
+
+    def _vp_bar_gebruikt(self, strategie: str, signal) -> None:
+        """2.4.0: een veldproefopzet stapt maar één keer per signaalbar in."""
+        if veldproef_mod.is_veldproef(strategie):
+            bar = (getattr(signal, "components", None) or {}).get("bar")
+            if bar is not None:
+                self._vp_laatste_bar[strategie] = int(bar)
+
+    @property
     def primaire_strategie(self) -> str:
         """Bij de combinatie en daghandel: daghandel; anders scalp."""
         return STRATEGIE_SCALP if self._strategie == STRATEGIE_SCALP else STRATEGIE_DAGHANDEL
@@ -1315,8 +1408,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         verliesreeks."""
         if not self.combinatie:
             return True
+        # 2.4.0: ook de veldproef telt niet mee (alleen de daghandel).
         return combinatie_mod.strategie_van_trade(
-            trade, None, self.primaire_strategie) != STRATEGIE_SCALP
+            trade, None, self.primaire_strategie) == STRATEGIE_DAGHANDEL
 
     def _exits_voor(self, strategie: str | None) -> ExitManager:
         if self.combinatie and strategie == STRATEGIE_SCALP:
@@ -2249,6 +2343,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 except Exception as err:  # noqa: BLE001 - controle mag de lus niet slopen
                     _LOGGER.debug("Afstemming niet gelukt: %s", err)
 
+        # 2.4.0: bars op 1m-30m voor de veldproef (15m ook in het archief).
+        await self._vp_bijwerken(quote, now)
+
         # -- open posities beheren, vóór alles anders ------------------------ #
         # Bij een gesloten markt niet ingrijpen: een stop verplaatsen of een
         # positie sluiten op een koers van uren geleden is erger dan wachten.
@@ -2504,8 +2601,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                             schaduw_reden = blok if blok in SCHADUW_REDENEN else None
 
                 if r_reject is None and r_signal.should_trade:
-                    if self._geopend_in_cyclus >= 1:
-                        # 1.9.0: hooguit één nieuwe positie per cyclus.
+                    if self._geopend_in_cyclus >= self._max_per_cyclus:
+                        # 1.9.0: hooguit één nieuwe positie per cyclus (2.4.0: bij 'alles' meer).
                         r_reject = "al een positie geopend in deze cyclus"
                         schaduw_reden = "per_cyclus"
                     else:
@@ -2514,19 +2611,24 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         )
 
                 # 1.9.0: geldig signaal, niet uitgevoerd: schaduwtrade.
+                # 2.4.0: geen schaduwtrades voor de veldproef (die handelt echt).
                 if (schaduw_reden and not uitgevoerd and quote.tradeable
-                        and not self.koers_verouderd):
+                        and not self.koers_verouderd
+                        and not veldproef_mod.is_veldproef(strategie)):
                     await self._open_schaduw(
                         r_signal, quote, now, schaduw_reden, r_reject,
                         open_positions, equity,
                     )
 
-                await self.hass.async_add_executor_job(
-                    self.db.log_signal, self.run_id, r_signal.score, r_signal.confidence,
-                    "buy" if r_signal.direction > 0 else "sell" if r_signal.direction < 0 else "flat",
-                    None, quote.spread, r_reject is None and r_signal.should_trade,
-                    r_reject, r_signal.components,
-                )
+                # 2.4.0: van de veldproef alleen signalen met een richting
+                # (anders 47 rijen per cyclus).
+                if not (veldproef_mod.is_veldproef(strategie) and not r_signal.direction):
+                    await self.hass.async_add_executor_job(
+                        self.db.log_signal, self.run_id, r_signal.score, r_signal.confidence,
+                        "buy" if r_signal.direction > 0 else "sell" if r_signal.direction < 0 else "flat",
+                        None, quote.spread, r_reject is None and r_signal.should_trade,
+                        r_reject, r_signal.components,
+                    )
 
             if ronde == 0:
                 reject_reason = r_reject
@@ -3150,7 +3252,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.warning("Instap overgeslagen: koers verouderd.")
             return False
         # 1.9.0: hooguit één nieuwe positie per cyclus (tweede grendel).
-        if self._geopend_in_cyclus >= 1:
+        if self._geopend_in_cyclus >= self._max_per_cyclus:
             _LOGGER.debug("Instap overgeslagen: al een positie in deze cyclus.")
             return False
         side = "buy" if signal.direction == 1 else "sell"
@@ -3223,6 +3325,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     self._last_entry_ts = now.timestamp()
                     self._laatste_instap[strategie] = now.timestamp()
                     self._geopend_in_cyclus += 1
+                    self._vp_bar_gebruikt(strategie, signal)
                     return True
                 if not result.success:
                     _LOGGER.warning("Order niet geplaatst: %s", result.error)
@@ -3267,6 +3370,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             self._last_entry_ts = now.timestamp()
             self._laatste_instap[strategie] = now.timestamp()
             self._geopend_in_cyclus += 1
+            self._vp_bar_gebruikt(strategie, signal)
             return True
         except (ModeLockedError, VenueError) as err:
             _LOGGER.error("Openen mislukt: %s", err)

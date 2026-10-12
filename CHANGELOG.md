@@ -1,5 +1,31 @@
 # Changelog — Gold Scalper
 
+## 2.4.0
+
+* **Veldproef: alle opzetten op 1m, 3m, 5m, 15m en 30m met echte demo-orders
+  (L-GS-018, opdracht Ruud 12-10: "geen schaduw trading maar echt traden op
+  diverse candle-tijden, zoveel mogelijk, om te verzamelen en te leren").**
+  Nieuwe strategiekeuze **alles** = daghandel + scalp + 45 veldproefopzetten
+  (`vp:<familie>:<tijdvak>`): EMA 9/21-kruising, Donchian 40 met trend, RSI(2)
+  terugkeer, Bollinger 2,5 terugkeer, marktstructuur (breuk in HH/HL resp.
+  LH/LL, en instap op een bevestigde hogere bodem / lagere top), momentum,
+  pullback naar EMA20 en inside-bar-uitbraak.
+  * Per opzet hooguit één positie, één instap per bar van het eigen
+    tijdvak, vaste grootte (`scalp_units`), stop 1,5 x ATR(14) en doel 2R bij
+    de broker, hooguit 48 bars open. Geen schaduwtrades.
+  * Tot 6 nieuwe posities per cyclus; het totaal aantal posities groeit met
+    één per opzet. Alleen de daghandel telt voor de verliesreeks.
+  * Bars op alle vijf tijdvakken uit de koersen (behalve 15m ook in het
+    archief); bij het opstarten opgewarmd uit het archief, 30m uit de 15m van
+    IG en anders uit de koersgeschiedenis van Home Assistant (10 dagen).
+  * Signaallog alleen voor veldproefsignalen met een richting.
+* Onderzoek vooraf (L-GS-017, 6.048 varianten op 1m-30m met kosten 1,4
+  USD/oz): bruto gemiddeld ~0, winnaars op het eerste deel verloren op het
+  laatste. Er is vooraf geen winnaar; de veldproef meet de werkelijke
+  uitvoering per opzet en tijdvak. Live blijft dicht.
+* Tijdvak `3m` toegevoegd.
+* Tests: `test_v240_veldproef.py`.
+
 ## 2.3.0
 
 * **Nieuwe actie `gold_scalper.export_data` (L-GS-017, onderzoek).** Geeft

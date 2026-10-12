@@ -172,7 +172,8 @@
       "options": {
         "daghandel": "Day trading (hourly trend, flat by 20:45 UTC)",
         "scalp": "Scalping (minutes, time stop)",
-        "combinatie": "Combination (day trading + scalping, both live)"
+        "combinatie": "Combination (day trading + scalping, both live)",
+        "alles": "Everything (day trading + scalping + field trial on 1m-30m, all live on demo)"
       }
     }
   },
