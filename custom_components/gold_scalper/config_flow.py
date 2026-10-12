@@ -729,7 +729,7 @@ class GoldScalperOptionsFlow(OptionsFlow):
                     CONF_MAX_POSITIONS_PER_RICHTING,
                     DEFAULT_MAX_POSITIONS_PER_RICHTING,
                 ),
-            ): _number(1, 3, 1, slider=True),  # MAX_POSITIONS_PER_RICHTING_GRENS
+            ): _number(1, 20, 1, slider=True),  # MAX_POSITIONS_PER_RICHTING_GRENS
             # Pyramiden: bijkopen bij bevestiging. Zie pyramid.py voor waarom
             # dit het spiegelbeeld van middelen is en niet een variant erop.
             vol.Required(

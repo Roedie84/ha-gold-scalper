@@ -3329,6 +3329,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     return True
                 if not result.success:
                     _LOGGER.warning("Order niet geplaatst: %s", result.error)
+                    # 2.4.1: een afgewezen veldproefsignaal niet elke cyclus
+                    # opnieuw proberen; de volgende bar telt weer.
+                    self._vp_bar_gebruikt(strategie, signal)
                     return False
 
                 # Vastleggen in de database. Zonder dit verdwijnen orders die
