@@ -51,7 +51,9 @@ STRATEGIE_DAGHANDEL: Final = "daghandel"
 STRATEGIE_SCALP: Final = "scalp"
 #: 2.1.0: beide tegelijk, elke positie met haar eigen strategie.
 STRATEGIE_COMBINATIE: Final = "combinatie"
-STRATEGIEEN: Final = (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP, STRATEGIE_COMBINATIE)
+#: 2.4.0: daghandel + scalp + de veldproef (alle opzetten op 1m-30m, echte demo-orders).
+STRATEGIE_ALLES: Final = "alles"
+STRATEGIEEN: Final = (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP, STRATEGIE_COMBINATIE, STRATEGIE_ALLES)
 #: 2.1.0: vaste grootte van scalptrades bij de combinatie (ounce).
 CONF_SCALP_UNITS: Final = "scalp_units"
 DEFAULT_SCALP_UNITS: Final = 1.0

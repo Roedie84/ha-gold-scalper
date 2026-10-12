@@ -75,6 +75,7 @@ from .const import (
     VENUE_STOOQ,
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
     CONF_STRATEGIE, DEFAULT_STRATEGIE, STRATEGIE_DAGHANDEL, STRATEGIE_SCALP, STRATEGIE_COMBINATIE,
+    STRATEGIE_ALLES,
     CONF_SCALP_UNITS, DEFAULT_SCALP_UNITS, DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
     CONF_MAX_CONSECUTIVE_LOSSES, CONF_MAX_DAILY_LOSS_PCT, CONF_MAX_RESUMES_PER_DAY, CONF_MAX_SPREAD, CONF_MAX_SPREAD_ATR,
     CONF_MAX_TRADES_PER_DAY, CONF_MAX_UNITS, CONF_MIN_EDGE_MULTIPLE, CONF_MODE,
@@ -117,6 +118,7 @@ from .strategy.schaduw import (
 from .learning.robustness import evaluate_robustness
 from .learning.sessions import build_news_impact, build_sessions
 from .strategy.aggregator import BAR_SECONDS, QuoteAggregator, closed_only
+from .strategy import veldproef as veldproef_mod
 from .strategy.pyramid import PyramidConfig, consider_addition
 from .strategy.sizing import SizingConfig, position_size
 from .strategy.streaming import StreamState
@@ -340,7 +342,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 # het totaal als vangnet (long en short samen).
                 # 2.1.0: bij de combinatie komt er één daghandelpositie bij.
                 max_open_positions=2 * self.strategy_cfg.max_positions_per_richting
-                + (1 if options.get(CONF_STRATEGIE) == STRATEGIE_COMBINATIE else 0),
+                + (1 if options.get(CONF_STRATEGIE) == STRATEGIE_COMBINATIE else 0)
+                # 2.4.0: bij 'alles' één positie per veldproefopzet erbij.
+                + ((1 + len(veldproef_mod.namen()))
+                   if options.get(CONF_STRATEGIE) == STRATEGIE_ALLES else 0),
             ),
             self.starting_balance,
         )
@@ -492,11 +497,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.lifecycle = LifecycleController(DrainPolicy.WAIT_THEN_CLOSE)
         self.exits = ExitManager(
             daghandel_mod.exit_config()
-            if self._strategie in (STRATEGIE_DAGHANDEL, STRATEGIE_COMBINATIE)
+            if self._strategie in (STRATEGIE_DAGHANDEL, STRATEGIE_COMBINATIE, STRATEGIE_ALLES)
             else ExitConfig()
         )
         #: 2.1.0: het scalpexitbeheer voor scalpposities bij de combinatie.
         self._exits_scalp = ExitManager(ExitConfig())
+        #: 2.4.0: veldproef - bars op 1m-30m, exitbeheer per opzet, laatste
+        #: gebruikte signaalbar per opzet.
+        self.veldproef = veldproef_mod.MeerTijdvakken()
+        self._exits_vp: dict[str, ExitManager] = {}
+        self._vp_laatste_bar: dict[str, int] = {}
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
         # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
         # bepaalde één uitschieter de p99.
@@ -1288,7 +1298,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     @property
     def combinatie(self) -> bool:
-        return self._strategie == STRATEGIE_COMBINATIE
+        """Meerdere strategieën tegelijk (2.1.0), ook bij 'alles' (2.4.0)."""
+        return self._strategie in (STRATEGIE_COMBINATIE, STRATEGIE_ALLES)
+
+    @property
+    def alles(self) -> bool:
+        return self._strategie == STRATEGIE_ALLES
 
     @property
     def primaire_strategie(self) -> str:
@@ -1306,6 +1321,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     def _exits_voor(self, strategie: str | None) -> ExitManager:
         if self.combinatie and strategie == STRATEGIE_SCALP:
             return self._exits_scalp
+        if veldproef_mod.is_veldproef(strategie):
+            if strategie not in self._exits_vp:
+                self._exits_vp[strategie] = ExitManager(veldproef_mod.exit_config(strategie))
+            return self._exits_vp[strategie]
         return self.exits
 
     async def _strategie_van(self, position) -> str:
@@ -1314,7 +1333,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if not self.combinatie:
             return self.primaire_strategie
         eigen = getattr(position, "strategie", None)
-        if eigen in (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP):
+        if eigen in (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP) or veldproef_mod.is_veldproef(eigen):
             return eigen
         ticket = str(getattr(position, "ticket", None) or getattr(position, "id", ""))
         if ticket in self._strategie_per_ticket:
@@ -1329,7 +1348,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     gevonden = getattr(trades[0], "strategie", None)
             except Exception as err:  # noqa: BLE001 - alleen een opzoeking
                 _LOGGER.debug("Strategie van %s niet op te zoeken: %s", ticket, err)
-        strategie = gevonden if gevonden in (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP) \
+        strategie = gevonden if (gevonden in (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP)
+                                 or veldproef_mod.is_veldproef(gevonden)) \
             else self.primaire_strategie
         self._strategie_per_ticket[ticket] = strategie
         return strategie
@@ -1338,6 +1358,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     def strategie_versie(self) -> str:
         """Komt in runs.strategy_version en in de vingerafdruk: een andere
         strategie is altijd een nieuwe run."""
+        if self.alles:
+            return veldproef_mod.VELDPROEF_VERSIE
         if self.combinatie:
             return combinatie_mod.COMBINATIE_VERSIE
         return daghandel_mod.STRATEGIE_VERSIE if self.daghandel else STRATEGY_VERSION
@@ -1346,6 +1368,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         strategie = strategie or self.primaire_strategie
         if strategie == STRATEGIE_SCALP:
             return evaluate
+        if veldproef_mod.is_veldproef(strategie):
+            bars, laatste = self.veldproef, self._vp_laatste_bar
+
+            def vp(candles, bid, ask, cfg, hour, eigen_open, sinds, *_a, **_k):
+                return veldproef_mod.evalueer(
+                    strategie, bars, bid, ask, cfg, eigen_open, sinds, laatste)
+            return vp
         return functools.partial(
             daghandel_mod.evaluate_daghandel, minuut_utc=now.astimezone(timezone.utc).minute,
         )
@@ -1373,7 +1402,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 2.1.0: de scalpgrootte hoort bij de opzet van de combinatie.
             "scalp_units": (
                 getattr(self, "_scalp_units", None)
-                if getattr(self, "_strategie", None) == STRATEGIE_COMBINATIE else None
+                if getattr(self, "_strategie", None) in (STRATEGIE_COMBINATIE, STRATEGIE_ALLES) else None
             ),
             "regime_switching": self.strategy_cfg.regime_switching,
             "min_edge_multiple": self.strategy_cfg.min_edge_multiple,
@@ -3258,8 +3287,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     def _scalp_vast(self, signal) -> bool:
         """2.1.0: bij de combinatie krijgen scalptrades een vaste grootte."""
+        naam = (getattr(signal, "components", None) or {}).get("strategie")
         return self.combinatie and (
-            (getattr(signal, "components", None) or {}).get("strategie") == STRATEGIE_SCALP
+            naam == STRATEGIE_SCALP or veldproef_mod.is_veldproef(naam)
         )
 
     def _grootte(self, signal, quote: VenueQuote, equity: float | None) -> float:
