@@ -256,3 +256,8 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-12 03:45,TUSSEN,gs_latency_p99_ms,666.7,2000,"p50 188.3; handelscycli + herstart 03:33"
 2026-10-12 03:45,TUSSEN,gs_tijdstop_240_overeenkomst_pct,92.9,28,"4 uurblokken; 720 s +1.10/trade (t 0.94), geen tijdstop +0.66 (t 0.54); geen oordeel (<20 blokken)"
 2026-10-12 03:45,TUSSEN,gs_afstemming,in_orde,78,"78/78 kloppen; kosten gemeten 76/78; sluitreden onbekend 0.0"
+2026-10-12 07:42,TUSSEN,gs_trades_sinds_vorige,14,14,"blokken 04-05 UTC: netto -35.56, bruto -18.15, kosten 17.41 (1.24/trade)"
+2026-10-12 07:42,TUSSEN,gs_t_cluster,-3.238,9,"run 101: 92 trades, netto -132.94, PF 0.412, winst 34.78 %"
+2026-10-12 07:42,TUSSEN,gs_t_bruto_blokken,0.20,12,"bruto +8.15 (+0.68/blok); t_netto -2.73; ~1200 blokken nodig voor t=2 bij dit gemiddelde"
+2026-10-12 07:42,TUSSEN,gs_latency_p99_ms,658.2,1,"2 herstarts 06:14/06:48"
+2026-10-12 07:42,TUSSEN,gs_afstemming,in_orde,92,"sluitreden onbekend 0.0; 0 fouten sinds 03:21:44"

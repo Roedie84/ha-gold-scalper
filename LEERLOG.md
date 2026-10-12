@@ -321,3 +321,13 @@ laatste ronde: 11-10 23:40, gemeten t/m 11-10 23:45
 - H-GS-7 (bruto < kosten) houdt (0,59 tegen 1,82). H-GS-10 (vrijdagsluiting) toets 16-10. Geen release.
 
 laatste ronde: 12-10 03:40, gemeten t/m 12-10 03:45
+
+## 12-10 07:40 · tussenronde
+- Maandag, markt open; demo, handel aan, 1 open positie, noodstop/dataprobleem uit, afstemming `in_orde`, drawdown 0,0 %, sluitreden onbekend 0,0 %. Geen knoppen gebruikt. 1.10.3 actief; 2 HA-herstarts (06:14, 06:48) met open-positie-afsluitmelding, daarna netjes verder. 0 Gold Scalper-fouten sinds 03:21:44 (storing L-GS-012 niet herhaald).
+- **Sinds 03:45: 14 trades** (uurblokken 04 en 05 UTC): netto −35,56 = bruto −18,15 − kosten 17,41 → per trade −2,54 / −1,30 / 1,24. Ook bruto negatief deze ochtend.
+- Run 101: **92 trades / 9 clusters**, netto −132,94, PF 0,412, winst 34,8 %, **t_cluster −3,24**; 12 uurblokken t_netto −2,73, bruto +8,15 (+0,68/blok, t_bruto 0,20). Per sessie bruto/blok: Azië −0,35, Londen +1,89, New York +0,78 (n=3-5, geen oordeel).
+- n-toets: netto is al duidelijk negatief (t −3,2 bij 9 clusters). Of er bruto een edge is: bij het huidige gemiddelde (+0,68/blok, sd ~12) zijn ~1200 uurblokken nodig voor t = 2 → bruto niet van ruis te onderscheiden; H-GS-7 (bruto < kosten) houdt.
+- L-GS-010: 0 voorcheck-time-outs (log) → nog niet getoetst. Latency p99 658 ms (herstarts). L-GS-011 klaar als patch voor 13-10.
+- Hypotheses H-GS-7 (bruto < kosten), H-GS-10 (vrijdagsluiting, toets 16-10). Geen release.
+
+laatste ronde: 12-10 07:40, gemeten t/m 12-10 07:42
