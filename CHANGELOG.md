@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 1.10.3
+
+* **Geen strategiewijziging; foutafhandeling.** Instappen, uitstappen,
+  ordergrootte, risico en handelslogica zijn niet aangeraakt.
+* **Integratie viel uit bij het afrekenen van een verdwenen positie.** Op
+  12-10 vanaf 02:21 gaf elke cyclus "Unexpected error fetching gold_scalper"
+  (360 keer) en waren alle entiteiten onbeschikbaar. Bij het zoeken naar de
+  uitstapprijs stonden twee verschillende transacties met hetzelfde
+  `openLevel` in het overzicht; `sort()` vergeleek daarna de transacties
+  zelf (dicts) en gooide een `TypeError`. Nu wordt alleen op verschil en
+  niveau gesorteerd.
+* Tests: `test_transactie_volledigheid.py` (+1).
+
 ## 1.10.2
 
 * **Geen strategiewijziging; foutafhandeling.** Instappen, uitstappen,

@@ -1475,7 +1475,11 @@ class IgStyleVenue(ExecutionVenue):
                 if niveau is None:
                     continue
                 kandidaten.append((abs(niveau - open_price), niveau, tx))
-            kandidaten.sort()
+            # 1.10.3: alleen op verschil en niveau sorteren. Bij twee
+            # transacties met hetzelfde openLevel vergeleek sort() daarna de
+            # dicts zelf: TypeError, elke cyclus opnieuw, en de hele
+            # integratie werd onbeschikbaar (12-10 vanaf 02:21, 360 keer).
+            kandidaten.sort(key=lambda k: (k[0], k[1]))
             dichtst = [
                 f"{n} (verschil {v:.2f}, gesloten {t.get('dateUtc')})"
                 for v, n, t in kandidaten[:3]

@@ -97,3 +97,16 @@ def test_enough_transactions_give_no_warning(caplog):
             "T1", 4319.64, "sell", nu - timedelta(hours=8),
             own_close_times=eigen))
     assert _waarschuwingen(caplog) == []
+
+
+def test_same_open_level_different_transactions_do_not_crash():
+    """1.10.3: twee verschillende transacties met hetzelfde openLevel liet
+    sort() de dicts vergelijken - TypeError in elke cyclus, en de hele
+    integratie onbeschikbaar (12 oktober vanaf 02:21)."""
+    venue = ig({"/history/transactions": ({"transactions": [
+        {"openLevel": "4000.00", "closeLevel": "4001.00", "size": "1.0",
+         "dateUtc": "2026-10-12T00:10:00"},
+        {"openLevel": "4000.00", "closeLevel": "3998.00", "size": "-1.0",
+         "dateUtc": "2026-10-12T00:20:00"},
+    ]}, 200)})
+    assert asyncio.run(venue.closed_deal("T1", 4319.64, "sell")) is None
