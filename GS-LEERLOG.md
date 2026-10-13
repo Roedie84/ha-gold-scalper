@@ -140,3 +140,15 @@ laatste ronde: 13-10 12:55
 - Meten: aandeel sluitingen "signaal gedraaid" (verlies/winst), netto per trade voor/na, gemiddeld verlies per verliestrade, aandeel break-even. Let op omkeer bij veldproef: tegengestelde opzetten in dezelfde familie/tf kunnen veel omkeren -> te veel sluiten = kosten; terug als netto per trade slechter wordt.
 
 laatste ronde: 13-10 13:35
+
+## 13-10 ~13:45 · ronde 7 (geplande controle)
+- Actief: 2.5.3 (run 122 sinds 10:54 UTC, veldproef-1.4.0); in HACS staat nu 2.5.6 (bevat ook 2.5.4/2.5.5 van de chat), herstart Ruud. Noodstop/dataprobleem uit, demo. Afstemming: 500/505 kloppen, 5 afwijkingen uitstapprijs/bedrag. 10 open posities met stops. 21 oude open rijen (aug–1 okt, runs 23-98) staan nog in de DB (bekend, geen broker-positie).
+- Vandaag n=616: netto −22.686, t −6,55, win 31 %, PF 0,48. Trades/uur 53-97 (actieve uren). Run 122: n=36, −2.348 (t −5,3).
+- Per tijdvak (alle tijd, veldproef): 1m n=306 −10.992 (t −6,55; kosten ~0,78/oz tegen MFE ~0,6/oz), 3m n=117 t −2,96, 5m n=87 t −2,29, 15m n=49 ~0 (t −0,03), 30m n=30 −1.010.
+- Opzetten: rsi_rev:1m n=100 t −2,72 → valt onder de uitzetregel; momentum:1m n=86 t −3,42 (volgt bij 100). Scalp-basis n=30 −2.370 (t −3,8); turbo-uitbraak n=6 alle verlies (te klein); reeksstukken n=3 +46.
+- IG 403 exceeded-account-allowance: 11x "Openen mislukt" vandaag (laatste 13:12); DNS-time-outs 3x.
+- **2.5.6** (suite 2161 groen/5 skip, in HACS, herstart Ruud): opzet met n ≥ 100 en t < −2 (netto per trade, alle runs) stapt niet meer in; lijst elke 5 min uit de DB, zichtbaar in de veldproefreden en als logwaarschuwing. veldproef-1.6.0.
+- Instellingen: niets (24-u-regel sinds 09:41 UTC; geen acuut risico, dagverlies ~0,2 % van de rekening).
+- Volgende: 1m-tijdvak als geheel (n=306, t −6,55) — na herstart meten of de uitzetregel per opzet volstaat; anders voorstel 1m uit of grotere stop op 1m. Effect 2.5.5 break-even/omkeer-exit meten.
+
+laatste ronde: 13-10 13:45
