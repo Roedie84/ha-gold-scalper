@@ -3471,9 +3471,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             )
             entry_price = quote.ask if side == "buy" else quote.bid
             if self._scalp_vast(signal):
-                units = float(min(self._scalp_units, self.sizing.max_units))
+                units = self._vaste_grootte(signal, entry_price)
                 self.last_sizing = {
-                    "units": units, "reason": "combinatie: vaste scalpgrootte",
+                    "units": units, "reason": "combinatie: vaste scalpgrootte (veldproef: op risico)",
                     "risk_amount": round(units * abs(entry_price - (signal.stop_loss or entry_price)), 2),
                 }
             else:
@@ -3584,6 +3584,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         koers = self.conversion.risk_rate or self.conversion.rate
         return bedrag * koers if koers else bedrag
 
+    def _vaste_grootte(self, signal, entry_price: float) -> float:
+        """2.6.2: vaste scalpgrootte; veldproef op risico (zie
+        ``veldproef.grootte_op_risico``)."""
+        units = float(min(self._scalp_units, self.sizing.max_units))
+        naam = (getattr(signal, "components", None) or {}).get("strategie")
+        if veldproef_mod.is_veldproef(naam):
+            return veldproef_mod.grootte_op_risico(units, entry_price, signal.stop_loss)
+        return units
+
     def _scalp_vast(self, signal) -> bool:
         """2.1.0: bij de combinatie krijgen scalptrades een vaste grootte."""
         naam = (getattr(signal, "components", None) or {}).get("strategie")
@@ -3604,7 +3613,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         side = "buy" if signal.direction == 1 else "sell"
         entry_price = quote.ask if side == "buy" else quote.bid
         if self._scalp_vast(signal):
-            return float(min(self._scalp_units, self.sizing.max_units))
+            return self._vaste_grootte(signal, entry_price)
         try:
             basis = (
                 self.paper.equity(self._paper_quote(quote))
@@ -3645,6 +3654,24 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 "hedgen staat uit tot een herstart"
             )
         instap = quote.ask if richting == 1 else quote.bid
+        # 2.6.2: niet te veel veldproefposities met risico in één richting.
+        naam = (getattr(signal, "components", None) or {}).get("strategie")
+        if veldproef_mod.is_veldproef(naam):
+            met_risico = 0
+            for p in open_positions:
+                if richting_van(getattr(p, "side", "buy")) != richting:
+                    continue
+                if not veldproef_mod.is_veldproef(await self._strategie_van(p)):
+                    continue
+                if veldproef_mod.loopt_risico(getattr(p, "side", "buy"),
+                                              getattr(p, "open_price", None),
+                                              getattr(p, "stop_loss", None)):
+                    met_risico += 1
+            if met_risico >= veldproef_mod.MAX_POSITIES_MET_RISICO:
+                return "cluster", (
+                    f"al {met_risico} veldproefposities met risico in deze richting "
+                    f"(max {veldproef_mod.MAX_POSITIES_MET_RISICO})"
+                )
         if zelfde:
             bestaand = []
             for p in zelfde:

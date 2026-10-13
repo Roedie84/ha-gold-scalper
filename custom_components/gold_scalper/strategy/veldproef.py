@@ -32,7 +32,7 @@ from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, BREAKEVEN_UITERLIJK_USD, E
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-1.9.0"  # 2.6.1: groepsregel per tijdvak. 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
+VELDPROEF_VERSIE = "veldproef-2.0.0"  # 2.6.2: grootte op risico, max 3 met risico per richting. 2.6.1: 2.6.1: groepsregel per tijdvak. 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
@@ -65,6 +65,36 @@ UITZET_MAX_T = -2.0
 #: kosten niet terug). 5m (n=183), 15m en 30m blijven aan.
 GROEP_MIN_N = 200
 GROEP_MAX_T = -3.0
+
+#: 2.6.2 (Ruud 13-10: "verliezen per trade zijn te groot"): een veldproeftrade
+#: riskeert hooguit dit bedrag (USD) tot de stop. De grootte volgt uit de
+#: stopafstand (bij een stop van 9 USD/oz: 11 oz in plaats van 50), met de
+#: vaste scalpgrootte als bovengrens. Op 13-10 18:05 verloren vijf trades van
+#: 50 oz met stops van 4-9 USD samen 1.506 USD.
+MAX_RISICO_PER_TRADE_USD = 100.0
+#: 2.6.2: hooguit zoveel veldproefposities per richting die nog risico lopen
+#: (stop nog niet op of voorbij de instap). Op 13-10 18:05-18:06 openden vijf
+#: shorts binnen een minuut op dezelfde beweging en gingen samen naar de stop.
+MAX_POSITIES_MET_RISICO = 3
+
+
+def grootte_op_risico(units: float, instap: float, stop: float | None) -> float:
+    """2.6.2: grootte zodat het verlies tot de stop hooguit
+    MAX_RISICO_PER_TRADE_USD is; nooit groter dan ``units``, minstens 1 oz."""
+    if stop is None or not instap:
+        return units
+    afstand = abs(float(instap) - float(stop))
+    if afstand <= 0:
+        return units
+    return max(1.0, min(units, math.floor(MAX_RISICO_PER_TRADE_USD / afstand * 10) / 10))
+
+
+def loopt_risico(side: str, open_price: float | None, stop: float | None) -> bool:
+    """2.6.2: staat de stop nog aan de verlieskant van de instap?"""
+    if open_price is None or stop is None:
+        return True
+    d = 1 if side == "buy" else -1
+    return (float(stop) - float(open_price)) * d < 0
 
 
 def t_statistiek(netto: list[float]) -> float:

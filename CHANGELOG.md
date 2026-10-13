@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 2.6.2
+
+* **Kleinere verliezen per trade** (Ruud 13-10: "verliezen per trade zijn te
+  groot"). Sinds 19:48: 7 verliezers gemiddeld -270 USD tegen 4 winnaars
+  gemiddeld +92. Oorzaak: elke veldproeftrade was 50 oz, ongeacht de stop
+  (4-13 USD/oz op 5m/15m/30m), dus 200-650 USD risico per trade.
+  * **Grootte op risico:** een veldproeftrade riskeert hooguit 100 USD tot de
+    stop; de grootte volgt uit de stopafstand (stop 9 USD -> 11 oz), met de
+    scalpgrootte (50 oz) als bovengrens en 1 oz als ondergrens.
+  * **Geen clusters:** hooguit 3 veldproefposities per richting die nog risico
+    lopen (stop nog niet op of voorbij de instap). Op 13-10 18:05-18:06 openden
+    vijf shorts op dezelfde beweging en verloren samen 1.506 USD. Posities met
+    de stop op break-even of in de winst tellen niet mee.
+* Strategieversies: veldproef-2.0.0, combinatie-1.8.0 (nieuwe run).
+
 ## 2.6.1
 
 * **Bewezen verliezende groepen gaan uit** (Ruud 13-10: "strategy verbeteren").

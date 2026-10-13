@@ -44,5 +44,5 @@ def test_daghandel_negeert_instelling_sinds_248(monkeypatch):
 
 
 def test_nieuwe_strategieversies():
-    assert V.VELDPROEF_VERSIE.startswith("veldproef-1.") and V.VELDPROEF_VERSIE >= "veldproef-1.2.0"
+    assert V.VELDPROEF_VERSIE >= "veldproef-1.2.0"  # 2.6.2: ook 2.x
     assert D.STRATEGIE_VERSIE >= "daghandel-1.2.0"
