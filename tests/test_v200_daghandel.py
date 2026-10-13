@@ -28,6 +28,12 @@ PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalp
 START = int(datetime(2026, 10, 5, 0, 0, tzinfo=timezone.utc).timestamp())  # maandag
 
 
+
+def _zonder_deel(cfg):
+    """2.5.9: deze test gaat over de stop, niet over de deelwinst."""
+    cfg.enable_partial_close = False
+    return cfg
+
 def _candles(n=400, stijging=0.05, slot_extra=0.0):
     ts, o, h, l, c = [], [], [], [], []
     prijs = 4000.0
@@ -112,7 +118,7 @@ T = datetime(2026, 10, 12, 10, 0, tzinfo=timezone.utc)
 
 
 def _uit(nu, open_=T, bid=4000.0, stop=3980.0, atr=5.0):
-    m = ExitManager(D.exit_config())
+    m = ExitManager(_zonder_deel(D.exit_config()))
     return m.evaluate("buy", 1.0, 4000.0, stop, bid, bid + 0.5, atr, open_, nu, 0.9)
 
 

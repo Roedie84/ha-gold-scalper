@@ -214,9 +214,26 @@ def read_database(path: str | Path, run_id: int) -> dict:
             (run_id, stap, aantal),
         ).fetchall()
         reeks = _reeks(conn, run_id)
+        # 2.5.9: genomen deelwinst per open positie (rij "<ticket>-deel").
+        delen = {
+            str(t)[: -len("-deel")]: (n or 0.0, a)
+            for t, n, a in conn.execute(
+                "SELECT broker_ticket, SUM(net_pnl), SUM(net_pnl_account) FROM trades "
+                "WHERE broker_ticket LIKE '%-deel' AND close_time IS NOT NULL "
+                "AND open_time >= datetime('now', '-2 days') GROUP BY broker_ticket"
+            )
+        } if "net_pnl_account" in kolommen else {
+            str(t)[: -len("-deel")]: (n or 0.0, None)
+            for t, n in conn.execute(
+                "SELECT broker_ticket, SUM(net_pnl) FROM trades "
+                "WHERE broker_ticket LIKE '%-deel' AND close_time IS NOT NULL "
+                "AND open_time >= datetime('now', '-2 days') GROUP BY broker_ticket"
+            )
+        }
     finally:
         conn.close()
     return {
+        "delen": delen,
         "open": [dict(r) for r in open_rijen],
         "gesloten": [dict(r) for r in gesloten],
         "equity": [dict(r) for r in equity],
@@ -340,7 +357,8 @@ def _dagverandering(c: dict | None, prijs, tz) -> dict | None:
     }
 
 
-def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> list[dict]:
+def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote,
+                   delen: dict | None = None) -> list[dict]:
     per_ticket = {str(r.get("broker_ticket")): r for r in db_open if r.get("broker_ticket")}
     bid = _num(getattr(quote, "bid", None))
     ask = _num(getattr(quote, "ask", None))
@@ -386,6 +404,10 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> li
             "punten": _num(punten, 3),
             "pnl": _num(pnl, 2),
             "pnl_account": _num(getattr(p, "unrealised_pnl", None), 2),
+            # 2.5.9: al genomen deelwinst (instrumentvaluta), en in
+            # accountvaluta als de broker die meldde.
+            "gerealiseerd": _num((delen or {}).get(ticket, (None, None))[0], 2),
+            "gerealiseerd_account": _num((delen or {}).get(ticket, (None, None))[1], 2),
             "geopend": geopend,
             "regime": regime,
             # 2.1.0: daghandel heeft geen tijdstop; "max. duur" is dan de tijd
@@ -649,7 +671,7 @@ def build_payload(
         "alarm": _alarmen(data, code),
         "candles": candles,
         "candles_fijn": candles_fijn or {},
-        "posities": _position_rows(data, db["open"], exit_cfg, quote),
+        "posities": _position_rows(data, db["open"], exit_cfg, quote, db.get("delen")),
         # 1.9.0: telling per richting en de limiet; netting als hij optrad.
         "posities_telling": _telling(data),
         "netting": data.get("netting"),

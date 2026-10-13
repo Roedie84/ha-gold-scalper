@@ -55,6 +55,11 @@ BREAKEVEN_UITERLIJK_USD = 1.5
 #: vanaf +2 USD de helft van de lopende winst vast, vanaf +5 USD 70%.
 #: Schuift alleen mee (de stop gaat nooit terug).
 WINSTSLOT_TREDEN: tuple[tuple[float, float], ...] = ((2.0, 0.5), (5.0, 0.7))
+#: 2.5.9 (Ruud 13-10: "partial profits werkt nog steeds niet?"): de helft
+#: van de positie dicht vanaf +3 USD/oz winst (of de ATR/R-drempel als die
+#: eerder komt). De rest loopt door met break-even, winstslot en volgstop.
+DEELWINST_USD = 3.0
+DEELWINST_FRACTIE = 0.5
 
 
 @dataclass(slots=True)
@@ -87,6 +92,8 @@ class ExitConfig:
     partial_close_fraction: float = 0.5
     partial_close_trigger_atr: float = 1.0
     enable_partial_close: bool = False
+    #: 2.5.9: ook vanaf deze winst in USD/oz (wat het eerst komt). None = uit.
+    partial_close_trigger_usd: float | None = None
 
     #: Trailing stop op deze ATR-afstand, actief vanaf deze winst.
     trailing_distance_atr: float = 1.2
@@ -132,6 +139,14 @@ class ExitManager:
 
     def __init__(self, config: ExitConfig | None = None) -> None:
         self.config = config or ExitConfig()
+
+    def _deel_gehaald(self, profit_atr: float, profit_per_oz: float) -> bool:
+        """2.5.9: deelwinst op de ATR/R-drempel of de USD-drempel."""
+        c = self.config
+        return profit_atr >= c.partial_close_trigger_atr or (
+            c.partial_close_trigger_usd is not None
+            and profit_per_oz >= c.partial_close_trigger_usd - 1e-9
+        )
 
     @staticmethod
     def _exit_price(side: str, bid: float, ask: float) -> float:
@@ -221,7 +236,7 @@ class ExitManager:
         deel_eerst = (
             self.config.enable_partial_close
             and not partial_taken
-            and profit_atr >= self.config.partial_close_trigger_atr
+            and self._deel_gehaald(profit_atr, profit_per_oz)
         )
         slot = (
             winstslot_stop(side, open_price, exit_price)
@@ -239,13 +254,13 @@ class ExitManager:
         if (
             self.config.enable_partial_close
             and not partial_taken
-            and profit_atr >= self.config.partial_close_trigger_atr
+            and self._deel_gehaald(profit_atr, profit_per_oz)
         ):
             return ExitAction(
                 "partial_close",
                 close_fraction=self.config.partial_close_fraction,
                 reason=(
-                    f"eerste doel geraakt op {profit_atr:.2f}xATR; "
+                    f"eerste doel geraakt ({profit_per_oz:+.2f} USD/oz, {profit_atr:.2f}xATR); "
                     f"{self.config.partial_close_fraction:.0%} van de positie gesloten, "
                     "de rest loopt door"
                 ),
@@ -352,7 +367,15 @@ def scalp_exit_config() -> "ExitConfig":
     """2.5.1: scalp met snelle break-even op de instap (Ruud 13-10)."""
     return ExitConfig(breakeven_trigger_usd=SCALP_BREAKEVEN_USD,
                       breakeven_buffer_cost_multiple=0.0,
-                      breakeven_min_afstand_usd=BREAKEVEN_MIN_AFSTAND_USD)
+                      breakeven_min_afstand_usd=BREAKEVEN_MIN_AFSTAND_USD,
+                      **deelwinst_velden())
+
+
+def deelwinst_velden() -> dict:
+    """2.5.9: deelwinst voor alle strategieën."""
+    return {"enable_partial_close": True,
+            "partial_close_fraction": DEELWINST_FRACTIE,
+            "partial_close_trigger_usd": DEELWINST_USD}
 
 
 def omkeer_actie(side: str, open_price: float, bid: float, ask: float,

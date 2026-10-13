@@ -13,9 +13,15 @@ from gold_scalper.strategy import veldproef as V  # noqa: E402
 NU = datetime(2026, 10, 13, 8, 0, tzinfo=timezone.utc)
 
 
+
+def _zonder_deel(cfg):
+    """2.5.9: deze test gaat over de stop, niet over de deelwinst."""
+    cfg.enable_partial_close = False
+    return cfg
+
 def _eval(prijs, stop, open_price=4189.0, tp=4197.0, kosten=0.64):
     r = V.r_van(open_price, tp)
-    m = ExitManager(V.exit_config("vp:momentum:5m"))
+    m = ExitManager(_zonder_deel(V.exit_config("vp:momentum:5m")))
     return m.evaluate(side="buy", volume=50, open_price=open_price, current_stop=stop,
                       bid=prijs, ask=prijs + 0.6, atr=r, opened_at=NU - timedelta(minutes=5),
                       now=NU, round_trip_cost_per_oz=kosten)

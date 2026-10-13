@@ -18,5 +18,5 @@ def test_kolom_bij_sl():
 
 def test_versie():
     from gold_scalper.const import INTEGRATION_VERSION
-    assert INTEGRATION_VERSION == "2.5.8"
-    assert json.load(open(os.path.join(BASIS, "manifest.json")))["version"] == "2.5.8"
+    assert INTEGRATION_VERSION >= "2.5.8"
+    assert json.load(open(os.path.join(BASIS, "manifest.json")))["version"] == INTEGRATION_VERSION

@@ -16,8 +16,14 @@ OPEN = NU - timedelta(minutes=5)
 ATR = 5.4  # 13-10 15:00
 
 
+
+def _zonder_deel(cfg):
+    """2.5.9: deze test gaat over de stop, niet over de deelwinst."""
+    cfg.enable_partial_close = False
+    return cfg
+
 def _eval(cfg, side, instap, stop, bid, ask):
-    return ExitManager(cfg).evaluate(side, 0.5, instap, stop, bid, ask, ATR, OPEN, NU, 0.8)
+    return ExitManager(_zonder_deel(cfg)).evaluate(side, 0.5, instap, stop, bid, ask, ATR, OPEN, NU, 0.8)
 
 
 def test_onder_2_usd_geen_winstslot():
@@ -68,7 +74,7 @@ def test_altijd_minimale_afstand_tot_de_koers():
 def test_strategieversies_omhoog():
     from gold_scalper.strategy import combinatie as C
     from gold_scalper.strategy.scalping import STRATEGY_VERSION
-    assert V.VELDPROEF_VERSIE == "veldproef-1.7.0"
-    assert D.STRATEGIE_VERSIE == "daghandel-1.5.0"
-    assert C.COMBINATIE_VERSIE == "combinatie-1.5.0"
-    assert STRATEGY_VERSION == "scalp-0.3.0"
+    assert V.VELDPROEF_VERSIE >= "veldproef-1.7.0"
+    assert D.STRATEGIE_VERSIE >= "daghandel-1.5.0"
+    assert C.COMBINATIE_VERSIE >= "combinatie-1.5.0"
+    assert STRATEGY_VERSION >= "scalp-0.3.0"

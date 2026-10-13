@@ -29,7 +29,7 @@ from .structure import read_structure
 
 _LOGGER = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "scalp-0.3.0"  # 2.5.7: winstslot
+STRATEGY_VERSION = "scalp-0.4.0"  # 2.5.9: deelwinst; 2.5.7: winstslot
 
 CONTRACT_SIZE = 100.0
 

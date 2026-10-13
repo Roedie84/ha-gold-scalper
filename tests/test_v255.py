@@ -14,9 +14,15 @@ from gold_scalper.strategy import veldproef as V  # noqa: E402
 NU = datetime(2026, 10, 13, 11, 0, tzinfo=timezone.utc)
 
 
+
+def _zonder_deel(cfg):
+    """2.5.9: deze test gaat over de stop, niet over de deelwinst."""
+    cfg.enable_partial_close = False
+    return cfg
+
 def test_veldproef_15m_met_3_usd_winst():
     # Screenshot 13-10: rsi_rev 15m, instap 4180,59, stop 4173,68 (R 6,91), koers +3,04.
-    m = ExitManager(V.exit_config("vp:rsi_rev:15m"))
+    m = ExitManager(_zonder_deel(V.exit_config("vp:rsi_rev:15m")))
     a = m.evaluate("buy", 0.5, 4180.59, 4173.68, 4183.63, 4184.03, 6.91,
                    NU - timedelta(minutes=30), NU, 0.8)
     assert a.kind == "modify_stop" and a.new_stop > 4180.59

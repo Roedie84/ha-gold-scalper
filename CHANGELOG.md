@@ -1,5 +1,17 @@
 # Changelog — Gold Scalper
 
+## 2.5.9
+
+* **Deelwinst voor alle strategieën** (Ruud 13-10: "partial profits werkt nog
+  steeds niet? Units blijven op 50 staan"). Deelsluiting stond bij elke
+  strategie uit. Nu: de helft van de positie dicht vanaf +3 USD/oz winst (of
+  de ATR/R-drempel als die eerder komt); de rest loopt door met break-even,
+  winstslot en volgstop. Geboekt als eigen gesloten trade `<ticket>-deel`.
+* **Open posities: kolom "Gerealiseerd"** met de al genomen deelwinst per
+  positie; de Units-kolom toont wat er nog openstaat.
+* Strategieversies omhoog (nieuwe run): veldproef-1.8.0, daghandel-1.6.0,
+  combinatie-1.6.0, scalp-0.4.0.
+
 ## 2.5.8
 
 * **Open posities: kolom "Bij SL"** (Ruud 13-10: "in het open posities

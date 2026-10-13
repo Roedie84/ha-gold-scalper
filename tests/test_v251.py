@@ -16,6 +16,12 @@ from gold_scalper.strategy import veldproef as V  # noqa: E402
 NU = datetime(2026, 10, 13, 10, 0, tzinfo=timezone.utc)
 
 
+
+def _zonder_deel(cfg):
+    """2.5.9: deze test gaat over de stop, niet over de deelwinst."""
+    cfg.enable_partial_close = False
+    return cfg
+
 def _eval(m, bid, stop=3998.0, kosten=0.8):
     return m.evaluate("buy", 0.5, 4000.0, stop, bid, bid + 0.3, 5.0,
                       NU - timedelta(seconds=30), NU, kosten)
@@ -40,7 +46,7 @@ def test_stop_nooit_tegen_de_koers():
 def test_veldproef_en_daghandel_sneller():
     assert V.BREAKEVEN_R == 0.5
     assert D.exit_config().breakeven_trigger_atr == 1.0
-    m = ExitManager(D.exit_config())
+    m = ExitManager(_zonder_deel(D.exit_config()))
     a = m.evaluate("buy", 0.5, 4000.0, 3980.0, 4005.5, 4005.8, 5.0,
                    NU - timedelta(seconds=300), NU, 0.8)
     assert a.kind == "modify_stop" and abs(a.new_stop - 4003.85) < 1e-6  # 2.5.7: winstslot
