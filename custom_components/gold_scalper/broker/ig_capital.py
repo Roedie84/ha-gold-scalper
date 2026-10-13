@@ -92,6 +92,17 @@ TIMEOUT = ClientTimeout(total=15, connect=5)
 OPENTIJD_TOLERANTIE_S = 600
 
 
+def _is_limietfout(payload) -> bool:
+    """2.6.0: 403 door een verzoekenlimiet (``error.public-api.exceeded-*``).
+
+    Die vraagt om wachten, niet om opnieuw inloggen.
+    """
+    if not isinstance(payload, dict):
+        return False
+    code = payload.get("errorCode") or payload.get("error") or ""
+    return isinstance(code, str) and code.startswith("error.public-api.exceeded-")
+
+
 def _utc(waarde) -> datetime | None:
     if waarde is None:
         return None
@@ -656,6 +667,17 @@ class IgStyleVenue(ExecutionVenue):
                     headers=headers,
                     timeout=timeout or TIMEOUT, **kwargs,
                 ) as response:
+                    if response.status == 403 and attempt == 1:
+                        # 2.6.0: een verzoekenlimiet is geen verlopen sessie.
+                        # Opnieuw inloggen kost dan een extra verzoek (dat ook
+                        # 403 krijgt: "Inloggen mislukte") en verdubbelt de
+                        # druk op dezelfde limiet. De sessie is nog geldig.
+                        try:
+                            payload = await response.json(content_type=None)
+                        except Exception:  # noqa: BLE001 - dan gewoon herlogin
+                            payload = None
+                        if _is_limietfout(payload):
+                            raise VenueError(self._describe_error(response.status, payload))
                     if response.status in (401, 403) and attempt == 1:
                         # Sessie verlopen. Capital.com doet dat na tien minuten
                         # inactiviteit; IG na langere tijd.

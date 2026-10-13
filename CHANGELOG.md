@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 2.6.0
+
+* **Verzoekenlimiet van IG is geen verlopen sessie.** Bij elke HTTP 403 logde
+  de client opnieuw in, ook bij `error.public-api.exceeded-account-allowance`
+  en `exceeded-api-key-allowance`. Dat inloggen is zelf een verzoek dat
+  dezelfde limiet raakt ("Inloggen mislukte ... 403"), dus elke geweigerde
+  koersopvraging of order kostte er twee en hield de limiet langer vol. Op
+  13-10 in ruim twee uur meer dan 100 van die logregels, waaronder reeksen van
+  10 mislukte orders binnen 10 s. Nu: een limietfout komt meteen terug als
+  fout (de bestaande afhandeling wacht en probeert de volgende cyclus), de
+  sessie blijft staan. Andere 401/403 (verlopen token) loggen nog steeds
+  opnieuw in. Geen strategie- of instellingswijziging: zelfde vingerafdruk.
+* Tests: `test_v260.py`.
+* Versietests van 2.5.9 vergelijken met >= (zoals de andere).
+
 ## 2.5.9
 
 * **Deelwinst voor alle strategieën** (Ruud 13-10: "partial profits werkt nog
