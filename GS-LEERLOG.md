@@ -109,3 +109,10 @@ laatste ronde: 13-10 11:50
 - Meten: scalptrades/uur (turbo vs cyclus), winst%, netto per scalptrade; terug naar 0,45 (of tussenwaarde) als netto per scalptrade na >= 30 trades duidelijk negatief is (t < -2). Telt als instellingenronde voor de 24-uursregel.
 
 laatste ronde: 13-10 11:42
+
+## 13-10 ~12:05 · 2.5.1 snelle break-even (chat, Ruud)
+- **2.5.1** (in HACS, wacht op herstart Ruud): scalp stop naar instap bij +0,6 USD/oz; veldproef break-even 0,5R (was 1R); daghandel break-even vanaf 1 x ATR15 (was uit); stop minstens 0,6 USD van de koers. Suite: 2134 groen + 6 bestaande tests aangepast aan het nieuwe gedrag.
+- Meten na herstart: aandeel trades dat op break-even sluit, gemiddeld verlies per verliestrade (moet dalen), gemiddelde winst per winnaar (mag niet veel dalen), netto per trade per strategie. Daghandel: backtest 2.1.0 vond break-even slechter; bij n >= 30 vergelijken en zo nodig terug.
+- Let op logs: veel IG 403 exceeded-account-allowance / api-key-allowance sinds de turbo (2.5.0) en de herstart; "Openen mislukt" 5x.
+
+laatste ronde: 13-10 12:05
