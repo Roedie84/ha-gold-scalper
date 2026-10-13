@@ -127,3 +127,9 @@ laatste ronde: 13-10 12:05
 - Volgende: opzet-uitzetmechanisme (n ≥ 100, t < −2) voor momentum:1m/rsi_rev:1m; effect 2.5.1 break-even (run 121: 10 trades, 0 % win, nog te klein).
 
 laatste ronde: 13-10 12:30
+
+## 13-10 ~12:55 · 2.5.3 turbo-uitbraak (chat, Ruud keuze 2)
+- **2.5.3** (suite 2148 groen + 1 paneeltest aangepast; in HACS, wacht op herstart): eigen turbosignaal op de ticks (strategy/turbo.py): uitbraak >= 0,10 USD door de band van 45 s, doorzetting >= 0,30 in 10 s, band 0,4-6 USD, 30 s wachten; stop/doel van scalp (2/1), scalpexits (break-even +0,6). open_reason "turbo uitbraak"/"turbo scalp"; paneel toont "Turbo scalp". Bovenop 2.5.2 (netting) van de geplande ronde.
+- Meten na herstart: uitbraakorders/uur (redenen.turbo), netto per turbotrade, winst%, aandeel break-even; IG-403 per uur. Bij n >= 30 en t < -2: band/doorzet-drempels aanscherpen of uitzetten.
+
+laatste ronde: 13-10 12:55
