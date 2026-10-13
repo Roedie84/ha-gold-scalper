@@ -895,6 +895,19 @@ class TradeDatabase:
             params.append(limit)
         return [self._row_to_trade(r) for r in self.conn.execute(query, params).fetchall()]
 
+    def closed_trades_since(self, sinds_iso: str, mode: str | None = None) -> list[Trade]:
+        """2.4.3: gesloten trades sinds een moment, over alle runs. Voor de
+        afstemming met de broker: een nieuwe run mag de laatste dagen van de
+        vorige niet ongecontroleerd laten."""
+        query = ("SELECT * FROM trades WHERE close_time IS NOT NULL AND close_time >= ? "
+                 "AND broker_ticket IS NOT NULL")
+        params: list[Any] = [sinds_iso]
+        if mode is not None:
+            query += " AND mode=?"
+            params.append(mode)
+        query += " ORDER BY close_time ASC"
+        return [self._row_to_trade(r) for r in self.conn.execute(query, params).fetchall()]
+
     @staticmethod
     def _row_to_trade(row: sqlite3.Row) -> Trade:
         fields = {f for f in Trade.__dataclass_fields__}

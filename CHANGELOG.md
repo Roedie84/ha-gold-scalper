@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.4.3
+
+* **Afstemming met de broker over alle runs.** De dagelijkse afstemming (en
+  de actie *Afstemmen met de broker*) keek alleen naar de lopende run. Na een
+  runwissel bleven de laatste dagen van de vorige run ongecontroleerd: op
+  13-10 06:03 meldde hij "geen gesloten trades" omdat run 110 net begonnen
+  was. Nu alle gesloten brokertrades van dezelfde modus binnen het venster.
+* Tests: `test_v243.py`.
+
 ## 2.4.2
 
 * **Tot 20 posities per richting** (Ruud 13-10). De grens van de instelling

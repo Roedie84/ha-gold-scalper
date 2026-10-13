@@ -3796,10 +3796,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return {}
         nu = datetime.now(timezone.utc)
         transacties = await haal(nu - timedelta(days=dagen), nu)
-        trades = await self.hass.async_add_executor_job(
-            self.db.closed_trades, self.run_id
-        )
         grens = nu - timedelta(days=dagen)
+        # 2.4.3: over alle runs, niet alleen de lopende. Na een runwissel
+        # (nieuwe opzet) bleven de laatste dagen van de vorige run anders
+        # ongecontroleerd: op 13-10 06:03 meldde de afstemming "geen gesloten
+        # trades" omdat run 110 net begonnen was.
+        trades = await self.hass.async_add_executor_job(
+            self.db.closed_trades_since,
+            (grens - timedelta(hours=1)).isoformat(), self.mode.value,
+        )
         recent = [
             t for t in trades
             if t.close_time and _as_datetime(t.close_time, nu) >= grens
