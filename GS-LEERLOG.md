@@ -186,3 +186,14 @@ laatste ronde: 13-10 16:40
 - Voorstel blijft: reeksstukken (bevestigd: MFE 0,08/oz bij gedeelde stop ~2,3/oz = R:R ≪ 1) uit of 1 stuk per cyclus met doel vanaf vulprijs; 1m-tijdvak uit.
 
 laatste ronde: 13-10 17:15
+
+## 13-10 ~18:15 · ronde 10 (geplande controle, RUST IN DE REGELS)
+- 2.6.0 actief, run 131 sinds 15:28 UTC (scalp_reeks uit in de vingerafdruk). 75 dicht + 6 open in 43 min (~105/u). Noodstop/dataprobleem uit, demo, alle open posities met stop en doel. Afstemming 503/507 (4 afwijkingen; paren lijken onderling verwisseld, bv. −369/−374).
+- Run 131: netto −689, bruto +2.056, kosten 2.746 (0,78 USD/oz), win 52 %, PF 0,75, t −1,0, DD −1.414, slippage instap 0,13/oz.
+- Per bron: vp:1m n=26 −1.156 (t −3,2, MFE 0,74/oz < kosten); turbo-uitbraak n=15 −568 (win 6 %); vp:3m n=16 +62; vp:5m n=7 +372; vp:15m n=9 +492; vp:30m n=2 +109 → 3m-30m samen n=34 +1.035. Vandaag n=1.369: −52.145, bruto ≈ 0, kosten 52.377 → kosten zijn het hele verlies.
+- 2.6.0 werkt: geen "Inloggen mislukte" meer; 403-limiet nog ~4 korte reeksen/u (2-3 koersvragen, 1x 6 orders in 0,5 s om 15:00 UTC) i.p.v. >50/u.
+- Code: niets (geen aantoonbare bug met verlies). Instellingen: niets (laatste wijziging 15:28 UTC < 48 u).
+- Voorstel bij volgende wijzigingsronde (≥ 15-10 15:28 UTC, als het zo blijft): turbo uit (dag n≈94, t < −4) en 1m-tijdvak uit; tijdvakken 3m-30m houden.
+- Meten: blijft 3m-30m positief bij n ≥ 100; 403-reeksen per uur.
+
+laatste ronde: 13-10 18:15
