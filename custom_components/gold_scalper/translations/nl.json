@@ -112,7 +112,7 @@
           "notify_critical": "Noodstop als kritieke melding (komt door stille stand heen)",
           "take_profit_atr": "Doel als veelvoud van de ATR",
           "stop_loss_atr": "Stop als veelvoud van de ATR",
-          "take_profit_usd": "Winstdoel in USD/oz voor alle strategieën (0 = eigen doel per strategie)",
+          "take_profit_usd": "Winstdoel scalp in USD/oz (0 = op ATR); veldproef en daghandel houden hun eigen doel",
           "stop_loss_usd": "Stop als vast bedrag (0 = ATR gebruiken)",
           "max_resumes_per_day": "Hervattingen per dag na een noodstop (0 = geen)",
           "risk_based_sizing": "Grootte uit risico berekenen (i.p.v. vaste ounces)",

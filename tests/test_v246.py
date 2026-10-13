@@ -17,11 +17,11 @@ class _Bars:
         return SimpleNamespace(atr=2.0, richting={"momentum": 1}, ts=123)
 
 
-def test_veldproef_neemt_instelling_over():
+def test_veldproef_negeert_instelling_sinds_248():
+    # 2.4.8: het vaste doel geldt alleen voor scalp; de veldproef houdt 2R.
     cfg = ScalpConfig(take_profit_usd=3.0)
     s = V.evalueer("vp:momentum:1m", _Bars(), 4000.0, 4000.3, cfg)
-    assert s.should_trade and s.take_profit == 4003.3
-    assert "doel 3.00 USD" in s.reason
+    assert s.should_trade and s.take_profit == round(4000.3 + V.RR * V.STOP_ATR * 2.0, 2)
 
 
 def test_veldproef_zonder_instelling_2r():
@@ -30,7 +30,7 @@ def test_veldproef_zonder_instelling_2r():
     assert s.take_profit == round(4000.3 + V.RR * V.STOP_ATR * 2.0, 2)
 
 
-def test_daghandel_neemt_instelling_over(monkeypatch):
+def test_daghandel_negeert_instelling_sinds_248(monkeypatch):
     monkeypatch.setattr(D, "stand", lambda c, cfg: D.DaghandelStand(10.0, 5.0, 3990.0, 3900.0, 2.0))
 
     class C(list):
@@ -38,11 +38,11 @@ def test_daghandel_neemt_instelling_over(monkeypatch):
     cs = C([0] * 100)
     cfg = ScalpConfig(take_profit_usd=3.0)
     s = D.evaluate_daghandel(cs, 4000.0, 4000.3, cfg, 10)
-    assert s.should_trade and s.take_profit == 4003.3
+    assert s.should_trade and s.take_profit is None  # 2.4.8: volgstop
     s = D.evaluate_daghandel(cs, 4000.0, 4000.3, ScalpConfig(take_profit_usd=0.0), 10)
     assert s.take_profit is None
 
 
 def test_nieuwe_strategieversies():
-    assert V.VELDPROEF_VERSIE == "veldproef-1.1.0"
-    assert D.STRATEGIE_VERSIE == "daghandel-1.1.0"
+    assert V.VELDPROEF_VERSIE == "veldproef-1.2.0"
+    assert D.STRATEGIE_VERSIE == "daghandel-1.2.0"

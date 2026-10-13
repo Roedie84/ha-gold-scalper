@@ -359,6 +359,7 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> li
         regime = db.get("exit_regime")
         strategie = _strategie(db, data)
         daghandel = strategie == "daghandel"
+        vp_duur = _vp_max_duur_s(strategie)
         uit.append({
             "strategie": strategie,
             # 2.2.1: bijkoop (pyramide) van een andere positie.
@@ -377,10 +378,13 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> li
             "regime": regime,
             # 2.1.0: daghandel heeft geen tijdstop; "max. duur" is dan de tijd
             # tot 20:45 UTC, wanneer hij dicht gaat.
-            "tijdstop_s": None if daghandel or regime == "zonder_tijdstop"
+            "tijdstop_s": None if daghandel or vp_duur is not None
+            or regime == "zonder_tijdstop"
             else exit_cfg.get("time_stop_seconds"),
-            "dode_zone_atr": None if daghandel else exit_cfg.get("time_stop_deadzone_atr"),
+            "dode_zone_atr": None if daghandel or vp_duur is not None
+            else exit_cfg.get("time_stop_deadzone_atr"),
             "max_duur_s": _sluit_daghandel_s(geopend) if daghandel
+            else vp_duur if vp_duur is not None
             else exit_cfg.get("max_hold_seconds"),
         })
     return uit
@@ -425,7 +429,23 @@ def _strategie(rij: dict, data: dict) -> str:
     eigen = rij.get("strategie")
     if eigen in ("daghandel", "scalp"):
         return eigen
+    # 2.4.8: veldproefopzetten (vp:<familie>:<tf>) niet meer als de primaire
+    # strategie tonen; bij "alles" stonden ze als "Daghandel" in het paneel.
+    if isinstance(eigen, str) and eigen.startswith("vp:"):
+        return eigen
     return data.get("primaire_strategie") or "scalp"
+
+
+def _vp_max_duur_s(strategie: str) -> int | None:
+    """2.4.8: maximale duur van een veldproefopzet (HOLD_BARS bars), anders None."""
+    if not str(strategie or "").startswith("vp:"):
+        return None
+    try:
+        from ..strategy import veldproef
+
+        return int(veldproef.exit_config(strategie).max_hold_seconds)
+    except Exception:  # noqa: BLE001 - alleen weergave
+        return None
 
 
 def _sluit_daghandel_s(geopend: int | None) -> int | None:

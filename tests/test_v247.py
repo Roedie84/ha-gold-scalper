@@ -88,5 +88,4 @@ def test_versie():
     from gold_scalper.const import INTEGRATION_VERSION
     pad = os.path.join(os.path.dirname(__file__), "..", "custom_components",
                        "gold_scalper", "manifest.json")
-    assert INTEGRATION_VERSION == "2.4.7"
-    assert json.load(open(pad))["version"] == "2.4.7"
+    assert json.load(open(pad))["version"] == INTEGRATION_VERSION

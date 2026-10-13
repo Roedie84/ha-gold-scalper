@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 2.4.8
+
+* **Vast winstdoel alleen nog voor scalp** (Ruud 13-10: "scalp moet kort,
+  snel en kleine winsten pakken"). Sinds 2.4.6 gold *Doel als vast bedrag*
+  (`take_profit_usd`) voor alle strategieën: met 2 USD gedroegen de
+  veldproefopzetten op 15m/30m (stops 8-12 USD) zich als scalp en was er
+  geen verschil meer. Nu weer: scalp het vaste doel, de veldproef 2 x de
+  stop, de daghandel geen doel (volgstop en 20:45 UTC). Nieuwe
+  strategieversies (veldproef-1.2.0, daghandel-1.2.0, combinatie-1.2.0):
+  nieuwe run.
+* **Paneel: veldproefposities kregen het label "Daghandel"** bij de keuze
+  *alles*, met de maximale duur tot 20:45. Nu "VP <familie> <tijdvak>" met
+  de eigen maximale duur (48 bars van het tijdvak) en zonder tijdstop.
+* Tests: `test_v248.py`, `test_v246.py` bijgewerkt.
+
 ## 2.4.7
 
 * **Verweesde trades worden afgewikkeld.** Een positie uit een eerdere run
