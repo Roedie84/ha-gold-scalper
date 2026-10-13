@@ -932,7 +932,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
       (p.live && isNum(p.pnl_broker) ? `<div class="pk-sub">broker (per cyclus): ${fmtS(p.pnl_broker)} ${esc(vl || "")}</div>` : "") +
       `<div class="pk-sub"><span class="${toon(p.punten)}">${fmtS(p.punten, 2)} pt</span> · instap ${fmt(p.instap)} → ${fmt(p.koers)}</div></div>` +
       slt +
-      `<div class="kv drie"><div><span class="lbl">Stop-loss</span><b class="neg">${fmt(p.sl)}</b><div class="s">${afstand(p.sl)}</div></div>` +
+      `<div class="kv drie"><div><span class="lbl">Stop-loss</span><b class="neg">${fmt(p.sl)}</b><div class="s">${afstand(p.sl)}${isNum(p.sl_gewijzigd) ? ` · verplaatst ${this._hm(p.sl_gewijzigd)}${p.sl_wijzigingen > 1 ? ` (${p.sl_wijzigingen}×)` : ""}` : ""}</div></div>` +
       `<div><span class="lbl">Take-profit</span><b class="pos">${fmt(p.tp)}</b><div class="s">${afstand(p.tp)}</div></div>` +
       `<div><span class="lbl">Duur</span><b id="pk-duur">${duur(this._nu() - p.geopend)}</b><div class="s">sinds ${esc(this._hm(p.geopend))}</div></div></div>` +
       `<div class="aftel" id="pk-aftel"></div>`;
@@ -1020,7 +1020,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
         cel("Strategie", (p.strategie ? `<span class="strat ${stratKlasse(p.strategie)}">${stratLabel(p.strategie)}</span>` : "—") +
           (p.bijkoop ? ' <span class="dim" title="Bijkoop (pyramide) van een andere positie">+ bijkoop</span>' : "")) +
         cel("Units", fmt(p.units), "r") + cel("Instap", fmt(p.instap), "r") +
-        cel("Koers", fmt(p.koers), "r") + cel("SL", fmt(p.sl), "r neg") + cel("TP", fmt(p.tp), "r pos") +
+        cel("Koers", fmt(p.koers), "r") + cel("SL", fmt(p.sl) + (isNum(p.sl_gewijzigd) ? `<div class="dim" title="${esc(p.sl_reden || "")}">↕ ${this._hm(p.sl_gewijzigd)}${p.sl_wijzigingen > 1 ? ` (${p.sl_wijzigingen}×)` : ""}</div>` : ""), "r neg") + cel("TP", fmt(p.tp), "r pos") +
         cel("P&amp;L", `<b>${fmtS(pnl)}</b> <span class="dim">${esc(pv || "")}</span>${p.live ? '<span class="ind" title="live, indicatief">live</span>' : ""}`, `r ${toon(pnl)}`) +
         cel("Punten", fmtS(p.punten), `r ${toon(p.punten)}`) +
         cel("Duur", duur(this._nu() - p.geopend), "r", `op-duur-${i}`) +

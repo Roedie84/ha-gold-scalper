@@ -1,5 +1,19 @@
 # Changelog — Gold Scalper
 
+## 2.4.11
+
+* **Paneel: open posities uit een vorige run kregen het label "Daghandel".**
+  Het paneel las alleen de open trades van de lopende run. Na elke
+  instellingswijziging of herstart (nieuwe run) kende het de posities die
+  nog openstonden niet en viel het terug op de primaire strategie
+  (daghandel), met de maximale duur tot 20:45. Nu ook open trades uit
+  eerdere runs (laatste 2 dagen), met hun eigen strategie, stop en doel.
+* **Tijdstip van de laatste stopverplaatsing** (Ruud 13-10: "om trailing te
+  controleren"). Elke verplaatste stop (break-even, volgstop) legt moment,
+  reden en aantal vast; het paneel toont onder SL "↕ hh:mm (n×)", met de
+  reden als tooltip.
+* Tests: `test_v2411.py`.
+
 ## 2.4.10
 
 * **Veldproef: break-even en volgstop** (Ruud 13-10: "soms mooie P&L van 3

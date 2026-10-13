@@ -162,7 +162,8 @@ _TRADE_KOLOMMEN = (
 
 #: 1.10.0: optioneel, alleen als de kolom er al is (een database die nog
 #: niet door deze versie is geopend, heeft ze niet).
-_TRADE_KOLOMMEN_EXTRA = ("looptijd_s", "close_reason_source", "strategie", "open_reason")
+_TRADE_KOLOMMEN_EXTRA = ("looptijd_s", "close_reason_source", "strategie", "open_reason",
+                         "stop_gewijzigd_op", "stop_wijzigingen", "stop_reden")
 
 
 def _kolommen(conn: sqlite3.Connection) -> str:
@@ -187,8 +188,13 @@ def read_database(path: str | Path, run_id: int) -> dict:
     conn = open_readonly(path)
     try:
         kolommen = _kolommen(conn)
+        # 2.4.11: ook open trades uit eerdere runs (meegenomen over een
+        # runwissel of herstart). Zonder die rijen kende het paneel hun
+        # strategie, stop en doel niet en toonde het de primaire strategie.
         open_rijen = conn.execute(
-            f"SELECT {kolommen} FROM trades WHERE run_id=? AND close_time IS NULL",
+            f"SELECT {kolommen} FROM trades WHERE close_time IS NULL AND ("
+            "run_id=? OR (broker_ticket IS NOT NULL AND broker_ticket != '' "
+            "AND open_time >= datetime('now', '-2 days')))",
             (run_id,),
         ).fetchall()
         gesloten = conn.execute(
@@ -371,6 +377,10 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> li
             "koers": koers,
             "sl": _num(getattr(p, "stop_loss", None)) or _num(db.get("stop_loss")),
             "tp": _num(getattr(p, "take_profit", None)) or _num(db.get("take_profit")),
+            # 2.4.11: laatste stopverplaatsing (break-even/volgstop).
+            "sl_gewijzigd": _epoch(db.get("stop_gewijzigd_op")),
+            "sl_wijzigingen": db.get("stop_wijzigingen") or 0,
+            "sl_reden": db.get("stop_reden"),
             "punten": _num(punten, 3),
             "pnl": _num(pnl, 2),
             "pnl_account": _num(getattr(p, "unrealised_pnl", None), 2),

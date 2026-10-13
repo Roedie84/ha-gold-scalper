@@ -523,6 +523,12 @@ class TradeDatabase:
         if "strategie" not in trade_columns:
             self._conn.execute("ALTER TABLE trades ADD COLUMN strategie TEXT")
             _LOGGER.info("Database bijgewerkt: kolom 'strategie' toegevoegd")
+        # 2.4.11: laatste stopverplaatsing (om break-even/volgstop te volgen).
+        for kolom, soort in (("stop_gewijzigd_op", "TEXT"),
+                             ("stop_wijzigingen", "INTEGER"),
+                             ("stop_reden", "TEXT")):
+            if kolom not in trade_columns:
+                self._conn.execute(f"ALTER TABLE trades ADD COLUMN {kolom} {soort}")
         self._backfill_exit_regime()
         self._migrate_close_reasons()
         self._normaliseer_sluitredenen()
@@ -870,6 +876,17 @@ class TradeDatabase:
             (mode, run_id),
         ).fetchall()
         return [self._row_to_trade(r) for r in rows]
+
+    def stop_gewijzigd(self, ticket: str, moment: str, reden: str | None) -> None:
+        """2.4.11: leg vast wanneer (en waarom) de stop van een open trade
+        voor het laatst verschoof, en hoe vaak."""
+        self.conn.execute(
+            "UPDATE trades SET stop_gewijzigd_op=?, stop_reden=?, "
+            "stop_wijzigingen=COALESCE(stop_wijzigingen, 0) + 1 "
+            "WHERE broker_ticket=? AND close_time IS NULL",
+            (moment, (reden or "")[:120] or None, str(ticket)),
+        )
+        self.conn.commit()
 
     def markeer_voorlopig(self, ticket: str) -> int:
         """2.4.10: een gesloten trade laten nakijken door de afstemming.

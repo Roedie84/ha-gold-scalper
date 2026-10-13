@@ -3289,7 +3289,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     # leidde de afwikkeling de sluitreden af van een stop die
                     # al lang niet meer gold.
                     if getattr(resultaat, "success", False):
-                        await self._sync_trade_stop(ticket, action.new_stop)
+                        await self._sync_trade_stop(ticket, action.new_stop, action.reason)
                 elif action.kind == "modify_stop":
                     position.stop_loss = action.new_stop
                 elif action.kind == "partial_close":
@@ -4348,7 +4348,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.ledger_cost_info = kosten
         return self._ledger_cost_value
 
-    async def _sync_trade_stop(self, ticket, nieuwe_stop: float) -> None:
+    async def _sync_trade_stop(self, ticket, nieuwe_stop: float,
+                               reden: str | None = None) -> None:
         """Zet een bij de broker verplaatste stop ook in de database."""
         if self.run_id is None:
             return
@@ -4357,6 +4358,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if trade is not None:
             trade.stop_loss = round(float(nieuwe_stop), 5)
             await self.hass.async_add_executor_job(self.db.update_trade, trade)
+            # 2.4.11: moment en reden, zodat de volgstop te controleren is.
+            try:
+                await self.hass.async_add_executor_job(
+                    self.db.stop_gewijzigd, str(ticket),
+                    datetime.now(timezone.utc).isoformat(timespec="seconds"), reden,
+                )
+            except Exception:  # noqa: BLE001 - alleen administratie
+                _LOGGER.debug("Stopmoment niet vastgelegd", exc_info=True)
 
     async def _correct_estimated_settlements(self, now: datetime) -> None:
         """Werk eerder geschatte afwikkelingen bij zodra de prijs beschikbaar is.
