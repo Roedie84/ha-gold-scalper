@@ -1,5 +1,12 @@
 # Changelog — Gold Scalper
 
+## 2.4.2
+
+* **Tot 20 posities per richting** (Ruud 13-10). De grens van de instelling
+  *Posities per richting* gaat van 3 naar 20; het totaal groeit mee
+  (2 x de limiet, plus daghandel en veldproef).
+* Tests: `test_v242.py`, `test_v190.py` (grens).
+
 ## 2.4.1
 
 * **Veldproef: minimale stopafstand 1,0 USD.** IG wees de 1m-orders af met

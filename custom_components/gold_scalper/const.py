@@ -31,7 +31,7 @@ CONF_PYRAMID_ENABLED: Final = "pyramid_enabled"
 #: mogen naast elkaar bestaan.
 CONF_MAX_POSITIONS_PER_RICHTING: Final = "max_positions_per_richting"
 DEFAULT_MAX_POSITIONS_PER_RICHTING: Final = 3
-MAX_POSITIONS_PER_RICHTING_GRENS: Final = 3
+MAX_POSITIONS_PER_RICHTING_GRENS: Final = 20
 CONF_PYRAMID_TRIGGER_ATR: Final = "pyramid_trigger_atr"
 CONF_PYRAMID_MAX_ADDITIONS: Final = "pyramid_max_additions"
 CONF_MAX_UNITS: Final = "max_units"
@@ -223,7 +223,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.4.1"
+INTEGRATION_VERSION: Final = "2.4.2"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

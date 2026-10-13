@@ -736,7 +736,8 @@ def test_vingerafdruk_en_uitvoeringsversie(tmp_path, monkeypatch):
 
 def test_optie_is_begrensd_op_1_tot_3():
     from gold_scalper.coordinator import _per_richting
-    assert [_per_richting(v) for v in (None, 0, 1, 2.0, 3, 7)] == [3, 1, 1, 2, 3, 3]
+    # 2.4.2: grens 20 (was 3).
+    assert [_per_richting(v) for v in (None, 0, 1, 2.0, 3, 7, 25)] == [3, 1, 1, 2, 3, 7, 20]
 
 
 def test_optie_in_options_flow_en_vertalingen():
