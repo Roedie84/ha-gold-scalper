@@ -135,6 +135,7 @@ from .learning.robustness import evaluate_robustness
 from .learning.sessions import build_news_impact, build_sessions
 from .strategy.aggregator import BAR_SECONDS, QuoteAggregator, closed_only
 from .strategy import veldproef as veldproef_mod
+from .strategy import turbo as turbo_mod
 from .strategy.pyramid import PyramidConfig, consider_addition
 from .strategy.scalp_reeks import ReeksConfig, stukken_nu
 from .strategy.sizing import SizingConfig, position_size
@@ -416,6 +417,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._turbo_afmelden = None
         self._turbo_ctx: dict | None = None
         self._turbo_stream = None
+        #: 2.5.2: eigen uitbraaksignaal op de live ticks (zie strategy/turbo.py).
+        self.turbo_signaal = turbo_mod.TickUitbraak()
+        self._turbo_sig_instap = 0.0
         self.turbo_stats: dict = {"ticks": 0, "rondes": 0, "orders": 0,
                                   "bijkopen": 0, "laatste_order": None}
         #: Per ticket: hoeveel toevoegingen en op welke prijs de laatste.
@@ -1591,7 +1595,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             ),
             # 2.5.0: turbo-scalp verandert hoeveel en wanneer scalptrades openen.
             "scalp_turbo": (
-                getattr(self, "turbo_orders_pm", None)
+                {"orders_pm": getattr(self, "turbo_orders_pm", None),
+                 "signaal": turbo_mod.TURBO_SIGNAAL_VERSIE}
                 if getattr(self, "turbo_aan", False) else None
             ),
             # De groottemethode hoort erbij (1.1): vast of uit risico bepaald
@@ -2732,7 +2737,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             recent = self._turbo_recent(time.monotonic())
             redenen["turbo"] = (
                 f"{recent}/{self.turbo_orders_pm} orders deze minuut, "
-                f"{self.turbo_stats['orders']} totaal, stream "
+                f"{self.turbo_stats['orders']} totaal "
+                f"({self.turbo_stats.get('uitbraak_orders', 0)} op uitbraak), "
+                f"uitbraak: {self.turbo_stats.get('laatste_signaal', '-')}, stream "
                 f"{getattr(self._turbo_stream, 'status', '?')}"
             )
         self._redenen_per_strategie = redenen
@@ -5403,6 +5410,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         """Callback van de stroom (synchroon): hooguit één ronde tegelijk."""
         if not isinstance(bericht, dict) or bericht.get("soort") != "tick":
             return
+        # 2.5.2: elke tick naar het uitbraaksignaal, ook als er een ronde loopt.
+        try:
+            t = bericht.get("tijd")
+            self.turbo_signaal.voeg_toe(
+                float(t) if isinstance(t, (int, float)) else time.time(),
+                bericht.get("bied"), bericht.get("laat"))
+        except (TypeError, ValueError):
+            pass
         if self._turbo_bezig or self._afgesloten:
             return
         self.turbo_stats["ticks"] += 1
@@ -5483,16 +5498,32 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 self.strategy_cfg, now.hour, len(eigen) + len(pending),
                 now.timestamp() - laatste, 0, tel_per_richting(eigen, pending),
             )
+            uitbraak = False
+            if sig is None or not sig.should_trade:
+                # 2.5.2: geen scalpsignaal -> het eigen uitbraaksignaal op de ticks.
+                nu_s = time.time()
+                sig = self.turbo_signaal.evalueer(
+                    nu_s, bid, ask, self.strategy_cfg,
+                    self.state.atr.value, nu_s - self._turbo_sig_instap)
+                uitbraak = bool(sig.should_trade)
+                self.turbo_stats["laatste_signaal"] = sig.reject_reason or "instap"
             if sig is not None and sig.should_trade and await self._turbo_mag_openen(
                     sig, quote, now, open_positions, eigen, ctx):
                 sig.components = {**(sig.components or {}),
-                                  "strategie": STRATEGIE_SCALP, "turbo": True}
+                                  "strategie": STRATEGIE_SCALP, "turbo": True,
+                                  # 2.5.3: herkenbaar in paneel en database.
+                                  "open_reason": "turbo uitbraak" if uitbraak else "turbo scalp"}
+                if uitbraak:
+                    self._turbo_sig_instap = time.time()
                 oud = self._geopend_in_cyclus
                 self._geopend_in_cyclus = 0
                 try:
                     if await self._open_position(
                             sig, quote, now, gelijktijdig_open=len(open_positions)):
                         geplaatst += 1
+                        if uitbraak:
+                            self.turbo_stats["uitbraak_orders"] = (
+                                self.turbo_stats.get("uitbraak_orders", 0) + 1)
                 finally:
                     self._geopend_in_cyclus = oud
 

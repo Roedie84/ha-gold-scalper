@@ -1,5 +1,23 @@
 # Changelog — Gold Scalper
 
+## 2.5.3
+
+* **Eigen turbosignaal: uitbraak op de live koers** (Ruud 13-10, keuze 2).
+  Turbo-scalp (2.5.0) reageerde alleen op het gewone scalpsignaal, en dat kwam
+  zelden boven de drempel (score ~0,1 tegen 0,30): 0 turbotrades. Nieuw in
+  `strategy/turbo.py`: de middenkoers breekt minstens 0,10 USD door de band van
+  de laatste 45 s (zonder de laatste 2 s), met minstens 0,30 USD doorzetting in
+  10 s; band tussen 0,40 en 6 USD; spread binnen `max_spread`; 30 s wachten na
+  een uitbraakinstap. Stop en doel van scalp (2 / 1 USD), scalpexits met snelle
+  break-even. Elke tick voedt het signaal; geeft het scalpsignaal niets, dan
+  beslist de uitbraak. Zelfde grendels en orderbudget als turbo-scalp.
+* Paneel/redenen: aantal uitbraakorders en de laatste uitbraakuitkomst.
+* Vingerafdruk: `scalp_turbo` bevat de signaalversie (turbo-uitbraak-1.0.0):
+  nieuwe run.
+* Paneel: kolom Strategie toont "Turbo scalp" voor posities die turbo-scalp
+  opende (open_reason "turbo uitbraak" / "turbo scalp").
+* Tests: `test_v253.py`.
+
 ## 2.5.2
 
 * **Geen valse netting meer als een tegengestelde positie op haar eigen stop

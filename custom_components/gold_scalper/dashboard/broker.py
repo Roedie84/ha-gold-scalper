@@ -370,6 +370,8 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote) -> li
             "strategie": strategie,
             # 2.2.1: bijkoop (pyramide) van een andere positie.
             "bijkoop": str(db.get("open_reason") or "").startswith("pyramide van "),
+            # 2.5.3: geopend door turbo-scalp (live koers).
+            "turbo": str(db.get("open_reason") or "").startswith("turbo"),
             "ticket": ticket,
             "richting": "long" if side == "buy" else "short",
             "units": _num(units, 2),

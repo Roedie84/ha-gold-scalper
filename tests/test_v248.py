@@ -46,4 +46,4 @@ def test_paneel_label():
     pad = os.path.join(os.path.dirname(__file__), "..", "custom_components",
                        "gold_scalper", "frontend", "broker-panel.js")
     js = open(pad, encoding="utf-8").read()
-    assert "stratLabel(p.strategie)" in js and 'startsWith("vp:")' in js
+    assert "stratLabel(p.strategie" in js and 'startsWith("vp:")' in js

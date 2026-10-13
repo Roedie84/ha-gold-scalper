@@ -212,6 +212,7 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 .strat.daghandel { color: var(--goud); }
 .strat.scalp { color: var(--tekst2); }
 .strat.veldproef { color: var(--tekst); }
+.strat.turbo { color: var(--oranje); }
 .zijde { padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 12px; letter-spacing: .12em; }
 .zijde.long { background: rgba(93, 173, 226, .16); color: var(--blauw); border: 1px solid rgba(93, 173, 226, .45); }
 .zijde.short { background: rgba(251, 146, 60, .14); color: var(--oranje); border: 1px solid rgba(251, 146, 60, .45); }
@@ -354,8 +355,9 @@ footer .demo { color: var(--goud); font-weight: 700; }
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // 2.4.8: veldproefopzetten (vp:<familie>:<tf>) met eigen label.
-const stratLabel = (v) => {
+const stratLabel = (v, turbo = false) => {
   const s = String(v ?? "");
+  if (turbo) return "Turbo scalp";
   if (s === "daghandel") return "Daghandel";
   if (s.startsWith("vp:")) { const d = s.split(":"); return esc(`VP ${d[1] || ""} ${d[2] || ""}`.trim()); }
   return "Scalp";
@@ -927,7 +929,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     }
     const afstand = (x) => (isNum(x) && isNum(p.koers) ? fmtS(x - p.koers) : "—");
     el.innerHTML =
-      `<div class="pk-kop"><span class="zijde ${p.richting}">${p.richting.toUpperCase()}</span>${p.strategie ? `<span class="strat ${stratKlasse(p.strategie)}">${stratLabel(p.strategie)}</span>` : ""}<b class="num">${fmt(p.units)} oz</b><span class="ticket">${esc(p.ticket)}</span></div>` +
+      `<div class="pk-kop"><span class="zijde ${p.richting}">${p.richting.toUpperCase()}</span>${p.strategie ? `<span class="strat ${p.turbo ? "turbo" : stratKlasse(p.strategie)}">${stratLabel(p.strategie, p.turbo)}</span>` : ""}<b class="num">${fmt(p.units)} oz</b><span class="ticket">${esc(p.ticket)}</span></div>` +
       `<div><div class="pk-pnl ${toon(pnl)}">${fmtS(pnl)}<small>${esc(pv || "")}</small>${p.live ? '<span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}</div>` +
       (p.live && isNum(p.pnl_broker) ? `<div class="pk-sub">broker (per cyclus): ${fmtS(p.pnl_broker)} ${esc(vl || "")}</div>` : "") +
       `<div class="pk-sub"><span class="${toon(p.punten)}">${fmtS(p.punten, 2)} pt</span> · instap ${fmt(p.instap)} → ${fmt(p.koers)}</div></div>` +
@@ -1017,7 +1019,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
       const pv = isNum(p.pnl_account) ? vl : iv;
       return `<tr>${cel("Ticket", esc(p.ticket), "ticket breed")}` +
         cel("Richting", `<span class="tag ${p.richting}">${p.richting.toUpperCase()}</span>`) +
-        cel("Strategie", (p.strategie ? `<span class="strat ${stratKlasse(p.strategie)}">${stratLabel(p.strategie)}</span>` : "—") +
+        cel("Strategie", (p.strategie ? `<span class="strat ${p.turbo ? "turbo" : stratKlasse(p.strategie)}">${stratLabel(p.strategie, p.turbo)}</span>` : "—") +
           (p.bijkoop ? ' <span class="dim" title="Bijkoop (pyramide) van een andere positie">+ bijkoop</span>' : "")) +
         cel("Units", fmt(p.units), "r") + cel("Instap", fmt(p.instap), "r") +
         cel("Koers", fmt(p.koers), "r") + cel("SL", fmt(p.sl) + (isNum(p.sl_gewijzigd) ? `<div class="dim" title="${esc(p.sl_reden || "")}">↕ ${this._hm(p.sl_gewijzigd)}${p.sl_wijzigingen > 1 ? ` (${p.sl_wijzigingen}×)` : ""}</div>` : ""), "r neg") + cel("TP", fmt(p.tp), "r pos") +
