@@ -559,6 +559,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: 2.5.6: bewezen verliezende opzetten (n >= 100, t < -2) en wanneer
         #: die lijst weer uit de database gelezen wordt.
         self._vp_uitgezet: dict[str, dict] = {}
+        #: 2.6.1: scalp (incl. turbo) als groep uitgezet; None = aan.
+        self._scalp_uitgezet: dict | None = None
         self._vp_uitgezet_volgende = 0.0
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
         # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
@@ -1530,6 +1532,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.warning("Veldproefopzet %s uitgezet: n=%s, netto %s, t=%s",
                             naam, nieuw[naam]["n"], nieuw[naam]["netto"], nieuw[naam]["t"])
         self._vp_uitgezet = nieuw
+        # 2.6.1: scalp en turbo als groep.
+        try:
+            scalp = await self.hass.async_add_executor_job(
+                self.db.netto_per_strategie, STRATEGIE_SCALP)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Scalpresultaten niet te lezen: %s", err)
+            return
+        groep = veldproef_mod.groep_uitgezet(scalp.get(STRATEGIE_SCALP, []))
+        if groep and not self._scalp_uitgezet:
+            _LOGGER.warning("Scalp (incl. turbo) uitgezet: n=%s, netto %s, t=%s",
+                            groep["n"], groep["netto"], groep["t"])
+        self._scalp_uitgezet = groep
 
     def _beslisser(self, now: datetime, strategie: str | None = None):
         strategie = strategie or self.primaire_strategie
@@ -2633,6 +2647,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 elif self.mode.places_orders and self.executor.has_pending:
                     r_reject = "onbevestigde order: eerst terugvinden"
                     schaduw_reden = "onbevestigde_order"
+                elif strategie == STRATEGIE_SCALP and self._scalp_uitgezet and self.alles:
+                    # 2.6.1: scalp bewezen verliezend als groep.
+                    r_reject = (f"scalp uitgezet (n={self._scalp_uitgezet['n']}, "
+                                f"t={self._scalp_uitgezet['t']})")
                 elif not r_signal.should_trade:
                     r_reject = r_signal.reject_reason
                     if r_signal.reject_reason == "max_positions_zelfde_richting":
@@ -2757,9 +2775,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 if vp_signalen else "geen signaal deze cyclus"
             )
             if self._vp_uitgezet:
+                # 2.6.1: een uitgezet tijdvak als één regel.
+                groepen = {v["groep"]: v for v in self._vp_uitgezet.values() if v.get("groep")}
+                losse = [f"{n[len(veldproef_mod.PREFIX):]} (n={v['n']}, t={v['t']})"
+                         for n, v in sorted(self._vp_uitgezet.items()) if not v.get("groep")
+                         and n.split(":")[-1] not in groepen]
                 redenen["veldproef"] += " · uitgezet: " + ", ".join(
-                    f"{n[len(veldproef_mod.PREFIX):]} (n={v['n']}, t={v['t']})"
-                    for n, v in sorted(self._vp_uitgezet.items()))
+                    [f"alle {tf} (n={v['n']}, t={v['t']})" for tf, v in sorted(groepen.items())]
+                    + losse)
         # 2.5.0: wat de turbo-scalp tussen twee cycli nodig heeft.
         self._turbo_ctx = {
             "balance": balance, "equity": equity,
@@ -5532,8 +5555,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             finally:
                 self.reeks.per_cyclus = eigen_per_cyclus
 
-        # 2. Nieuwe scalppositie.
-        if budget - geplaatst > 0 and self._candles is not None and len(self._candles) >= 60:
+        # 2. Nieuwe scalppositie (2.6.1: niet als scalp als groep uitgezet is).
+        if (budget - geplaatst > 0 and self._candles is not None and len(self._candles) >= 60
+                and not (self._scalp_uitgezet and self.alles)):
             if geplaatst:
                 open_positions = await self._open_positions()
             eigen = [p for p in open_positions

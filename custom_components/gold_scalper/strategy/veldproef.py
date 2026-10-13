@@ -32,7 +32,7 @@ from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, BREAKEVEN_UITERLIJK_USD, E
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-1.8.0"  # 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
+VELDPROEF_VERSIE = "veldproef-1.9.0"  # 2.6.1: groepsregel per tijdvak. 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
@@ -57,6 +57,14 @@ MAX_BARS = 400
 #: netto resultaat per trade onder deze grens stapt niet meer in.
 UITZET_MIN_N = 100
 UITZET_MAX_T = -2.0
+#: 2.6.1 (Ruud 13-10: "strategy verbeteren"): dezelfde regel per GROEP - alle
+#: opzetten van één tijdvak samen, en scalp (incl. turbo) als geheel. Strenger,
+#: omdat een groep veel trades telt: n >= 200 en t < -3. Op 13-10 19:00:
+#: 1m n=481 t=-8,7; 3m n=257 t=-4,8; scalp n=381 t ~ -9 (gemiddeld -0,8 USD/oz
+#: per trade, ongeveer de spread: op 1m/3m en scalp verdient de beweging de
+#: kosten niet terug). 5m (n=183), 15m en 30m blijven aan.
+GROEP_MIN_N = 200
+GROEP_MAX_T = -3.0
 
 
 def t_statistiek(netto: list[float]) -> float:
@@ -80,7 +88,29 @@ def uitgezette_opzetten(per_opzet: dict[str, list[float]]) -> dict[str, dict]:
         t = t_statistiek(netto)
         if t < UITZET_MAX_T:
             uit[naam] = {"n": len(netto), "netto": round(sum(netto), 2), "t": round(t, 2)}
+    # 2.6.1: per tijdvak als groep.
+    per_tf: dict[str, list[float]] = {}
+    for naam, netto in per_opzet.items():
+        if is_veldproef(naam) and naam.count(":") == 2:
+            per_tf.setdefault(naam.split(":")[2], []).extend(netto)
+    for tf, netto in per_tf.items():
+        groep = groep_uitgezet(netto)
+        if groep is None:
+            continue
+        for naam in namen():
+            if naam.endswith(":" + tf):
+                uit[naam] = {**groep, "groep": tf}
     return uit
+
+
+def groep_uitgezet(netto: list[float]) -> dict | None:
+    """2.6.1: n >= GROEP_MIN_N en t < GROEP_MAX_T -> de hele groep uit."""
+    if len(netto) < GROEP_MIN_N:
+        return None
+    t = t_statistiek(netto)
+    if t >= GROEP_MAX_T:
+        return None
+    return {"n": len(netto), "netto": round(sum(netto), 2), "t": round(t, 2)}
 
 
 def namen() -> tuple[str, ...]:

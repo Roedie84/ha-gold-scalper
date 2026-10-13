@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 2.6.1
+
+* **Bewezen verliezende groepen gaan uit** (Ruud 13-10: "strategy verbeteren").
+  Dezelfde regel als 2.5.6, nu per groep en strenger: alle veldproefopzetten
+  van één tijdvak samen, en scalp (incl. turbo) als geheel, gaan uit bij
+  n >= 200 en t < -3 (netto per trade, alle runs). Stand 13-10 19:00 (USD/oz
+  per trade): 1m n=481 -0,77 t=-8,7; 3m n=257 -0,80 t=-4,8; scalp n=381
+  -0,78 tot -1,18 t ~ -5 per soort. Dat is ongeveer de spread: op die korte
+  termijn verdient de beweging de kosten niet terug. 5m (n=183), 15m en 30m
+  blijven aan (sinds de nieuwe uitstapregels 5m +0,92, 15m +0,35, 30m +1,09
+  USD/oz per trade). Het paneel toont "alle 1m (n, t)" en "scalp uitgezet".
+* Strategieversies: veldproef-1.9.0, combinatie-1.7.0 (nieuwe run).
+
 ## 2.6.0
 
 * **Verzoekenlimiet van IG is geen verlopen sessie.** Bij elke HTTP 403 logde
