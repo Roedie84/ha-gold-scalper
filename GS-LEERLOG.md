@@ -86,3 +86,12 @@ laatste ronde: 13-10 10:34
 
 laatste ronde: 13-10 11:05
 
+
+## 13-10 11:12 · ronde 5 (geplande controle)
+- 2.4.11 actief sinds herstart ~09:02 UTC (run 119 sinds 08:34 UTC). Demo, noodstop/dataprobleem uit, afstemming in_orde, 6 open (1 long/5 short), eq. 10.074.218. Na herstart weer IG rate limit (account allowance) en DNS-time-outs ~1 min; 12 trades bij de broker al gesloten → afgewikkeld.
+- Run 119 (37 min, uit sensor): 39 trades (~63/u), alle veldproef; netto −2.042, bruto −490, kosten 1.552 (3,2× bruto), win 28 %, PF 0,24. Scalp 0 trades (score onder drempel 0,45). Momentum 1m/3m n=15 −1.054 (slechtste), maar alle opzetten n < 30.
+- Databaseanalyse niet gedaan: uitvoeren van het onderzoeksscript via de File editor werd deze ronde door de rechtencontrole geweigerd → Ruud moet dit toestaan, anders alleen sensorcijfers.
+- Geen release (geen bug met bewijs), geen instellingen (laatste wijziging 10:34, 24-u-regel; n te klein).
+- Volgende ronde: scalp met doel 1/stop 2 zodra n ≥ 30; veldproef 1m-kosten (~0,8 USD/oz per trade tegen R ~1,5 ATR1m); momentum:1m richting n=100.
+
+laatste ronde: 13-10 11:12
