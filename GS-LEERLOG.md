@@ -14,3 +14,12 @@ Per ronde: gemeten, trades per uur, conclusies, gebouwd, instellingen. Eerdere r
 - Volgende ronde meten: aantal verweesde trades afgewikkeld (na herstart), netto per tijdvak onder TP 2, rsi_rev richting 100 trades.
 
 laatste ronde: 13-10 08:10
+
+## 13-10 08:30 · handmatige herhaalronde (20 min na de vorige)
+- Payload noemde 2.4.6 niet actief en TP 3; gemeten: run 113 draait veldproef-1.1.0 (2.4.6 actief), take_profit_usd 2. 2.4.7 in HACS, wacht op herstart Ruud. Geen nieuwe release (vorige 20 min geleden, data nauwelijks veranderd).
+- 06:17 UTC opnieuw netting: order DIAAAAYM2QT5RB7 verrekende 2 longs ondanks forceOpen → hedgen uit tot herstart: nu 7 long / 0 short, tegengestelde signalen geweigerd (kost trades). Integratie meldde dit zelf aan Ruud.
+- Afstemming 269/271: oude afwijking (trade 1437) opgelost; 2 nieuwe: instap 4196,33/4196,32, wij uitstap 4193,31/4192,37, broker beide 4194,87 (−64,05) → vermoedelijk de nettingprijs; zwakke koppeling (twee trades zelfde instap), dus niet overgenomen.
+- Open punt voor volgende ronde: waarom IG ondanks forceOpen verrekent (alleen bij gelijke grootte/tegelijk?) en of hedgen-uit-tot-herstart > 20 % trades kost. Instellingen ongewijzigd.
+
+laatste ronde: 13-10 08:30
+
