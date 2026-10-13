@@ -40,7 +40,7 @@ def test_strategie_van_trade_kent_veldproef():
 def test_exit_config_maximale_duur():
     cfg = vp.exit_config("vp:rsi_rev:5m")
     assert cfg.max_hold_seconds == vp.HOLD_BARS * 300
-    assert cfg.enable_trailing is False
+    assert cfg.enable_trailing is True  # 2.4.10: volgstop in R
 
 
 def test_bars_op_alle_tijdvakken():

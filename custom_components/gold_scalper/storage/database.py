@@ -871,6 +871,21 @@ class TradeDatabase:
         ).fetchall()
         return [self._row_to_trade(r) for r in rows]
 
+    def markeer_voorlopig(self, ticket: str) -> int:
+        """2.4.10: een gesloten trade laten nakijken door de afstemming.
+
+        Voor verweesde trades: het activiteitenoverzicht kan bij één actie die
+        veel posities sluit één niveau voor allemaal noemen; het
+        transactieoverzicht is de afrekening en wordt dan overgenomen.
+        """
+        cur = self.conn.execute(
+            "UPDATE trades SET reconciliation_status='pending' "
+            "WHERE broker_ticket=? AND close_time IS NOT NULL",
+            (str(ticket),),
+        )
+        self.conn.commit()
+        return cur.rowcount
+
     def repair_broker_settlement_usd(self) -> int:
         """Herreken het dollarresultaat van trades die de broker afrekende.
 

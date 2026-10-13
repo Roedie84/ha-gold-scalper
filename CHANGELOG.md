@@ -1,5 +1,22 @@
 # Changelog — Gold Scalper
 
+## 2.4.10
+
+* **Veldproef: break-even en volgstop** (Ruud 13-10: "soms mooie P&L van 3
+  USD en toch uitgestopt"). De veldproef had bewust alleen stop, doel (2R)
+  en maximale duur. Gemeten sinds run 110: 4 van de 27 trades die minstens
+  2 USD/oz in de plus stonden, sloten toch met verlies, alle vier veldproef.
+  Nu: vanaf 1R winst de stop naar instap plus kosten, vanaf 1,5R een
+  volgstop op 1R afstand. R is de stopafstand bij instap, afgeleid uit het
+  vaste doel (R = doel-afstand / 2). Nieuwe strategieversie
+  (veldproef-1.3.0): nieuwe run.
+* **Verweesde trades worden door de afstemming nagekeken.** Na de herstart
+  van 13-10 kregen acht weesjes allemaal 4190,33 uit één activiteit van de
+  broker; het transactieoverzicht rekende er een af op 4185,13. De
+  afwikkeling staat nu als voorlopig, zodat de afstemming de prijs van de
+  broker overneemt.
+* Tests: `test_v2410.py`.
+
 ## 2.4.9
 
 * **Scalpreeks** (Ruud 13-10: "bij scalpen veel meer trades in de

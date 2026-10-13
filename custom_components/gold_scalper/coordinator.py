@@ -3209,12 +3209,17 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 size = (getattr(position, "volume", 0) or 0) * CONTRACT_SIZE
             # 2.1.0: de uitstapregels van de strategie die de positie opende.
             strategie = await self._strategie_van(position)
+            # 2.4.10: de veldproef rekent break-even en volgstop in R.
+            maat = (
+                veldproef_mod.r_van(position.open_price, getattr(position, "take_profit", None))
+                if veldproef_mod.is_veldproef(strategie) else atr
+            )
             action = self._exits_voor(strategie).evaluate(
                 side=position.side,
                 volume=size,
                 open_price=position.open_price,
                 current_stop=getattr(position, "stop_loss", None),
-                bid=quote.bid, ask=quote.ask, atr=atr,
+                bid=quote.bid, ask=quote.ask, atr=maat,
                 opened_at=opened, now=now,
                 round_trip_cost_per_oz=cost,
                 partial_taken=ticket in self._partial_taken,
@@ -4877,6 +4882,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 "broker_gesloten_gemeten", moment,
                 bron=activiteit.get("source") or "broker_activity",
                 risico=False,
+            )
+            # 2.4.10: de afstemming neemt de prijs uit het transactieoverzicht
+            # over zodra die er is (13-10: acht weesjes kregen allemaal 4190,33
+            # uit één activiteit; de broker rekende 2L69KAS af op 4185,13).
+            await self.hass.async_add_executor_job(
+                self.db.markeer_voorlopig, str(trade.broker_ticket)
             )
             afgewikkeld += 1
             _LOGGER.warning(

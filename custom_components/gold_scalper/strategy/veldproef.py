@@ -32,7 +32,7 @@ from ..broker.exits import ExitConfig
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-1.2.0"  # 2.4.8: doel weer RR x stop
+VELDPROEF_VERSIE = "veldproef-1.3.0"  # 2.4.10: break-even 1R, volgstop 1,5R/1R
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
@@ -65,17 +65,42 @@ def ontleed(naam: str) -> tuple[str, str]:
     return familie, tf
 
 
+#: 2.4.10 (Ruud 13-10: "+3 USD en toch uitgestopt"): break-even en volgstop
+#: in R (de stopafstand bij instap). De coordinator geeft voor een
+#: veldproefpositie R door op de plek van de ATR (zie :func:`r_van`).
+BREAKEVEN_R = 1.0
+VOLGSTOP_VANAF_R = 1.5
+VOLGSTOP_AFSTAND_R = 1.0
+
+
 def exit_config(naam: str) -> ExitConfig:
-    """Stop en doel staan bij de broker; hier alleen de maximale duur. Geen
-    tijdstop, geen break-even, geen volgstop, geen deelsluiting."""
+    """Stop en doel staan bij de broker. Hier: break-even vanaf 1R, volgstop
+    vanaf 1,5R op 1R afstand, en de maximale duur. Geen tijdstop, geen
+    deelsluiting. Afstanden in R: de coordinator geeft R door als 'atr'."""
     _, tf = ontleed(naam)
     return ExitConfig(
-        breakeven_trigger_atr=1e9,
+        breakeven_trigger_atr=BREAKEVEN_R,
         enable_partial_close=False,
-        enable_trailing=False,
+        enable_trailing=True,
+        trailing_activate_atr=VOLGSTOP_VANAF_R,
+        trailing_distance_atr=VOLGSTOP_AFSTAND_R,
         time_stop_seconds=10 ** 9,
         max_hold_seconds=HOLD_BARS * BAR_SECONDS[tf],
     )
+
+
+def r_van(open_price, take_profit) -> float:
+    """R (stopafstand bij instap) van een veldproefpositie.
+
+    Het doel staat vast op RR x R vanaf de instap en schuift nooit mee (de
+    stop wel), dus R = |doel - instap| / RR. Zonder bruikbaar doel de
+    minimale stopafstand.
+    """
+    try:
+        r = abs(float(take_profit) - float(open_price)) / RR
+    except (TypeError, ValueError):
+        return MIN_STOP_USD
+    return r if r > 0 else MIN_STOP_USD
 
 
 # -- indicatoren (op lijsten, laatste waarde) --------------------------------- #
