@@ -152,3 +152,14 @@ laatste ronde: 13-10 13:35
 - Volgende: 1m-tijdvak als geheel (n=306, t −6,55) — na herstart meten of de uitzetregel per opzet volstaat; anders voorstel 1m uit of grotere stop op 1m. Effect 2.5.5 break-even/omkeer-exit meten.
 
 laatste ronde: 13-10 13:45
+
+## 13-10 ~16:30 · ronde 8 (geplande controle, onder RUST IN DE REGELS)
+- Runs: 128 (13:01 UTC; 46 trades in 16 min, −2.387, bruto −570, kosten 1.817 = 3,2x bruto, scalp n=20 −835 t −2,1) → 130 sinds 14:04 UTC na chatreleases 2.5.7 winstslot / 2.5.9 deelwinst (Ruud). Run 130: 59 trades in ~26 min (~135/u), win 77 %, bruto +1.336, kosten 1.929, netto −593. Noodstop/dataprobleem uit, demo, afstemming 499/501 (2 afwijkingen uitstapprijs).
+- DB niet gelezen: uitvoeren via de File editor-app werd deze ronde door de sandbox geweigerd → analyse alleen uit sensoren/logs.
+- IG 403 exceeded-account-allowance: >100 logregels in ~2 u, pieken van 10 mislukte orders binnen 10 s, koers tot 57 s oud zonder exitbeheer. Oorzaak (bug): elke 403 → opnieuw inloggen, ook bij een limietfout; die login raakt dezelfde limiet.
+- **2.6.0** (suite 2183 groen/5 skip, in HACS, herstart Ruud): limietfout (exceeded-*) direct als fout, geen herlogin; sessie blijft. Vingerafdruk ongewijzigd. Versietests 2.5.9 naar >=.
+- Instellingen: niets (fix pakt de limiet aan; een optiewijziging herlaadt de integratie midden in een run).
+- Voorstel (strategie, niet gebouwd): reeksstukken krijgen doel = koers + 0,5 bij plaatsing, maar 2e/3e stuk in dezelfde cyclus vult hoger → effectief doel 0,17-0,35 USD bij gedeelde stop ~3,5 USD (R:R ~1:15). Doel vanaf de vulprijs, of max 1 stuk per cyclus.
+- Meten na herstart: 403-regels per uur (moet fors dalen), "Openen mislukt" per uur.
+
+laatste ronde: 13-10 16:30
