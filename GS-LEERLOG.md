@@ -61,3 +61,13 @@ laatste ronde: 13-10 10:00
 - Volgende ronde: run 117 per strategie (scalpreeks met doel 0,5: winst% en netto per stuk), kosten/trade per tijdvak, 1m-veldproef richting 100 per opzet.
 
 laatste ronde: 13-10 10:11
+
+## 13-10 ~10:40 · chat met Ruud (vervolg)
+- Ruud herstartte 10:08/10:10 (2.4.9 actief); weesjes-afwikkeling werkt (o.a. 2L69KAS, LLVNAN), maar acht kregen allemaal 4190,33 uit één activiteit 07:33:56; transactieoverzicht: 2L69KAS 4185,13 (−410,50) → 1 afwijking.
+- **2.4.10** (suite 2127 groen, in HACS, herstart Ruud): veldproef break-even 1R, volgstop vanaf 1,5R op 1R (R = doelafstand/2), veldproef-1.3.0; weesjes als voorlopig gemarkeerd zodat de afstemming de transactieprijs overneemt.
+- Ruud: doel = winstgevend ("al doe je 100000 trades per dag"). Screenshot "Scalp" met TP 4176/4208: dat zijn veldproefposities (max 47:20/2u23/11u59/23u59 = 1m/3m/15m/30m x 48 bars) met een oud paneelscript in de browser → pagina herladen.
+- Instellingen nu: take_profit_usd 0 (Ruud 09:14), scalp_reeks default aan (stap 0,30, max 100, doel 1,00).
+- Aanpassing geplande controletaak gevraagd door Ruud; bijwerken werd door de rechtencontrole geweigerd → Ruud moet het toestaan.
+
+laatste ronde: 13-10 10:40
+
