@@ -42,3 +42,10 @@ laatste ronde: 13-10 09:15
 
 laatste ronde: 13-10 08:55
 
+## 13-10 ~10:00 · chat met Ruud (vervolg)
+- **2.4.9** (suite 2120 groen, in HACS): scalpreeks (stap 0,30, max 100 stukken, doel 1,00 per stuk, gedeelde stop, max 3 per cyclus, standaard aan), reden per strategie in het paneel (was alleen daghandel "geen_uitbraak"), scalpdoel instelbaar per 0,1 USD.
+- Ruud zette om 07:14 UTC take_profit_usd 0 (eigen doel per strategie); run 115 sinds 07:34.
+- Ruud: "trailing stop/profit werkt niet, +3 USD en toch uitgestopt". Gemeten run ≥110 (248 gesloten): MFE ≥ 2 USD/oz en toch verlies = 4 van 27, allemaal veldproef (1m/3m/5m; bv. id 1648/1649 vp:5m MFE 2,7 → stop). Scalp 0 van 2. Oorzaak: veldproef heeft bewust geen break-even/volgstop (alleen stop 1,5 ATR, doel 2R, max 48 bars); het label "Daghandel" (bug, opgelost in 2.4.8) liet het lijken op een kapotte daghandelvolgstop. Voorstel aan Ruud: break-even/volgstop in R voor de veldproef.
+
+laatste ronde: 13-10 10:00
+
