@@ -103,3 +103,9 @@ laatste ronde: 13-10 11:12
 
 laatste ronde: 13-10 11:50
 
+
+## 13-10 11:42 · instelling (chat, op verzoek Ruud)
+- entry_threshold 0,45 -> 0,30: scalp deed 0 trades in run 119 (score onder 0,45), daardoor ook turbo-scalp (2.5.0) 0 orders. Run 120 sinds ~09:42 UTC.
+- Meten: scalptrades/uur (turbo vs cyclus), winst%, netto per scalptrade; terug naar 0,45 (of tussenwaarde) als netto per scalptrade na >= 30 trades duidelijk negatief is (t < -2). Telt als instellingenronde voor de 24-uursregel.
+
+laatste ronde: 13-10 11:42
