@@ -95,3 +95,11 @@ laatste ronde: 13-10 11:05
 - Volgende ronde: scalp met doel 1/stop 2 zodra n ≥ 30; veldproef 1m-kosten (~0,8 USD/oz per trade tegen R ~1,5 ATR1m); momentum:1m richting n=100.
 
 laatste ronde: 13-10 11:12
+
+## 13-10 ~11:50 · 2.5.0 turbo-scalp (akkoord Ruud)
+- **2.5.0** (suite 2137 groen, in HACS, herstart Ruud): scalp reageert op de IG-koersstroom, max 1 ronde/s, scalpreeks + nieuwe scalpposities, zelfde grendels als de cyclus, orderbudget 20/min (instelbaar 1-60), nooit tegelijk met de cyclus, posities/saldo uit de laatste cyclus. Instellingen scalp_turbo (aan) en scalp_turbo_orders_per_min. Paneel: regel "Turbo-scalp" met verbruik.
+- Test test_v181 (stroom voedt nooit beslissingen) bewust aangepast: alleen _turbo_start mag de stroom lezen.
+- Meten na herstart: turbo-orders/uur, IG-403-meldingen per uur (mag niet stijgen), netto per scalptrade turbo vs cyclus (components turbo).
+
+laatste ronde: 13-10 11:50
+
