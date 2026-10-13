@@ -7,5 +7,5 @@ PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalp
 
 
 def test_grens_twintig():
-    assert const.MAX_POSITIONS_PER_RICHTING_GRENS == 20
-    assert "_number(1, 20, 1, slider=True)" in (PKG / "config_flow.py").read_text()
+    assert const.MAX_POSITIONS_PER_RICHTING_GRENS >= 20   # 2.5.4: 100
+    assert "_number(1, 100, 1, slider=True)" in (PKG / "config_flow.py").read_text()

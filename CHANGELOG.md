@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.5.4
+
+* **Tot 100 posities per richting** (Ruud 13-10: "max posities mocht veel
+  hoger"). De grens van de instelling *Max posities per richting* gaat van 20
+  naar 100 (totaal dus tot 200). Let op: meer posities betekent meer
+  stopwijzigingen bij IG en dus sneller de verzoekenlimiet; het orderbudget van
+  turbo en de bestaande grendels (marge, vloer, daglimiet) blijven gelden.
+* Tests: `test_v190`/`test_v242` volgen de nieuwe grens.
+
 ## 2.5.3
 
 * **Eigen turbosignaal: uitbraak op de live koers** (Ruud 13-10, keuze 2).
