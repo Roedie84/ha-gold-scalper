@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 2.4.5
+
+* **Dashboard: "Netto sinds start" in plaats van "Netto run".** Elke
+  instellingswijziging start een nieuwe run en een positie telt bij de run die
+  haar opende; "Netto run" toonde op 13-10 -841 USD terwijl het saldo bij IG
+  in die run +2.429 EUR steeg (posities van run 108 sloten in run 110). Het
+  hoofdgetal telt nu alle runs van de huidige strategie (zelfde modus en
+  strategieversie, aaneengesloten), met eronder de huidige run en de
+  saldoverandering bij de broker als controle. *Kosten* gaat over dezelfde reeks.
+* **Grafiek: 1m, 3m, 5m, 15m, 30m, 1u en 4u.** 1m/3m/5m/30m komen uit de
+  veldproefbars, 15m/1u/4u uit de basiscandles (45m en 3u vervallen).
+* Tests: `test_v245.py`.
+
 ## 2.4.4
 
 * **Geen valse noodstop meer als het saldo niet op te vragen is.** Faalde het

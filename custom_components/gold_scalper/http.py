@@ -304,6 +304,18 @@ class GoldScalperBrokerView(HomeAssistantView):
         data = coordinator.data
         # Candles kopiëren in de event-loop: de coordinator voegt ze daar toe.
         candles = candles_slice(getattr(coordinator, "_candles", None))
+        # 2.4.5: fijnere bars (1m/3m/5m/30m) voor de tijdkeuze in de grafiek.
+        candles_fijn = {}
+        vp = getattr(coordinator, "veldproef", None)
+        if vp is not None:
+            from .strategy.aggregator import BAR_SECONDS
+            for tf in ("1m", "3m", "5m", "30m"):
+                try:
+                    c = candles_slice(vp.candles(tf), limit=400)
+                except Exception:  # noqa: BLE001
+                    c = None
+                if c:
+                    candles_fijn[str(BAR_SECONDS[tf])] = c
         db_deel = None
         db = getattr(coordinator, "db", None)
         run_id = getattr(coordinator, "run_id", None)
@@ -339,6 +351,7 @@ class GoldScalperBrokerView(HomeAssistantView):
             timeframe=getattr(coordinator, "timeframe", None),
             candles=candles,
             db=db_deel,
+            candles_fijn=candles_fijn,
             exit_cfg=exit_cfg,
             version=INTEGRATION_VERSION,
             status=build_status(data),

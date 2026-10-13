@@ -207,6 +207,7 @@ def read_database(path: str | Path, run_id: int) -> dict:
             ") WHERE (rn - 1) % ? = 0 OR rn = ? ORDER BY ts",
             (run_id, stap, aantal),
         ).fetchall()
+        reeks = _reeks(conn, run_id)
     finally:
         conn.close()
     return {
@@ -214,6 +215,67 @@ def read_database(path: str | Path, run_id: int) -> dict:
         "gesloten": [dict(r) for r in gesloten],
         "equity": [dict(r) for r in equity],
         "equity_rijen": aantal,
+        "reeks": reeks,
+    }
+
+
+def _reeks(conn: sqlite3.Connection, run_id: int) -> dict | None:
+    """2.4.5: resultaat sinds de start van de huidige strategie.
+
+    Elke instellingswijziging start een nieuwe run, en een positie telt bij
+    de run die haar opende. "Netto run" mist daardoor de posities van eerdere
+    runs die nu pas sluiten. De reeks = de aaneengesloten runs (zelfde modus,
+    zelfde strategieversie) tot en met de huidige; daarover alle gesloten
+    trades plus de saldoverandering bij de broker als controle."""
+    try:
+        runs = conn.execute(
+            "SELECT id, started_at, mode, strategy_version FROM runs WHERE id<=? "
+            "ORDER BY id DESC LIMIT 500",
+            (run_id,),
+        ).fetchall()
+        if not runs or runs[0]["id"] != run_id:
+            return None
+        huidig = runs[0]
+        ids = []
+        for r in runs:
+            if r["mode"] != huidig["mode"] or r["strategy_version"] != huidig["strategy_version"]:
+                break
+            ids.append(r["id"])
+        start = runs[len(ids) - 1]["started_at"]
+        plek = ",".join("?" * len(ids))
+        som = conn.execute(
+            f"SELECT COUNT(*), SUM(net_pnl), SUM(gross_pnl), SUM(total_cost) FROM trades "
+            f"WHERE run_id IN ({plek}) AND close_time IS NOT NULL AND net_pnl IS NOT NULL",
+            ids,
+        ).fetchone()
+        open_n = conn.execute(
+            f"SELECT COUNT(*) FROM trades WHERE run_id IN ({plek}) AND close_time IS NULL",
+            ids,
+        ).fetchone()[0]
+        eerste = conn.execute(
+            f"SELECT balance FROM equity WHERE run_id IN ({plek}) AND balance IS NOT NULL "
+            "ORDER BY ts LIMIT 1",
+            ids,
+        ).fetchone()
+        laatste = conn.execute(
+            f"SELECT balance FROM equity WHERE run_id IN ({plek}) AND balance IS NOT NULL "
+            "ORDER BY ts DESC LIMIT 1",
+            ids,
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    return {
+        "start": start,
+        "runs": len(ids),
+        "strategie": huidig["strategy_version"],
+        "trades": som[0] or 0,
+        "netto": som[1],
+        "bruto": som[2],
+        "kosten": som[3],
+        "open": open_n,
+        "saldo_verschil": (
+            laatste[0] - eerste[0] if eerste is not None and laatste is not None else None
+        ),
     }
 
 
@@ -431,6 +493,22 @@ def _alarmen(data: dict, status_code: str) -> dict:
     }
 
 
+def _reeks_payload(r: dict | None) -> dict | None:
+    if not r:
+        return None
+    return {
+        "start": _epoch(r.get("start")),
+        "runs": r.get("runs") or 0,
+        "strategie": r.get("strategie"),
+        "trades": r.get("trades") or 0,
+        "netto": _num(r.get("netto"), 2),
+        "bruto": _num(r.get("bruto"), 2),
+        "kosten": _num(r.get("kosten"), 2),
+        "open": r.get("open") or 0,
+        "saldo_verschil": _num(r.get("saldo_verschil"), 2),
+    }
+
+
 def build_payload(
     data: dict,
     *,
@@ -444,6 +522,7 @@ def build_payload(
     places_orders: bool,
     uses_real_money: bool,
     tz=None,
+    candles_fijn: dict | None = None,
 ) -> dict[str, Any]:
     """Het volledige model voor één verversing."""
     quote = data.get("quote")
@@ -535,6 +614,7 @@ def build_payload(
         },
         "alarm": _alarmen(data, code),
         "candles": candles,
+        "candles_fijn": candles_fijn or {},
         "posities": _position_rows(data, db["open"], exit_cfg, quote),
         # 1.9.0: telling per richting en de limiet; netting als hij optrad.
         "posities_telling": _telling(data),
@@ -567,6 +647,8 @@ def build_payload(
             "kosten": _num(stats.get("total_costs"), 2),
             "kosten_per_trade": _num(stats.get("cost_per_trade"), 3),
             "stats_valuta": conversion.get("instrument") or "USD",
+            # 2.4.5: hoofdgetal "Netto sinds start" (alle runs van deze strategie).
+            "reeks": _reeks_payload(db.get("reeks")),
         },
         "equity": {
             "t": [_epoch(r["ts"]) for r in db["equity"]],

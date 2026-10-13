@@ -52,7 +52,7 @@ def test_daghandel_telt_af_tot_2045_utc():
 
 
 def test_js_uurgrafiek_en_letters():
-    assert "3600 / base" in JS
+    assert "3600, 14400]" in JS   # 2.4.5: vaste keuzes incl. 1u en 4u
     assert 'dh ? "D" : "S"' in JS and 'class="strat' in JS
     assert "strategie" in B._TRADE_KOLOMMEN_EXTRA
 

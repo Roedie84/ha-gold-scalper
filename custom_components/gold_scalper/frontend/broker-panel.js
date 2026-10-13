@@ -436,7 +436,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._data = null;
     this._key = null;
     this._fout = null;
-    this._tfMul = 1;
+    this._tfS = null;            // gekozen candletijd in seconden (null = basis)
     this._zoom = 8;          // pixels per bar
     this._offset = 0;        // bars vanaf rechts
     this._hover = null;
@@ -698,7 +698,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._q("#tf").addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b) return;
-      this._tfMul = Number(b.dataset.m) || 1; this._offset = 0;
+      this._tfS = Number(b.dataset.s) || null; this._offset = 0;
       this._renderTf(); this._teken();
     });
     for (const el of this._root.querySelectorAll("[id]")) onthoudHtml(el);
@@ -828,24 +828,56 @@ class GoldScalperBrokerPanel extends HTMLElement {
       this._tegel("Open P&L", `<span class="${toon(open)}">${fmtS(open)}</span><small>${esc(a.valuta || "")}</small>`,
         `${(d.posities || []).length} positie(s) open${(d.posities || []).some((p) => p.live) ? ' <span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}`, kl(open)),
       this._tegel("Dag-P&L", `<span class="${toon(a.dag_pnl)}">${fmtS(a.dag_pnl)}</span><small>${esc(a.valuta || "")}</small>`, (isNum(a.dag_verlies_pct) && isNum(a.daglimiet_pct) ? `verlies ${fmt(Math.max(0, a.dag_verlies_pct), 2)}% van daglimiet ${fmt(a.daglimiet_pct, 0)}% (${v}${fmt(a.daglimiet)})` : "equity t.o.v. dagstart"), kl(a.dag_pnl)),
-      this._tegel("Netto run", `<span class="${toon(a.netto)}">${fmtS(a.netto)}</span><small>${esc(a.stats_valuta)}</small>`, `bruto ${fmtS(a.bruto)} · ${d.stats.trades} trades`, kl(a.netto)),
-      this._tegel("Kosten", `${sv}${fmt(a.kosten)}`, `${sv}${fmt(a.kosten_per_trade, 2)} per trade`, "var(--oranje)"),
+      ...this._tegelsResultaat(a, d, sv, v, kl),
       this._tegel("Vermogensvloer", `${v}${fmt(a.vloer)}`, `afstand ${v}${fmt(a.vloer_afstand)}`, "var(--blauw)", vloer),
     ].join("");
   }
 
-  _tfOpties() {
+  // 2.4.5: hoofdgetal over alle runs van de huidige strategie; een positie
+  // telt bij de run die haar opende, dus "netto run" alleen gaf een scheef
+  // beeld. De run en de saldoverandering bij de broker staan eronder.
+  _tegelsResultaat(a, d, sv, v, kl) {
+    const r = a.reeks;
+    if (!r || !isNum(r.netto)) {
+      return [
+        this._tegel("Netto run", `<span class="${toon(a.netto)}">${fmtS(a.netto)}</span><small>${esc(a.stats_valuta)}</small>`, `bruto ${fmtS(a.bruto)} · ${d.stats.trades} trades`, kl(a.netto)),
+        this._tegel("Kosten", `${sv}${fmt(a.kosten)}`, `${sv}${fmt(a.kosten_per_trade, 2)} per trade`, "var(--oranje)"),
+      ];
+    }
+    const saldo = isNum(r.saldo_verschil) ? ` · saldo broker <span class="${toon(r.saldo_verschil)}">${fmtS(r.saldo_verschil)}</span> ${esc(a.valuta || "")}` : "";
+    const run = r.runs > 1 ? `<br>deze run <span class="${toon(a.netto)}">${fmtS(a.netto)}</span> (${d.stats.trades} trades)${saldo}` : saldo ? `<br>${saldo.slice(3)}` : "";
+    return [
+      this._tegel("Netto sinds start", `<span class="${toon(r.netto)}">${fmtS(r.netto)}</span><small>${esc(a.stats_valuta)}</small>`,
+        `bruto ${fmtS(r.bruto)} · ${r.trades} trades · sinds ${esc(this._dhm(r.start))}${r.runs > 1 ? ` (${r.runs} runs)` : ""}${run}`, kl(r.netto)),
+      this._tegel("Kosten", `${sv}${fmt(r.kosten)}`, `${sv}${fmt(r.trades ? r.kosten / r.trades : null, 2)} per trade · sinds start`, "var(--oranje)"),
+    ];
+  }
+
+  // 2.4.5: vaste keuzes 1m 3m 5m 15m 30m 1u 4u. Een veelvoud van de basis
+  // (15m) komt uit de basiscandles; 1m/3m/5m (en 30m als dat geen veelvoud
+  // is) uit de veldproefbars die de server meestuurt.
+  _tfBron(s) {
+    const d = this._data;
+    if (!d) return null;
+    const base = d.instrument.tf_s || 60;
+    if (s >= base && s % base === 0) return { s: base, basis: true };
+    const fijn = d.candles_fijn || {};
+    const opties = Object.keys(fijn).map(Number).filter((k) => k <= s && s % k === 0 && fijn[k] && fijn[k].t.length)
+      .sort((a, b) => b - a);
+    return opties.length ? { s: opties[0], basis: false, c: fijn[opties[0]] } : null;
+  }
+  _tfSec() {
     const base = (this._data && this._data.instrument.tf_s) || 60;
+    return this._tfS && this._tfBron(this._tfS) ? this._tfS : base;
+  }
+  _tfOpties() {
     const lab = (s) => (s < 3600 ? `${s / 60}m` : `${s / 3600}u`);
-    const opts = [1, 5, 15].map((m) => ({ m, s: base * m })).filter((o) => o.s <= 3600);
-    // 2.1.0: ook een uurgrafiek (bij 15m: 15m, 45m, 1u, 3u).
-    if (base >= 300) return [...new Set([1, 3, 3600 / base, 12])].filter((m) => Number.isInteger(m) && m >= 1)
-      .sort((a, b) => a - b).map((m) => ({ m, s: base * m, l: lab(base * m) }));
-    return opts.map((o) => ({ ...o, l: lab(o.s) }));
+    return [60, 180, 300, 900, 1800, 3600, 14400].filter((s) => this._tfBron(s)).map((s) => ({ s, l: lab(s) }));
   }
   _renderTf() {
+    const nu = this._tfSec();
     this._q("#tf").innerHTML = this._tfOpties()
-      .map((o) => `<button type="button" data-m="${o.m}" aria-pressed="${o.m === this._tfMul}">${o.l}</button>`).join("");
+      .map((o) => `<button type="button" data-s="${o.s}" aria-pressed="${o.s === nu}">${o.l}</button>`).join("");
   }
 
   _renderGkop(d, hov) {
@@ -1164,14 +1196,24 @@ ${tl}
 
   _aggregeer() {
     const d = this._eff();
-    const c = d && d.candles;
+    const tf = this._tfSec();
+    const bron = this._tfBron(tf);
+    const c = bron && !bron.basis ? bron.c : d && d.candles;
     if (!c || !c.t.length) return [];
-    const base = d.instrument.tf_s || 60;
-    const tf = base * this._tfMul;
     const basis = c.t.map((t, i) => ({ t, o: c.o[i], h: c.h[i], l: c.l[i], c: c.c[i] }));
     const laatst = basis[basis.length - 1];
     const lc = this._liveActief() ? this._liveCandle : null;
-    if (lc) {
+    if (bron && !bron.basis) {
+      // Fijne bars: de actuele koers in de lopende bar (of een nieuwe bar).
+      const live = this._liveActief() ? this._live : null;
+      const mid = live && isNum(live.mid) ? live.mid : d.koers.mid;
+      const tNu = live && isNum(live.tijd) ? live.tijd : Date.now() / 1000;
+      if (isNum(mid) && d.status.markt_open !== false) {
+        const b = Math.floor(tNu / bron.s) * bron.s;
+        if (b > laatst.t) basis.push({ t: b, o: laatst.c, h: Math.max(laatst.c, mid), l: Math.min(laatst.c, mid), c: mid });
+        else if (b === laatst.t) { laatst.c = mid; laatst.h = Math.max(laatst.h, mid); laatst.l = Math.min(laatst.l, mid); }
+      }
+    } else if (lc) {
       // 1.8.1: de lopende candle uit de live ticks (high/low/close).
       if (laatst.t === lc.t) { laatst.h = Math.max(laatst.h, lc.h); laatst.l = Math.min(laatst.l, lc.l); laatst.c = lc.c; }
       else if (lc.t > laatst.t) basis.push({ ...lc });
@@ -1242,7 +1284,7 @@ ${tl}
     g.strokeStyle = KLEUR.as; g.beginPath(); g.moveTo(pw + 0.5, 0); g.lineTo(pw + 0.5, H); g.moveTo(0, H - TB + 0.5); g.lineTo(W, H - TB + 0.5); g.stroke();
 
     // tijdas
-    const tf = (d.instrument.tf_s || 60) * this._tfMul;
+    const tf = this._tfSec();
     const elk = Math.max(1, Math.ceil(90 / zoom));
     const stappen = [1, 2, 3, 5, 6, 10, 12, 15, 20, 30, 60, 120, 240];
     const sb = stappen.find((s) => s >= elk) || elk;
