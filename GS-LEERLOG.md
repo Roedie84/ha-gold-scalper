@@ -71,3 +71,10 @@ laatste ronde: 13-10 10:11
 
 laatste ronde: 13-10 10:40
 
+## 13-10 10:34 · instellingen (op vraag Ruud, run 118 sinds 08:32 UTC na herstart)
+- take_profit_usd 0 -> 1,0 (scalp: "kort, snel, klein"; met 0 gold 1,5 x ATR15 ~ 8 USD). stop_loss_usd 0 -> 2,0 (was 1 x ATR15 ~ 5,6: doel 1 tegen stop 5,6 vraagt > 85 % winst; nu ~67 %). min_edge_multiple 2 -> 1 (filter eist doel >= 2 x kosten ~1,5 USD; daardoor zou elk scalpsignaal met doel 1 geweigerd worden; doel telt al vanaf de vulprijs). max_trades_per_day 1000 -> 2000 (bij ~90/u plus scalpreeks raakt 1000 binnen een dag de grens).
+- Ruud zette zelf scalp_reeks_doel_usd 0,5. Ongewijzigd: risico 3 %/max 500 oz (alleen daghandel risicogestuurd; ~0,1 % van 10 mln per trade), daglimiet/vloer, max 20 per richting.
+- Meten: scalp winst%, netto/trade, aantal scalptrades/uur vóór en na; terug als netto per scalptrade na >= 30 trades duidelijk slechter is.
+
+laatste ronde: 13-10 10:34
+
