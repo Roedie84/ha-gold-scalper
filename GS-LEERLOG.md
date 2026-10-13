@@ -197,3 +197,14 @@ laatste ronde: 13-10 17:15
 - Meten: blijft 3m-30m positief bij n ≥ 100; 403-reeksen per uur.
 
 laatste ronde: 13-10 18:15
+
+## 13-10 ~19:15 · ronde 11 (geplande controle, RUST IN DE REGELS)
+- 2.6.0 actief, run 131 (15:28 UTC), geen nieuwe commits. 165 dicht + 7 open in 101 min (~98/u). Noodstop/dataprobleem uit, demo, alle open met stop en doel. Afstemming 502/506 (zelfde 4 afwijkingen).
+- Run 131: netto −2.647, bruto +3.061, win 52 %, PF 0,62, t −2,4. Dashboard −2.420 EUR ≈ DB in EUR; 162 vs 165 trades (lag).
+- Per bron: turbo n=33 −1.582 (win 9 %, PF 0,10, t −3,9); vp:1m n=55 −2.398 (MFE ≤ 0,8/oz); vp:3m n=39 −51; vp:5m n=16 +730; vp:15m n=17 +351; vp:30m n=4 +218 → 5m-30m n=37 +1.299.
+- Uitstap: tijdslimiet n=20 −1.170 (win 5 %), deelwinst n=15 +875, stop n=64 −566, broker_gesloten n=63 −1.547.
+- Logs: 403-limiet nog 1 reeks (5 orders 15:00 UTC), geen herlogin meer; DNS/time-outs naar IG 16:33 UTC (los, herstelde zich).
+- Code: niets. Instellingen: niets (< 48 u sinds 15:28 UTC).
+- Voorstel blijft (volgende ronde ≥ 15-10 15:28 UTC, als n het bevestigt): turbo uit en 1m-tijdvak uit; samen −3.980 van −2.647 in deze run.
+
+laatste ronde: 13-10 19:15
