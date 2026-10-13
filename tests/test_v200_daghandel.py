@@ -161,7 +161,7 @@ def test_coordinator_kiest_beslisser_uitstap_en_nieuwe_run():
     assert '"strategy": self.strategie_versie,' in bron
     assert bron.count("self.db.start_run, self.mode.value, self.strategie_versie,") == 2
     assert "if self.db is None or not ref or strategie != STRATEGIE_SCALP:" in bron
-    assert "self.pyramid.enabled and strategie == STRATEGIE_SCALP" in bron
+    assert "(self.reeks.enabled or self.pyramid.enabled)" in bron
     assert D.STRATEGIE_VERSIE.startswith("daghandel-")
 
 

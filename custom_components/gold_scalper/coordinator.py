@@ -55,6 +55,14 @@ from .broker.paper import Quote as PaperQuote
 from .broker.risk import RiskLimits, RiskManager, TradingState
 from .broker.saldosprong import SaldoSprongBewaker
 from .const import (
+    CONF_SCALP_REEKS,
+    CONF_SCALP_REEKS_STAP,
+    CONF_SCALP_REEKS_MAX,
+    CONF_SCALP_REEKS_DOEL,
+    DEFAULT_SCALP_REEKS,
+    DEFAULT_SCALP_REEKS_STAP,
+    DEFAULT_SCALP_REEKS_MAX,
+    DEFAULT_SCALP_REEKS_DOEL,
     STRATEGY_WINDOW_BARS,
     EXECUTION_SEMANTICS_VERSION,
     EXIT_REGIME_HUIDIG,
@@ -123,6 +131,7 @@ from .learning.sessions import build_news_impact, build_sessions
 from .strategy.aggregator import BAR_SECONDS, QuoteAggregator, closed_only
 from .strategy import veldproef as veldproef_mod
 from .strategy.pyramid import PyramidConfig, consider_addition
+from .strategy.scalp_reeks import ReeksConfig, stukken_nu
 from .strategy.sizing import SizingConfig, position_size
 from .strategy.streaming import StreamState
 
@@ -382,6 +391,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             enabled=options.get(CONF_PYRAMID_ENABLED, False),
             trigger_atr=options.get(CONF_PYRAMID_TRIGGER_ATR, 1.0),
             max_additions=_as_int(options.get(CONF_PYRAMID_MAX_ADDITIONS), 2),
+        )
+        # 2.4.9: scalpreeks; vervangt voor scalp de ATR-piramide als hij aan staat.
+        self.reeks = ReeksConfig(
+            enabled=bool(options.get(CONF_SCALP_REEKS, DEFAULT_SCALP_REEKS)),
+            stap_usd=float(options.get(CONF_SCALP_REEKS_STAP, DEFAULT_SCALP_REEKS_STAP)
+                           or DEFAULT_SCALP_REEKS_STAP),
+            max_stukken=_as_int(options.get(CONF_SCALP_REEKS_MAX), DEFAULT_SCALP_REEKS_MAX),
+            doel_usd=float(options.get(CONF_SCALP_REEKS_DOEL, DEFAULT_SCALP_REEKS_DOEL)
+                           or DEFAULT_SCALP_REEKS_DOEL),
         )
         #: Per ticket: hoeveel toevoegingen en op welke prijs de laatste.
         self._pyramid_state: dict[str, dict] = {}
@@ -1196,6 +1214,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         "assumed_spread": "assumed_spread",
         "sizing": "risk_based_sizing",
         "positielimiet": CONF_MAX_POSITIONS_PER_RICHTING,
+        "scalp_reeks": CONF_SCALP_REEKS,
     }
 
     async def _notify(self, stats: dict) -> None:
@@ -1544,6 +1563,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # uitkomst waardeloos maken - juist het verschil tussen die twee
             # is wat je wilt meten.
             "mode": self.mode.value,
+            # 2.4.9: de scalpreeks bepaalt hoeveel scalptrades er openen.
+            "scalp_reeks": (
+                {"stap": self.reeks.stap_usd, "max": self.reeks.max_stukken,
+                 "doel": self.reeks.doel_usd}
+                if getattr(self, "reeks", None) is not None and self.reeks.enabled
+                else None
+            ),
             # De groottemethode hoort erbij (1.1): vast of uit risico bepaald
             # verandert het resultaat per trade in dollars. Run 99 mengde beide.
             # Het maximum blijft erbuiten: dat is een risicolimiet.
@@ -2504,6 +2530,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             posities_per_strategie = {self.primaire_strategie: list(open_positions)}
         signal = None
         reject_reason = None
+        # 2.4.9: de reden per strategie (bij alles/combinatie toonde het paneel
+        # alleen die van de daghandel, ook als scalp en veldproef handelden).
+        redenen: dict[str, str | None] = {}
+        vp_signalen = vp_ingestapt = 0
         per_richting = tel_per_richting(open_positions, pending)
         for ronde, strategie in enumerate(combinatie_mod.strategieen(self._strategie)):
             eigen = posities_per_strategie.get(strategie, [])
@@ -2653,6 +2683,21 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
             if ronde == 0:
                 reject_reason = r_reject
+            if r_signal is not None:
+                if veldproef_mod.is_veldproef(strategie):
+                    if r_signal.direction:
+                        vp_signalen += 1
+                        if r_reject is None and r_signal.should_trade:
+                            vp_ingestapt += 1
+                else:
+                    redenen[strategie] = r_reject or (
+                        "ingestapt" if r_signal.should_trade else None)
+        if vp_signalen or self.alles:
+            redenen["veldproef"] = (
+                f"{vp_ingestapt} van {vp_signalen} signalen ingestapt"
+                if vp_signalen else "geen signaal deze cyclus"
+            )
+        self._redenen_per_strategie = redenen
 
         # 1.10.1: alleen een gemeten equity in de equitycurve. De terugval op
         # de startbalans (opvraging mislukt) is geen meting; hij gaf op 10-10
@@ -2754,6 +2799,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "atr": self.state.atr.value,
             "signal": signal,
             "reject_reason": reject_reason,
+            "redenen_per_strategie": getattr(self, "_redenen_per_strategie", None) or {},
             "balance": balance,
             "equity": equity,
             # 1.7.7: onverklaarde saldosprong (dataprobleem).
@@ -3201,10 +3247,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
             # Pyramiden vóór de exitacties: bijkopen bij bevestiging is een
             # aparte beslissing van de vraag of je moet sluiten.
-            if (self.pyramid.enabled and strategie == STRATEGIE_SCALP
+            if (strategie == STRATEGIE_SCALP
+                    and (self.reeks.enabled or self.pyramid.enabled)
                     and action.kind in ("hold", "modify_stop")
                     and not await self._is_bijkoop(ticket)):
-                await self._consider_pyramid(position, quote, ticket)
+                if self.reeks.enabled:
+                    await self._consider_reeks(position, quote, ticket)
+                else:
+                    await self._consider_pyramid(position, quote, ticket)
 
             if action.is_noop:
                 continue
@@ -5169,6 +5219,88 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         state["additions"] += 1
         state["last_price"] = price
         _LOGGER.info("Bijgekocht: %s", decision.reason)
+
+    async def _consider_reeks(self, position, quote: VenueQuote, ticket: str) -> int:
+        """2.4.9: scalpreeks - bij elke stap in de goede richting een stuk erbij.
+
+        Elk stuk: dezelfde grootte als de eerste positie, de stop van de
+        eerste positie (gedeeld), een eigen doel van ``doel_usd``. Vastgelegd
+        als eigen trade ("pyramide van <ticket>"). Geeft het aantal stukken.
+        """
+        if not self.mode.places_orders or getattr(self, "koers_verouderd", False):
+            return 0
+        if ticket not in self._pyramid_state and self.db is not None:
+            eerder = await self.hass.async_add_executor_job(
+                self.db.bijkopen_van, str(ticket)
+            )
+            self._pyramid_state[ticket] = {
+                "additions": len(eerder),
+                "last_price": eerder[-1].open_price if eerder else None,
+                "original": None,
+            }
+        state = self._pyramid_state.setdefault(
+            ticket, {"additions": 0, "last_price": None, "original": None}
+        )
+        units_now = float(getattr(position, "units", 0) or 0)
+        if state["original"] is None:
+            state["original"] = units_now
+        stop = getattr(position, "stop_loss", None)
+        if units_now <= 0 or not stop:
+            return 0
+        side = getattr(position, "side", "buy")
+        long = side == "buy"
+        richting = 1 if long else -1
+        price = quote.bid if long else quote.ask
+        n = stukken_nu(
+            self.reeks, side=side,
+            entry_price=float(getattr(position, "open_price", price) or price),
+            current_price=price, last_price=state["last_price"],
+            done=state["additions"],
+        )
+        if n <= 0:
+            return 0
+        strategie = await self._strategie_van(position)
+        geplaatst = 0
+        for _ in range(n):
+            now = datetime.now(timezone.utc)
+            instap = quote.ask if long else quote.bid
+            doel = round(instap + richting * self.reeks.doel_usd, 2)
+            signaal = ScalpSignal(
+                direction=richting, score=0.0, confidence=0.0,
+                should_trade=True, reject_reason=None,
+                reason=(f"scalpreeks: stuk {state['additions'] + 1} van "
+                        f"{self.reeks.max_stukken} op {ticket}, doel "
+                        f"{self.reeks.doel_usd:.2f} USD, gedeelde stop {stop}")[:200],
+                stop_loss=stop, take_profit=doel,
+                components={"strategie": strategie, "open_reason": f"pyramide van {ticket}"},
+                geldig=True,
+            )
+            try:
+                result, _notes = await self.executor.open_protected(
+                    self.symbol, side, state["original"], quote.mid,
+                    stop_loss=stop, take_profit=doel,
+                    context=(signaal, quote, side, now),
+                )
+            except VenueError as err:
+                _LOGGER.warning("Scalpreeks: stuk niet geplaatst: %s", err)
+                break
+            self._positions_cache = None
+            if result.unconfirmed:
+                state["additions"] += 1
+                state["last_price"] = price
+                _LOGGER.warning("Scalpreeks: stuk onbevestigd: %s", result.error)
+                break
+            if not result.success:
+                _LOGGER.warning("Scalpreeks: stuk niet geplaatst: %s", result.error)
+                break
+            await self._record_broker_open(result, signaal, quote, side, now)
+            if result.ticket:
+                self._bijkopen.add(str(result.ticket))
+            self.risk.record_open()
+            state["additions"] += 1
+            state["last_price"] = price
+            geplaatst += 1
+        return geplaatst
 
     async def _is_bijkoop(self, ticket: str) -> bool:
         """2.2.0: is deze positie zelf een bijkoop? Die piramidet niet verder."""

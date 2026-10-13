@@ -325,6 +325,9 @@ def _coordinator(venue, tmp_path, monkeypatch):
             # 2.0.0: deze lustests gaan over het scalpmechanisme (tijdstop,
             # meerdere posities); daghandel heeft eigen tests.
             "strategie": "scalp",
+            # 2.4.9: de scalpreeks staat standaard aan; deze lustests gaan
+            # over losse posities (eigen tests: test_v249).
+            "scalp_reeks": False,
         }
 
     hass = FakeHass()

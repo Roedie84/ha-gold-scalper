@@ -125,7 +125,11 @@
           "use_schedule": "Handelstijden controleren tegen een eigen rooster",
           "close_buffer_minutes": "Geen nieuwe posities zoveel minuten voor sluiting",
           "strategie": "Strategie",
-          "scalp_units": "Scalpgrootte bij combinatie (ounce)"
+          "scalp_units": "Scalpgrootte bij combinatie (ounce)",
+          "scalp_reeks": "Scalpreeks: bij elke stap winst een stuk bijkopen",
+          "scalp_reeks_stap_usd": "Scalpreeks: stap per stuk (USD/oz)",
+          "scalp_reeks_max": "Scalpreeks: maximaal aantal stukken",
+          "scalp_reeks_doel_usd": "Scalpreeks: winstdoel per stuk (USD/oz)"
         },
         "data_description": {
           "strategie": "Daghandel: uitbraak uit het kanaal van 20 uur in de richting van de uurtrend, stop 4 x ATR, volgstop, uiterlijk om 20:45 UTC dicht. Scalpen: de oorspronkelijke strategie. Een andere keuze start een nieuwe run. Combinatie: beide tegelijk, elke positie met haar eigen regels; scalptrades op een vaste grootte.",

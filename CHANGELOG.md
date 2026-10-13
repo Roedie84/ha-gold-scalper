@@ -1,5 +1,28 @@
 # Changelog — Gold Scalper
 
+## 2.4.9
+
+* **Scalpreeks** (Ruud 13-10: "bij scalpen veel meer trades in de
+  minuutcandle, soort pyramide opbouwen ... mogelijk zelfs met 1 USD winst;
+  tot wel 100 trades"). Loopt een scalppositie in de goede richting, dan komt
+  er bij elke *stap* (standaard 0,30 USD/oz sinds het vorige stuk) een stuk
+  van dezelfde grootte bij, tot *maximaal 100 stukken* per reeks en hooguit
+  3 per cyclus (IG-limieten). Elk stuk heeft een eigen *winstdoel*
+  (standaard 1,00 USD/oz) en deelt de stop van de eerste positie. Nooit
+  bijkopen bij tegenslag. Elk stuk is een eigen trade ("pyramide van
+  <ticket>"), dus resultaat, kosten en afstemming kloppen; voor de statistiek
+  is een reeks één cluster. Vier nieuwe instellingen; staat standaard aan en
+  vervangt voor scalp de ATR-piramide. Hoort bij de vingerafdruk: nieuwe run.
+* *Doel als vast bedrag* (scalp) in stappen van 0,1 USD in plaats van 0,5,
+  zodat ook een doel van 0,2 USD kan (Ruud 13-10: "mag al bij 0,2 sluiten
+  als het maar winstgevend is"). Het doel telt vanaf de vulprijs, dus na de
+  spread.
+* **Paneel: reden per strategie.** Bij *alles* stond onder *Waarom geen
+  trade* alleen de reden van de daghandel ("geen_uitbraak"), ook als scalp
+  en veldproef gewoon handelden. Nu per strategie: daghandel, scalp, en voor
+  de veldproef hoeveel signalen er deze cyclus instapten.
+* Tests: `test_v249.py`.
+
 ## 2.4.8
 
 * **Vast winstdoel alleen nog voor scalp** (Ruud 13-10: "scalp moet kort,

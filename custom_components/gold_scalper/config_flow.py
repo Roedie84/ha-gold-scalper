@@ -26,6 +26,9 @@ from .broker.public_data import PublicDataVenue
 from .broker.stooq import StooqVenue
 from .validation import reward_risk_warning
 from .const import (
+    CONF_SCALP_REEKS, CONF_SCALP_REEKS_STAP, CONF_SCALP_REEKS_MAX,
+    CONF_SCALP_REEKS_DOEL, DEFAULT_SCALP_REEKS, DEFAULT_SCALP_REEKS_STAP,
+    DEFAULT_SCALP_REEKS_MAX, DEFAULT_SCALP_REEKS_DOEL,
     CONF_ACCOUNT_ID, CONF_ASSUMED_SPREAD, CONF_BUILD_FROM_QUOTES,
     CONF_NOTIFY_CRITICAL, CONF_NOTIFY_HOURLY, CONF_NOTIFY_SERVICE,
     CONF_CLOSE_BUFFER_MINUTES, CONF_USE_SCHEDULE,
@@ -743,6 +746,23 @@ class GoldScalperOptionsFlow(OptionsFlow):
                 CONF_PYRAMID_MAX_ADDITIONS,
                 default=default(CONF_PYRAMID_MAX_ADDITIONS, 2),
             ): _number(1, 5, 1, slider=True),
+            # 2.4.9: scalpreeks (strategy/scalp_reeks.py); vervangt voor scalp
+            # de piramide hierboven zolang hij aan staat.
+            vol.Required(
+                CONF_SCALP_REEKS, default=default(CONF_SCALP_REEKS, DEFAULT_SCALP_REEKS)
+            ): BooleanSelector(),
+            vol.Required(
+                CONF_SCALP_REEKS_STAP,
+                default=default(CONF_SCALP_REEKS_STAP, DEFAULT_SCALP_REEKS_STAP),
+            ): _number(0.05, 10, 0.05, "USD"),
+            vol.Required(
+                CONF_SCALP_REEKS_MAX,
+                default=default(CONF_SCALP_REEKS_MAX, DEFAULT_SCALP_REEKS_MAX),
+            ): _number(1, 100, 1),
+            vol.Required(
+                CONF_SCALP_REEKS_DOEL,
+                default=default(CONF_SCALP_REEKS_DOEL, DEFAULT_SCALP_REEKS_DOEL),
+            ): _number(0.1, 50, 0.1, "USD"),
 
             vol.Required(
                 CONF_SCALE_WITH_CONFIDENCE,
@@ -773,7 +793,7 @@ class GoldScalperOptionsFlow(OptionsFlow):
             ): _number(0.3, 3.0, 0.1, slider=True),
             vol.Required(
                 CONF_TAKE_PROFIT_USD, default=default(CONF_TAKE_PROFIT_USD, 0.0)
-            ): _number(0.0, 100.0, 0.5, "USD"),
+            ): _number(0.0, 100.0, 0.1, "USD"),  # 2.4.9: kleine scalpdoelen (0,2)
             vol.Required(
                 CONF_STOP_LOSS_USD, default=default(CONF_STOP_LOSS_USD, 0.0)
             ): _number(0.0, 100.0, 0.5, "USD"),

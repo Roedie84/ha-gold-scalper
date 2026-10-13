@@ -223,7 +223,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.4.8"
+INTEGRATION_VERSION: Final = "2.4.9"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
@@ -272,3 +272,13 @@ AFWIKKELFOUT_MELDING: Final = 10
 WEES_INTERVAL_S: Final = 300
 WEES_PER_RONDE: Final = 3
 WEES_MAX_LEEFTIJD_H: Final = 46
+
+# 2.4.9: scalpreeks (zie strategy/scalp_reeks.py).
+CONF_SCALP_REEKS: Final = "scalp_reeks"
+CONF_SCALP_REEKS_STAP: Final = "scalp_reeks_stap_usd"
+CONF_SCALP_REEKS_MAX: Final = "scalp_reeks_max"
+CONF_SCALP_REEKS_DOEL: Final = "scalp_reeks_doel_usd"
+DEFAULT_SCALP_REEKS: Final = True
+DEFAULT_SCALP_REEKS_STAP: Final = 0.3
+DEFAULT_SCALP_REEKS_MAX: Final = 100
+DEFAULT_SCALP_REEKS_DOEL: Final = 1.0

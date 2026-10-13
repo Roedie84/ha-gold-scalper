@@ -631,6 +631,8 @@ def build_payload(
             "koers_verouderd": bool(data.get("koers_verouderd")),
             "signaal": _signaal(data.get("signal")),
             "reden_geen_trade": data.get("reject_reason"),
+            # 2.4.9: per strategie bij alles/combinatie.
+            "redenen_per_strategie": data.get("redenen_per_strategie") or {},
         },
         "alarm": _alarmen(data, code),
         "candles": candles,
