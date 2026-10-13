@@ -34,3 +34,11 @@ laatste ronde: 13-10 08:30
 - Geen release (2.4.7 van 40 min geleden wacht op herstart).
 
 laatste ronde: 13-10 09:15
+
+## 13-10 08:55 · chat met Ruud
+- Ruud: scalp-posities stonden gelijk aan "Daghandel"-posities. Oorzaak: (1) paneelbug, veldproefopzetten kregen bij "alles" het label Daghandel + max duur tot 20:45; (2) sinds 2.4.6 gold TP 2 USD voor alles, dus 30m-opzetten met 12 USD stop gedroegen zich als scalp.
+- Besluit Ruud: vast doel alleen voor scalp ("kort, snel, kleine winsten"). **2.4.8** gebouwd: veldproef terug naar 2R, daghandel geen doel (volgstop/20:45), nieuwe strategieversies (nieuwe run), paneel toont "VP <familie> <tf>". Suite 2112 groen, in HACS; herstart door Ruud (activeert ook 2.4.7).
+- Nieuwe wens Ruud: scalp veel trades per 1m-candle, pyramide-achtig, tot 100 trades, doel desnoods 1 USD. Nog niet gebouwd; vraagt ontwerpkeuze (zie chat): blokkades nu = spreidingsregel (1 per richting per candle), max 20 per richting, IG-ratelimiet, kosten ~0,6-0,75 USD/oz tegen 1 USD doel.
+
+laatste ronde: 13-10 08:55
+
