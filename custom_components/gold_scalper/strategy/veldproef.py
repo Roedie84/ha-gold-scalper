@@ -32,7 +32,7 @@ from ..broker.exits import ExitConfig
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-1.0.0"
+VELDPROEF_VERSIE = "veldproef-1.1.0"  # 2.4.6: instelbaar winstdoel
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
@@ -313,15 +313,21 @@ def evalueer(
 
     instap = ask if d == 1 else bid
     afstand = max(STOP_ATR * k.atr, MIN_STOP_USD)
+    # 2.4.6 (Ruud 13-10: "alles op instelbaar doel"): een vast winstdoel in
+    # USD/oz uit de instellingen gaat voor de standaard van RR x de stop.
+    doel = cfg.take_profit_usd if getattr(cfg, "take_profit_usd", 0) and cfg.take_profit_usd > 0 \
+        else RR * afstand
+    doel_tekst = (f"doel {doel:.2f} USD (instelling)" if doel != RR * afstand
+                  else f"doel {RR:g}R")
     sig = ScalpSignal(
         direction=d, score=float(d), confidence=1.0, should_trade=True,
         reject_reason=None, geldig=True,
         reason=(f"Veldproef {familie} op {tf}: {'long' if d == 1 else 'short'}, "
-                f"stop {STOP_ATR:g} x ATR ({afstand:.2f}), doel {RR:g}R, "
+                f"stop {STOP_ATR:g} x ATR ({afstand:.2f}), {doel_tekst}, "
                 f"hooguit {HOLD_BARS} bars"),
         stop_loss=round(instap - d * afstand, 2),
-        take_profit=round(instap + d * RR * afstand, 2),
-        expected_move=round(RR * afstand, 3),
+        take_profit=round(instap + d * doel, 2),
+        expected_move=round(doel, 3),
         expected_cost=round(ask - bid + 2 * cfg.expected_slippage, 3),
         components=onderdelen | {"strategie": naam},
     )

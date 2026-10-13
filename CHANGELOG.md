@@ -1,5 +1,15 @@
 # Changelog — Gold Scalper
 
+## 2.4.6
+
+* **Winstdoel uit de instellingen voor alle strategieën** (Ruud 13-10: "alles
+  op instelbaar doel, nu 3"). *Doel als vast bedrag* (`take_profit_usd`, USD/oz)
+  gold alleen voor scalp. Nu ook voor de veldproef (was vast 2R) en de
+  daghandel (was geen doel; de volgstop en 20:45 UTC blijven). 0 = elke
+  strategie haar eigen doel zoals voorheen. Nieuwe strategieversies
+  (veldproef-1.1.0, daghandel-1.1.0, combinatie-1.1.0): nieuwe run.
+* Tests: `test_v246.py`.
+
 ## 2.4.5
 
 * **Dashboard: "Netto sinds start" in plaats van "Netto run".** Elke

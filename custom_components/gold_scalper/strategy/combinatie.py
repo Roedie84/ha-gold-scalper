@@ -24,7 +24,7 @@ from typing import Iterable
 from ..const import STRATEGIE_ALLES, STRATEGIE_COMBINATIE, STRATEGIE_DAGHANDEL, STRATEGIE_SCALP
 from . import veldproef
 
-COMBINATIE_VERSIE = "combinatie-1.0.0"
+COMBINATIE_VERSIE = "combinatie-1.1.0"  # 2.4.6: instelbaar winstdoel
 
 
 def strategieen(keuze: str) -> tuple[str, ...]:

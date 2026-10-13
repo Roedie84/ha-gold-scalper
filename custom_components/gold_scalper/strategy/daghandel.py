@@ -37,7 +37,7 @@ from ..analysis.volatility import atr
 from .scalping import ScalpConfig, ScalpSignal
 
 #: In runs.strategy_version; een andere strategie is altijd een nieuwe run.
-STRATEGIE_VERSIE = "daghandel-1.0.0"
+STRATEGIE_VERSIE = "daghandel-1.1.0"  # 2.4.6: instelbaar winstdoel
 
 KANAAL_BARS = 80
 EMA_SNEL = 20
@@ -221,7 +221,12 @@ def evaluate_daghandel(
             f"volgstop {VOLGSTOP_ATR15:g} x ATR vanaf {VOLGSTOP_VANAF_ATR15:g} x ATR winst, dicht om 20:45 UTC"
         ),
         stop_loss=round(stop, 3),
-        take_profit=None,
+        # 2.4.6 (Ruud 13-10: "alles op instelbaar doel"): een vast winstdoel
+        # in USD/oz uit de instellingen; 0 = geen doel, alleen de volgstop.
+        take_profit=(
+            round(entry + trend * cfg.take_profit_usd, 3)
+            if getattr(cfg, "take_profit_usd", 0) and cfg.take_profit_usd > 0 else None
+        ),
         expected_move=round(STOP_ATR15 * s.atr15, 3),
         expected_cost=round(spread + 2 * cfg.expected_slippage, 3),
         components=onderdelen,
