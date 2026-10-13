@@ -1,5 +1,17 @@
 # Changelog — Gold Scalper
 
+## 2.4.7
+
+* **Verweesde trades worden afgewikkeld.** Een positie uit een eerdere run
+  die al dicht was voordat de nieuwe run hem kon meenemen (runwissel,
+  herstart), bleef eeuwig open in de database en telde in geen enkel
+  resultaat mee. Op 13-10 ging het om 23 veldproeftrades uit run 110/111.
+  Elke 5 minuten worden er nu tot 3 nagevraagd in het activiteitenoverzicht
+  van de broker en afgewikkeld op diens uitstapprijs en sluitmoment, in hun
+  eigen run. Nooit op een schatting: niet gevonden = blijft staan. Telt niet
+  mee voor daglimiet of verliesreeks. Alleen trades jonger dan 46 uur.
+* Tests: `test_v247.py`.
+
 ## 2.4.6
 
 * **Winstdoel uit de instellingen voor alle strategieën** (Ruud 13-10: "alles

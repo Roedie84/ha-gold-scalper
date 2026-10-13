@@ -86,6 +86,9 @@ from .const import (
     DEFAULT_UPDATE_SECONDS, DOMAIN, MIN_UPDATE_SECONDS, MIN_WARMUP_CANDLES,
     WARMUP_CANDLES, KOERS_HOUD_MAX_MISLUKT, KOERS_HOUD_MAX_SECONDEN,
     AFWIKKELFOUT_MELDING,
+    WEES_INTERVAL_S,
+    WEES_PER_RONDE,
+    WEES_MAX_LEEFTIJD_H,
 )
 from .learning.analysis import evaluate_threshold, measure_execution, regime_performance
 from .learning.postmortem import analyse_losses
@@ -409,6 +412,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.account_drawdown: dict = {}
         #: Tickets van open trades uit een eerdere run die nog live staan.
         self._carried_tickets: set[str] = set()
+        # 2.4.7: afwikkeling van verweesde trades (zie _wikkel_wezen_af).
+        self._wees_laatst: datetime | None = None
+        self._wees_pogingen: dict[str, int] = {}
         #: Equity bij de start van de run, in accountvaluta.
         self.opening_equity: float | None = None
         #: Laatst gemelde equity van de broker, in accountvaluta.
@@ -4753,6 +4759,81 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         for ticket in list(self._afwikkelfouten):
             if ticket not in fout_nu:
                 self._afwikkeling_gelukt(ticket)
+        try:
+            await self._wikkel_wezen_af(live_tickets, quote, now)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - mag de cyclus nooit stilleggen
+            _LOGGER.debug("Afwikkelen verweesde trades mislukt", exc_info=True)
+
+    async def _wikkel_wezen_af(self, live_tickets, quote: VenueQuote,
+                               now: datetime) -> int:
+        """2.4.7: verweesde trades uit eerdere runs afwikkelen.
+
+        Een positie uit een eerdere run die al dicht was voordat deze run hem
+        zag (runwissel, herstart), werd nooit meegenomen en bleef eeuwig open
+        in de database: op 13-10 23 veldproeftrades uit run 110/111, die in
+        geen enkel resultaat meetelden. Alleen afwikkelen op de uitstapprijs
+        en het sluitmoment uit het activiteitenoverzicht van de broker - nooit
+        op de koers van nu, dat zou de oude run vervuilen. Niet gevonden: de
+        trade blijft staan voor een volgende ronde. Telt niet mee voor de
+        daglimiet of de verliesreeks: dat verlies is niet van vandaag.
+        """
+        if not self.mode.places_orders or self.run_id is None:
+            return 0
+        laatst = self._wees_laatst
+        if laatst is not None and (now - laatst).total_seconds() < WEES_INTERVAL_S:
+            return 0
+        self._wees_laatst = now
+        kandidaten = await self.hass.async_add_executor_job(
+            self.db.wees_trades, self.mode.value, self.run_id
+        )
+        live = {str(t) for t in (live_tickets or ())}
+        grens = now - timedelta(hours=WEES_MAX_LEEFTIJD_H)
+        wezen = [
+            t for t in kandidaten
+            if str(t.broker_ticket) not in live
+            and str(t.broker_ticket) not in self._carried_tickets
+            and _as_datetime(t.open_time, now) >= grens
+        ]
+        # Wie het vaakst vergeefs is nagevraagd, achteraan: één onvindbare
+        # trade mag de rest niet blokkeren.
+        wezen.sort(key=lambda t: self._wees_pogingen.get(str(t.broker_ticket), 0))
+        wezen = wezen[:WEES_PER_RONDE]
+        afgewikkeld = 0
+        for trade in wezen:
+            activiteit = await self._zoek_activiteit(trade)
+            if not activiteit or not activiteit.get("exit_price"):
+                ticket = str(trade.broker_ticket)
+                self._wees_pogingen[ticket] = self._wees_pogingen.get(ticket, 0) + 1
+                continue
+            exit_price = float(activiteit["exit_price"])
+            long = trade.side == "buy"
+            settle = VenueQuote(
+                bid=exit_price if long else exit_price - quote.spread,
+                ask=exit_price + quote.spread if long else exit_price,
+                time=quote.time, tradeable=quote.tradeable,
+            )
+            datum = activiteit.get("activity_date")
+            if isinstance(datum, str):
+                datum = datum.replace("/", "-").replace(" ", "T", 1)
+            moment = _as_datetime(datum, now)
+            if moment.tzinfo is None:
+                moment = moment.replace(tzinfo=timezone.utc)
+            if moment > now:
+                moment = now
+            await self._record_broker_close(
+                _TicketOnly(str(trade.broker_ticket)), settle,
+                "broker_gesloten_gemeten", moment,
+                bron=activiteit.get("source") or "broker_activity",
+                risico=False,
+            )
+            afgewikkeld += 1
+            _LOGGER.warning(
+                "Verweesde trade %s uit run %s afgewikkeld op %.2f (broker, %s).",
+                trade.broker_ticket, trade.run_id, exit_price, moment.isoformat(),
+            )
+        return afgewikkeld
 
     def _afwikkelfout(self, ticket: str, err: Exception) -> None:
         """Een afwikkelfout voor één trade noteren (1.11.0, L-GS-012).
@@ -5245,9 +5326,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     async def _record_broker_close(
         self, position, quote: VenueQuote, reason: str, now: datetime,
-        bron: str = "broker_transactions",
+        bron: str = "broker_transactions", risico: bool = True,
     ) -> None:
         """Werk de open trade bij tot een gesloten trade.
+
+        ``risico`` (2.4.7): False voor een verweesde trade uit een eerdere
+        run; die telt niet voor de daglimiet of de verliesreeks van nu.
 
         Zonder dit blijft de rij eeuwig open staan en telt hij nergens in mee:
         de bewijsfase kijkt naar gesloten trades.
@@ -5344,8 +5428,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             trade.close_reason_source = "own_order"
 
         await self.hass.async_add_executor_job(self.db.update_trade, trade)
-        self.risk.record_close(trade.net_pnl, now,
-                               telt_voor_reeks=self._telt_voor_reeks(trade))
+        if risico:
+            self.risk.record_close(trade.net_pnl, now,
+                                   telt_voor_reeks=self._telt_voor_reeks(trade))
         _LOGGER.info(
             "Trade gesloten: %s, bruto %.2f, kosten %.2f, netto %.2f",
             reason, trade.gross_pnl, trade.total_cost, trade.net_pnl,

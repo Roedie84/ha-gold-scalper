@@ -223,7 +223,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.4.6"
+INTEGRATION_VERSION: Final = "2.4.7"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
@@ -262,3 +262,13 @@ EXIT_REGIME_GRENS_UTC: Final = "2026-10-08T10:16:00+00:00"
 # 1.11.0 (L-GS-012): na zoveel cycli op rij met een afwikkelfout voor dezelfde
 # trade komt er een reparatiemelding (bij 20 s per cyclus ruim 3 minuten).
 AFWIKKELFOUT_MELDING: Final = 10
+
+# 2.4.7: verweesde trades. Een trade uit een eerdere run waarvan de positie
+# bij de broker al dicht was voordat deze run hem kon meenemen (runwissel of
+# herstart), bleef eeuwig open in de database en telde nergens mee (13-10:
+# 23 veldproeftrades uit run 110/111). Ze worden afgewikkeld op de
+# uitstapprijs uit het activiteitenoverzicht van de broker, nooit op een
+# schatting. Begrensd om de IG-limieten te sparen.
+WEES_INTERVAL_S: Final = 300
+WEES_PER_RONDE: Final = 3
+WEES_MAX_LEEFTIJD_H: Final = 46

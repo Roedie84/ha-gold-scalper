@@ -857,6 +857,20 @@ class TradeDatabase:
         ).fetchall()
         return [self._row_to_trade(r) for r in rows]
 
+    def wees_trades(self, mode: str, run_id: int) -> list[Trade]:
+        """2.4.7: open brokertrades van deze modus uit een andere run.
+
+        Kandidaten voor de afwikkeling van verweesde trades; de aanroeper
+        filtert op leeftijd en op wat bij de broker nog openstaat.
+        """
+        rows = self.conn.execute(
+            "SELECT * FROM trades WHERE close_time IS NULL "
+            "AND broker_ticket IS NOT NULL AND broker_ticket != '' "
+            "AND mode=? AND run_id != ? ORDER BY id",
+            (mode, run_id),
+        ).fetchall()
+        return [self._row_to_trade(r) for r in rows]
+
     def repair_broker_settlement_usd(self) -> int:
         """Herreken het dollarresultaat van trades die de broker afrekende.
 
