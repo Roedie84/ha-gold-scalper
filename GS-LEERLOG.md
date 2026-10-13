@@ -133,3 +133,10 @@ laatste ronde: 13-10 12:30
 - Meten na herstart: uitbraakorders/uur (redenen.turbo), netto per turbotrade, winst%, aandeel break-even; IG-403 per uur. Bij n >= 30 en t < -2: band/doorzet-drempels aanscherpen of uitzetten.
 
 laatste ronde: 13-10 12:55
+
+## 13-10 ~13:35 · 2.5.4 + 2.5.5 (chat, Ruud)
+- **2.5.4**: grens max posities per richting 20 -> 100 (instelling zelf nog 20; Ruud: "mocht veel hoger"). Na herstart instellen op 100 (of Ruud zelf).
+- **2.5.5** (suite 2156 groen, in HACS, wacht op herstart): break-even uiterlijk bij +1,5 USD/oz voor veldproef en daghandel (naast 0,5R / 1 ATR15; screenshot: rsi_rev 15m/30m op +3 USD zonder BE). Omkeer-exit: tegengesteld signaal van de eigen strategie -> verlies of < 0,6 USD winst sluiten, anders stop op 0,6 USD van de koers. Nieuwe strategieversies.
+- Meten: aandeel sluitingen "signaal gedraaid" (verlies/winst), netto per trade voor/na, gemiddeld verlies per verliestrade, aandeel break-even. Let op omkeer bij veldproef: tegengestelde opzetten in dezelfde familie/tf kunnen veel omkeren -> te veel sluiten = kosten; terug als netto per trade slechter wordt.
+
+laatste ronde: 13-10 13:35
