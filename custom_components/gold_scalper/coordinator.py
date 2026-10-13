@@ -3460,7 +3460,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 # 1.9.0: verrekende de broker de order met een tegengestelde
                 # positie? Nooit stil laten gebeuren.
                 await self._controleer_netting(
-                    result, richting, voor, tegengesteld,
+                    result, richting, voor, tegengesteld, units=units,
                 )
                 # 1.9.5: tijdstopvarianten van deze positie (alleen meting).
                 await self._open_varianten(
@@ -3598,6 +3598,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     async def _controleer_netting(
         self, result, richting: int, voor: list, tegengesteld: list,
+        units: float | None = None,
     ) -> None:
         """Verrekende de broker de order met een tegengestelde positie?
 
@@ -3616,7 +3617,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if na is not None:
                 onderweg = set(self._sluitverzoeken) | set(self._sluit_onderweg)
                 verrekend = [
-                    t for t in netting_uit_posities(voor, na, richting, result.ticket)
+                    t for t in netting_uit_posities(
+                        voor, na, richting, result.ticket, nieuw_units=units,
+                    )
                     if t not in onderweg
                 ]
         if not verrekend:

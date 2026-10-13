@@ -1,5 +1,21 @@
 # Changelog — Gold Scalper
 
+## 2.5.2
+
+* **Geen valse netting meer als een tegengestelde positie op haar eigen stop
+  sluit.** Op 13-10 om 10:02 UTC opende een veldproef-short (28VDTA7) in
+  dezelfde seconden waarin een veldproef-long (286ATAG) bij de broker op zijn
+  stop sloot. De nettingcontrole zag de long verdwijnen en meldde
+  verrekening; daarop ging hedgen uit tot een herstart, zodat alle
+  tegengestelde signalen (bv. momentum:1m en pullback:3m short) geweigerd
+  werden. De short stond na de order gewoon volledig open (sloot pas om
+  10:08 op zijn stop), en IG opent met `forceOpen` altijd apart. Nu geldt:
+  staat de nieuwe positie er na de order volledig, dan is er niets
+  verrekend. Een echte (gedeeltelijke) verrekening, waarbij de nieuwe
+  positie ontbreekt of kleiner is dan besteld, wordt nog steeds luid gemeld.
+  Geen strategiewijziging (zelfde strategieversie).
+* Tests: `test_v252.py`.
+
 ## 2.5.1
 
 * **Snel de stop naar de instap, bij alle strategieën** (Ruud 13-10: "bij alle

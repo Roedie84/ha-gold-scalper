@@ -227,6 +227,7 @@ def netting_uit_bevestiging(affected) -> list[str]:
 
 def netting_uit_posities(
     voor: Iterable, na: Iterable, richting: int, nieuw_ticket: str | None,
+    nieuw_units: float | None = None,
 ) -> list[str]:
     """Tegengestelde posities die bij het openen verdwenen of kromp.
 
@@ -234,9 +235,27 @@ def netting_uit_posities(
     tegengestelde positie die weg is of kleiner werd, terwijl er geen
     sluitverzoek van ons liep, wijst op verrekening. Een nieuwe positie die
     niet in de lijst staat ook.
+
+    2.5.2: staat de nieuwe positie er ná de order volledig (``nieuw_units``,
+    in ounces, of onbekend), dan is er niets verrekend: bij verrekening
+    verdwijnt (een deel van) de nieuwe order in de oude positie. Een
+    tegengestelde positie die in dezelfde seconden op haar eigen stop of doel
+    sloot, is dan geen netting. Op 13-10 10:02 zette zo'n samenloop (vp-long
+    op zijn stop, vp-short net open) hedgen tot de herstart uit.
     """
     na = list(na)
     na_per_ticket = {str(getattr(p, "ticket", "")): p for p in na}
+    if nieuw_ticket and str(nieuw_ticket) in na_per_ticket:
+        nieuw = na_per_ticket[str(nieuw_ticket)]
+        try:
+            heel = (
+                not nieuw_units
+                or float(getattr(nieuw, "units", 0) or 0) >= float(nieuw_units) * 0.999
+            )
+        except (TypeError, ValueError):
+            heel = True
+        if heel:
+            return []
     verdacht = []
     for p in voor:
         if richting_van(getattr(p, "side", "buy")) == richting:
