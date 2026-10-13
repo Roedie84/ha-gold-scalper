@@ -163,3 +163,14 @@ laatste ronde: 13-10 13:45
 - Meten na herstart: 403-regels per uur (moet fors dalen), "Openen mislukt" per uur.
 
 laatste ronde: 13-10 16:30
+
+## 13-10 ~16:40 · ronde 8b (geplande controle, parallel aan ronde 8)
+- Zelfde 403-fix gebouwd en getest (2182 groen), maar 2.6.0 stond al op main → niet uitgebracht (dubbel). 2.5.9 actief, run 130 (14:04 UTC), 28 trades (19 dicht, −1.238).
+- DB wel gelezen (File editor werkte). Vandaag n=1.121 dicht: netto −46.059 USD, bruto −2.974, kosten 0,79 USD/oz tegen MFE 0,96/oz, MAE −1,87/oz; win 35 %, PF 0,41, t −10,7. Trades/u 11-13 UTC: 139/169/185.
+- Runs 128-130 n=212: −9.887 (t −5,0). Sluitredenen: broker_gesloten_gemeten 102 (−5.858), stop 54 (−3.541), doel 22 (+552), omkeer-exit 15 (13 verlies, −0,4..−3,6 USD/oz), deelwinst 4 (+356).
+- Vandaag per bron: scalp-turbo n=79 −3.155 (win 16 %, t −4,6); scalp-pyramide n=105 −3.032 (win 60 % maar PF 0,34: MFE 0,08/oz); 1m-opzetten allemaal negatief (donchian t −5,0, pullback −4,0, structuur_hl −3,7, momentum −4,1 → uitgezet n=102; rsi_rev:1m uitgezet n=115).
+- Instellingen: niets (laatste wijziging 13:01 UTC < 48 u; dagverlies ~0,46 % rekening, geen acuut risico).
+- Voorstel (strategie/instelling, niet gedaan): turbo uit (scalp_turbo) bij n ≥ 100 als t < −2 blijft; 1m-tijdvak als geheel uit (kosten ≈ MFE). Grootte: alles op 0,5 contract; risico via grootte i.p.v. aantal pas na bewijs.
+- Let op: 21 HA-afsluitingen in 6 u → elke herstart nieuwe IG-login (+ quotum) en nieuwe run.
+
+laatste ronde: 13-10 16:40
