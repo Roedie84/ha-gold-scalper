@@ -23,3 +23,14 @@ laatste ronde: 13-10 08:10
 
 laatste ronde: 13-10 08:30
 
+
+## 13-10 09:15 · ronde 3
+- Actief nog 2.4.6 (2.4.7 geïnstalleerd, wacht op herstart Ruud). Demo, noodstop/dataprobleem uit. Eq. 9.992.328.
+- Trades/uur (openingen, UTC): 05u 93, 06u 55, 07u 18 in 13 min. Run 113 (TP 2, 05:58-07:14): 77 gesloten, netto −4.856, bruto −2.072, kosten 2.784, win 29 %, PF 0,30, t −4,36.
+- **TP 2 USD gemeten slechter:** veldproef run 107-112 (eigen doel 2R, med. 4,79 USD) n=179 −12,5/trade (t −0,9); run 113 (TP 2) n=68 −57,4/trade (t −3,8); verschil ≈ 45/trade, Welch t ≈ 2,3. Mediane stop 2,1 USD + kosten ~1 USD/oz → quitte pas bij ~75 % winst; gemeten 29 %. Schade vooral op 3m-15m (grotere stops): niet-1m −81/trade tegen +3,7 eerder; 1m −41 tegen −29.
+- **Instelling: take_profit_usd 2 → 0** (elke strategie haar eigen doel: veldproef 2R, scalp eigen doel, daghandel volgstop). Run 114 sinds 07:14 UTC. Verwacht: aantal openingen gelijk (doel bepaalt geen instap), netto per trade terug richting −12. Meten: per trade en per tijdvak tegen run 113; terugdraaien als run 114 na n ≥ 60 niet beter is.
+- Kosten zijn de kern: sinds run 107 bruto +1.760, kosten 9.758. tf 1m n=128 bruto +209 kosten 4.410 (t −4,25). Familie rsi_rev n=82 t −4,0 (rsi_rev:1m n=43 t −3,2) → bij 100 trades uitzetten als t < −2 blijft. Scalp n=20 PF 0,05: < 30, geen oordeel.
+- Afstemming: nieuwe afwijkingen bij paren met gelijke instap (4193,69/4193,70: wij −205,76, broker −13,07) → zelfde koppelprobleem als vorige ronde; volgende ronde uitzoeken of de uitstapprijs bij gelijktijdige trades verkeerd wordt toegewezen. IG rate limit ~4×/uur, telkens hersteld; 1 order mislukt door rate limit.
+- Geen release (2.4.7 van 40 min geleden wacht op herstart).
+
+laatste ronde: 13-10 09:15
