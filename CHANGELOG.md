@@ -1,5 +1,17 @@
 # Changelog — Gold Scalper
 
+## 2.4.4
+
+* **Geen valse noodstop meer als het saldo niet op te vragen is.** Faalde het
+  opvragen van het account (IG-limiet `exceeded-account-allowance`, DNS-fout),
+  dan werd de startbalans als equity ingevuld. Met *Startbalans* 1.000.000 op
+  een account van ~10 miljoen viel dat onder de verliesvloer: NOODSTOP op
+  13-10 02:16 en 06:43 zonder enig verlies. Nu geldt de laatst gemeten
+  waarde voor de weergave en wordt er die cyclus geen risicotoets gedaan en
+  geen positie geopend ("saldo van de broker niet op te vragen"); het
+  exitbeheer loopt door.
+* Tests: `test_v244.py`.
+
 ## 2.4.3
 
 * **Afstemming met de broker over alle runs.** De dagelijkse afstemming (en

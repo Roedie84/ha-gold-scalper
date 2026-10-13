@@ -2424,6 +2424,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: saldosprongbewaking; de terugval op de startbalans bij een mislukte
         #: opvraging is geen meting.
         gemeten_equity: float | None = None
+        #: 2.4.4: reden als het saldo deze cyclus niet op te vragen was.
+        saldo_onbekend: str | None = None
         self._marge_vrij = None
         if self.paper:
             self.paper.update_positions(self._paper_quote(quote))
@@ -2439,8 +2441,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 # 1.9.0: voor de margetoets bij een extra positie.
                 vrij = getattr(snapshot, "margin_available", None)
                 self._marge_vrij = float(vrij) if vrij else None
-            except VenueError:
-                balance = equity = self.starting_balance
+            except VenueError as err:
+                # 2.4.4: geen saldo van de broker is geen verlies. Eerst werd
+                # hier de startbalans ingevuld (1.000.000) en die viel onder de
+                # verliesvloer van het echte account (~10 mln): NOODSTOP op
+                # 13-10 02:16 en 06:43, telkens bij een IG-limiet of DNS-fout.
+                # Nu: laatst gemeten waarde voor de weergave, en geen
+                # risicotoets en geen nieuwe positie deze cyclus.
+                laatst = self.current_equity or self.starting_balance
+                balance = equity = laatst
+                saldo_onbekend = str(err)[:120] or "geen antwoord"
 
         # Eerst onbevestigde orders terugzoeken: vóór de telling, zodat een
         # teruggevonden positie meetelt en vastgelegd is voordat de strategie
@@ -2536,6 +2546,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         schaduw_reden = "positielimiet"
                     elif r_signal.reject_reason == "cooldown":
                         schaduw_reden = "cooldown"
+                elif saldo_onbekend:
+                    # 2.4.4: zonder gemeten saldo geen risicotoets (die zou
+                    # op een ingevulde waarde een valse noodstop geven) en dus
+                    # geen nieuwe positie. Exitbeheer loopt gewoon door.
+                    r_reject = f"saldo van de broker niet op te vragen: {saldo_onbekend}"
                 else:
                     fx_ok, fx_reden = self.conversion.usable_for_entry(now)
                     allowed, why = self.risk.can_open(
