@@ -174,3 +174,15 @@ laatste ronde: 13-10 16:30
 - Let op: 21 HA-afsluitingen in 6 u → elke herstart nieuwe IG-login (+ quotum) en nieuwe run.
 
 laatste ronde: 13-10 16:40
+
+## 13-10 ~17:15 · ronde 9 (geplande controle, RUST IN DE REGELS)
+- Actief 2.5.9, run 130 (14:04 UTC); 2.6.0 (403-fix) staat in HACS, wacht op herstart Ruud. Geen nieuwe commits sinds ronde 8. Noodstop/dataprobleem uit, demo, 12-14 open met stops. Afstemming 501/505 (4 afwijkingen uitstapprijs).
+- Run 130 n=146 dicht in 68 min (~130/u): netto −5.978, t −4,1, DD −5.978 (geen piek), win 55 %, slippage instap gem. 0,21 USD/oz. Vandaag n=1.251: −50.175, t −11,1.
+- Per bron run 130: scalp-reeksstukken n=48 −2.492 (win 58 %, PF 0,22, MFE 0,08/oz, MAE −2,35/oz); vp:1m n=23 −1.342 (t −3,1); vp:3m n=17 −1.062; turbo-uitbraak n=17 −328; vp:15m n=10 ~0; vp:30m n=9 +195 (PF 2,4).
+- Uitstap: stop n=50 −3.018, broker_gesloten n=48 −3.385, tijd n=15 −746, doel n=14 +346, deelwinst n=11 +880, omkeer-exit n=3 −58.
+- Nog steeds 403 exceeded-account/api-key-allowance (9x koers, 6x openen sinds 14:31 UTC) → 2.6.0 actief maken lost de herlogin-verdubbeling op.
+- 15:02 UTC: 2 posities met stop broker ≠ DB (DB strakker). modify_stop telt "gelukt" op dealReference zonder deal-bevestiging; een door IG geweigerde verplaatsing komt zo in de DB. Niet gebouwd (extra bevestiging kost een verzoek per stopverplaatsing bij al krappe limiet); meten of het vaker voorkomt.
+- Code: niets (geen aantoonbare bug met verlies; dubbele wachtende release vermeden). Instellingen: niets (< 48 u, geen acuut risico, dagverlies ~0,5 % rekening).
+- Voorstel blijft: reeksstukken (bevestigd: MFE 0,08/oz bij gedeelde stop ~2,3/oz = R:R ≪ 1) uit of 1 stuk per cyclus met doel vanaf vulprijs; 1m-tijdvak uit.
+
+laatste ronde: 13-10 17:15
