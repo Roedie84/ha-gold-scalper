@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.5.8
+
+* **Open posities: kolom "Bij SL"** (Ruud 13-10: "in het open posities
+  overzicht verwacht ik ook iets als gerealiseerde profit/loss"). Per positie
+  het resultaat als de stop nu geraakt wordt, in accountvaluta: groen
+  "vastgezet" zodra break-even of de winstslot de stop in de winst heeft
+  gezet, anders rood "risico".
+
 ## 2.5.7
 
 * **Winstslot: winst sneller vastzetten, ook bij volatiliteit** (Ruud 13-10:
