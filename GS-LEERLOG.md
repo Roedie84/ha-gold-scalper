@@ -208,3 +208,14 @@ laatste ronde: 13-10 18:15
 - Voorstel blijft (volgende ronde ≥ 15-10 15:28 UTC, als n het bevestigt): turbo uit en 1m-tijdvak uit; samen −3.980 van −2.647 in deze run.
 
 laatste ronde: 13-10 19:15
+
+## 13-10 ~20:15 · ronde 12 (geplande controle, RUST IN DE REGELS)
+- 2.6.1 (uit de chat met Ruud, 17:12 UTC) geïnstalleerd en actief: run 132 sinds 17:48 UTC. Bij de start uitgezet: alle 1m (n=507, t −9,8), alle 3m (n=276, t −5,4), scalp+turbo (n=395, t −9,0). Run 132 handelt alleen nog 5m/15m/30m: 13 trades in 22 min (~35/u, was ~100/u).
+- Run 132 n=11 dicht: −1.180, bruto −797, kosten 383 (0,85/oz), win 45 %, t −1,7 → n veel te klein. Run 131 eindstand n=223 −1.617 (t −1,2). Vandaag n=1.529 −54.284 (≈0,5 % rekening).
+- Noodstop/dataprobleem uit, demo, 2 open (vp momentum:15m, rsi_rev:5m) met stop en doel. Afstemming 500/504 (4 afwijkingen, DB-bedrag ≠ broker, geen netting).
+- Logs: DNS-time-outs naar IG 19:13 en 19:57 lokaal (herstelde zich); geen 403-reeksen meer. Stop broker ≠ DB 2x (19:12 4148,97 vs 4153,64; 20:08 4159,30 vs 4159,55). Exitbeheer stuurt de stop elke cyclus opnieuw vanaf de brokerpositie → lijkt zelfherstellend, geen aantoonbaar verlies; niet gebouwd.
+- Oude rijen zonder close_time (aug/sep, strategie leeg, 21 stuks) staan nog in trades; niet bij de broker → alleen administratief.
+- Code: niets. Instellingen: niets (< 48 u sinds 15:28 UTC, geen acuut risico).
+- Meten: 5m-30m bij n ≥ 100 in run 132 (eerder +; nu klein −); trades/uur na de uitschakeling.
+
+laatste ronde: 13-10 20:15
