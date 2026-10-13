@@ -44,7 +44,7 @@ SLUIT_BACKOFF = (10, 30, 60, 120)
 from .broker.schedule import (
     SPOT_GOLD, ClosureObservation, bij_roostergrens, cross_check, minutes_until_close,
 )
-from .broker.exits import ExitConfig, ExitManager
+from .broker.exits import ExitConfig, ExitManager, scalp_exit_config
 from .broker.ig_capital import CapitalVenue, IgVenue
 from .broker.oanda import OandaVenue
 from .broker.public_data import PublicDataVenue
@@ -540,10 +540,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             daghandel_mod.exit_config()
             if self._strategie in (STRATEGIE_DAGHANDEL, STRATEGIE_COMBINATIE)
             or self._strategie == STRATEGIE_ALLES
-            else ExitConfig()
+            else scalp_exit_config()
         )
         #: 2.1.0: het scalpexitbeheer voor scalpposities bij de combinatie.
-        self._exits_scalp = ExitManager(ExitConfig())
+        #: 2.5.1: met snelle break-even (stop naar instap bij +0,6 USD/oz).
+        self._exits_scalp = ExitManager(scalp_exit_config())
         #: 2.4.0: veldproef - bars op 1m-30m, exitbeheer per opzet, laatste
         #: gebruikte signaalbar per opzet.
         self.veldproef = veldproef_mod.MeerTijdvakken()

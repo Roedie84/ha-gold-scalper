@@ -42,6 +42,12 @@ _LOGGER = logging.getLogger(__name__)
 from ..const import CONTRACT_SIZE
 
 
+#: 2.5.1: minimale afstand tussen koers en een break-evenstop (USD/oz).
+BREAKEVEN_MIN_AFSTAND_USD = 0.6
+#: 2.5.1: scalp zet de stop op de instap zodra 0,6 USD/oz winst staat.
+SCALP_BREAKEVEN_USD = 0.6
+
+
 @dataclass(slots=True)
 class ExitConfig:
     """Instellingen voor exitbeheer. Afstanden zijn veelvouden van de ATR."""
@@ -61,6 +67,12 @@ class ExitConfig:
     #: Buffer bovenop het instappunt bij break-even, in veelvouden van de
     #: round-trip kosten. 1.0 betekent: de trade kan hierna niet meer verliezen.
     breakeven_buffer_cost_multiple: float = 1.2
+    #: 2.5.1 (Ruud 13-10: "bij alle trades relatief snel stop naar entry"):
+    #: break-even vanaf een vaste winst in USD/oz in plaats van in ATR. None
+    #: = de ATR-drempel hierboven.
+    breakeven_trigger_usd: float | None = None
+    #: 2.5.1: minimale afstand koers-stop bij break-even (USD/oz); 0 = geen.
+    breakeven_min_afstand_usd: float = 0.0
 
     #: Sluit dit deel van de positie bij het eerste doel.
     partial_close_fraction: float = 0.5
@@ -220,12 +232,24 @@ class ExitManager:
         # Zodra je de helft hebt afgeroomd is de rest gratis geworden; die
         # daarna alsnog met verlies laten sluiten is de slechtste van beide
         # werelden - je hebt je winst begrensd én je verlies niet.
-        trigger = (
-            0.0 if partial_taken else self.config.breakeven_trigger_atr
-        )
-        if profit_atr >= trigger:
+        if partial_taken:
+            gehaald = profit_atr >= 0.0
+        elif self.config.breakeven_trigger_usd is not None:
+            gehaald = profit_per_oz >= self.config.breakeven_trigger_usd - 1e-9
+        else:
+            gehaald = profit_atr >= self.config.breakeven_trigger_atr
+        if gehaald:
             buffer = round_trip_cost_per_oz * self.config.breakeven_buffer_cost_multiple
             breakeven = open_price + direction * buffer
+            # 2.5.1: een snelle break-even mag de stop niet tegen of voorbij de
+            # koers leggen (IG weigert dat, of de positie sluit meteen). Past
+            # instap + kosten niet, dan de instap zelf; past ook die niet, dan
+            # nog niets verplaatsen.
+            afstand = self.config.breakeven_min_afstand_usd - 1e-9
+            if afstand > 0 and (exit_price - breakeven) * direction < afstand:
+                buffer, breakeven = 0.0, open_price
+            if afstand > 0 and (exit_price - breakeven) * direction < afstand:
+                return ExitAction("hold", reason="break-even nog te dicht bij de koers")
             if current_stop is None or (breakeven - current_stop) * direction > 0:
                 return ExitAction(
                     "modify_stop",
@@ -272,3 +296,10 @@ class ExitManager:
             ),
             "harde_limiet": f"{c.max_hold_seconds}s",
         }
+
+
+def scalp_exit_config() -> "ExitConfig":
+    """2.5.1: scalp met snelle break-even op de instap (Ruud 13-10)."""
+    return ExitConfig(breakeven_trigger_usd=SCALP_BREAKEVEN_USD,
+                      breakeven_buffer_cost_multiple=0.0,
+                      breakeven_min_afstand_usd=BREAKEVEN_MIN_AFSTAND_USD)

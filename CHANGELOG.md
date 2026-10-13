@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 2.5.1
+
+* **Snel de stop naar de instap, bij alle strategieën** (Ruud 13-10: "bij alle
+  trades relatief snel stop naar entry om verliezen te beperken").
+  * Scalp: stop naar de instap zodra +0,6 USD/oz winst staat (was 0,8 x ATR15,
+    ~4 USD, bij een doel van 1 USD dus nooit).
+  * Veldproef: break-even vanaf 0,5R (was 1R).
+  * Daghandel: break-even vanaf 1 x ATR15 = 0,25R (was uit; de backtest van
+    2.1.0 vond break-even slechter voor de daghandel: meten).
+  * De stop blijft minstens 0,6 USD/oz van de koers (IG weigert stops te dicht
+    bij de koers); past instap + kosten niet, dan de instap zelf.
+  * Nieuwe strategieversies (veldproef-1.4.0, daghandel-1.3.0,
+    combinatie-1.3.0): nieuwe run.
+* Tests: `test_v251.py`; `test_v195` volgt de nieuwe scalpconfiguratie.
+
 ## 2.5.0
 
 * **Turbo-scalp** (Ruud 13-10: "turbo trading, bij wijze van seconden, moet

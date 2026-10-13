@@ -28,11 +28,11 @@ import math
 from dataclasses import dataclass, field
 
 from ..analysis.signals import Candles
-from ..broker.exits import ExitConfig
+from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, ExitConfig
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-1.3.0"  # 2.4.10: break-even 1R, volgstop 1,5R/1R
+VELDPROEF_VERSIE = "veldproef-1.4.0"  # 2.5.1: break-even 0,5R
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
@@ -68,7 +68,8 @@ def ontleed(naam: str) -> tuple[str, str]:
 #: 2.4.10 (Ruud 13-10: "+3 USD en toch uitgestopt"): break-even en volgstop
 #: in R (de stopafstand bij instap). De coordinator geeft voor een
 #: veldproefpositie R door op de plek van de ATR (zie :func:`r_van`).
-BREAKEVEN_R = 1.0
+#: 2.5.1 (Ruud 13-10: "relatief snel stop naar entry"): 0,5R (was 1R).
+BREAKEVEN_R = 0.5
 VOLGSTOP_VANAF_R = 1.5
 VOLGSTOP_AFSTAND_R = 1.0
 
@@ -80,6 +81,7 @@ def exit_config(naam: str) -> ExitConfig:
     _, tf = ontleed(naam)
     return ExitConfig(
         breakeven_trigger_atr=BREAKEVEN_R,
+        breakeven_min_afstand_usd=BREAKEVEN_MIN_AFSTAND_USD,
         enable_partial_close=False,
         enable_trailing=True,
         trailing_activate_atr=VOLGSTOP_VANAF_R,

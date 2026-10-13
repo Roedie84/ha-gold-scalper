@@ -20,7 +20,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "custom_components"))
 sys.path.insert(0, os.path.dirname(__file__))
 
-from gold_scalper.broker.exits import ExitConfig, ExitManager  # noqa: E402
+from gold_scalper.broker.exits import ExitConfig, ExitManager, scalp_exit_config  # noqa: E402
 from gold_scalper.storage import performance  # noqa: E402
 from gold_scalper.storage.database import Trade, TradeDatabase  # noqa: E402
 from gold_scalper.strategy.schaduw import SchaduwBoek, SchaduwKosten  # noqa: E402
@@ -398,7 +398,7 @@ def test_echte_handel_identiek_met_en_zonder_varianten(tmp_path, monkeypatch):
     assert kern(a) == kern(b)
     assert a.db.tijdstop_varianten(a.run_id) and not b.db.tijdstop_varianten(b.run_id)
     # De echte exitconfiguratie is onaangeroerd.
-    assert a.exits.config == ExitConfig()
+    assert a.exits.config == scalp_exit_config()   # 2.5.1: snelle break-even
     assert a.exits.config.time_stop_seconds == 240
     assert a.exits.config.max_hold_seconds == 900
     assert a.varianten.exits is a.exits

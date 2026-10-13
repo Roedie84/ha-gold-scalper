@@ -38,7 +38,7 @@ def test_open_positie_veldproef_zonder_tijdstop():
 
 
 def test_versies():
-    assert C.COMBINATIE_VERSIE == "combinatie-1.2.0"
+    assert C.COMBINATIE_VERSIE >= "combinatie-1.2.0"
     assert V.VELDPROEF_VERSIE.startswith("veldproef-1.") and V.VELDPROEF_VERSIE >= "veldproef-1.2.0"
 
 

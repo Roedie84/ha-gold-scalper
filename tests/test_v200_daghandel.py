@@ -116,16 +116,20 @@ def _uit(nu, open_=T, bid=4000.0, stop=3980.0, atr=5.0):
     return m.evaluate("buy", 1.0, 4000.0, stop, bid, bid + 0.5, atr, open_, nu, 0.9)
 
 
-def test_geen_tijdstop_en_geen_break_even():
+def test_geen_tijdstop_wel_break_even_vanaf_1_atr():
     assert _uit(T + timedelta(minutes=30)).kind == "hold"
-    assert _uit(T + timedelta(hours=3), bid=4008.0).kind == "hold"  # 1,6 x ATR
+    assert _uit(T + timedelta(hours=3), bid=4004.0).kind == "hold"  # 0,8 x ATR
+    # 2.5.1: break-even vanaf 1 x ATR15 (instap + 1,2 x kosten 0,9).
+    a = _uit(T + timedelta(hours=3), bid=4008.0)
+    assert a.kind == "modify_stop" and abs(a.new_stop - 4001.08) < 1e-6
 
 
 def test_volgstop_vanaf_2_atr_op_4_atr():
     """2.1.0: 4 x ATR (was 6)."""
     a = _uit(T + timedelta(hours=1), bid=4015.0)  # 3 x ATR winst
     assert a.kind == "modify_stop" and a.new_stop == 4015.0 - 20.0
-    assert _uit(T + timedelta(hours=1), bid=4009.0).kind == "hold"  # 1,8 x ATR
+    a = _uit(T + timedelta(hours=1), bid=4009.0)  # 1,8 x ATR: nog geen volgstop, wel break-even
+    assert a.kind == "modify_stop" and abs(a.new_stop - 4001.08) < 1e-6
 
 
 def test_dicht_om_2045_utc_en_na_een_dagwissel():

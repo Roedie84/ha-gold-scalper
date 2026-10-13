@@ -26,8 +26,9 @@ def test_r_uit_het_doel():
     assert V.r_van(4189.0, None) == V.MIN_STOP_USD
 
 
-def test_onder_1r_niets():
-    assert _eval(4192.9, 4185.0).kind == "hold"
+def test_onder_halve_r_niets():
+    # 2.5.1: break-even vanaf 0,5R (R = 4 -> +2 USD).
+    assert _eval(4190.9, 4185.0).kind == "hold"
 
 
 def test_break_even_vanaf_1r():
@@ -46,7 +47,7 @@ def test_geen_tijdstop_wel_maximale_duur():
 
 
 def test_versie_en_coordinator():
-    assert V.VELDPROEF_VERSIE == "veldproef-1.3.0"
+    assert V.VELDPROEF_VERSIE >= "veldproef-1.3.0"
     pad = os.path.join(os.path.dirname(__file__), "..", "custom_components",
                        "gold_scalper", "coordinator.py")
     assert "veldproef_mod.r_van(position.open_price" in open(pad, encoding="utf-8").read()
