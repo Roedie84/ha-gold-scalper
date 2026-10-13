@@ -116,3 +116,14 @@ laatste ronde: 13-10 11:42
 - Let op logs: veel IG 403 exceeded-account-allowance / api-key-allowance sinds de turbo (2.5.0) en de herstart; "Openen mislukt" 5x.
 
 laatste ronde: 13-10 12:05
+
+## 13-10 12:30 · ronde 6 (geplande controle)
+- 2.5.1 actief (run 121 sinds 10:01 UTC). Demo, noodstop/dataprobleem uit, afstemming in_orde (3 afwijkingen uitstap/bedrag, o.a. instap 4187,87: +59,92 wij / −74,35 broker). Trades/uur vandaag 50-97 (actieve uren).
+- Vandaag n=548: netto −19.864, bruto +618, kosten 20.483 (0,79 USD/oz), t −6,0. Veldproef n=518 −17.494 (t −5,4); 1m n=269 −10.872 (t −7,9, kosten 0,78/oz tegen MFE 0,70/oz: structureel); 15m n=46 ~0 (PF 0,99); bb_fade n=11 +310. Scalp-basis n=30 −2.370 (t −3,8); sinds run 119 0 scalptrades (score onder 0,30).
+- Per opzet (alle tijd): rsi_rev:1m n=85 t −3,95, momentum:1m n=78 t −5,15 → bij n ≥ 100 uitzetten; er bestaat nog geen mechanisme om één opzet uit te zetten (volgende release).
+- Valse netting 10:02:09: long 286ATAG sloot op zijn stop terwijl short 28VDTA7 opende (die stond tot 10:08 open) → hedgen uit tot herstart, shortsignalen geweigerd.
+- **2.5.2** (suite 2144 groen/5 skip, in HACS, herstart Ruud): netting alleen als de nieuwe positie ontbreekt of kleiner is dan besteld.
+- Instellingen: niets (laatste wijziging 09:41 UTC, 24-u-regel; geen acuut risico).
+- Volgende: opzet-uitzetmechanisme (n ≥ 100, t < −2) voor momentum:1m/rsi_rev:1m; effect 2.5.1 break-even (run 121: 10 trades, 0 % win, nog te klein).
+
+laatste ronde: 13-10 12:30
