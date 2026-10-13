@@ -78,3 +78,11 @@ laatste ronde: 13-10 10:40
 
 laatste ronde: 13-10 10:34
 
+## 13-10 ~11:05 · chat met Ruud (vervolg)
+- Ruud herstartte 10:32 (2.4.10 actief, run 118); mijn instellingswijziging 10:34 → run 119. Daarna toonde het paneel alle open posities als "Daghandel": paneel las alleen open trades van de lopende run → fallback primaire strategie.
+- **2.4.11** (suite 2130 groen, in HACS): paneel leest ook open trades uit eerdere runs (2 dagen); tijdstip/reden/aantal van de laatste stopverplaatsing per positie (kolommen stop_gewijzigd_op/stop_wijzigingen/stop_reden), onder SL "↕ hh:mm (n×)".
+- Screenshots "Scalp" met verre TP (max 42:36 / 3u53) zijn veldproef 1m/5m met een oud paneelscript in de app → app/browser verversen.
+- Wens Ruud: "turbo trading, seconden" bij scalp. Nu: cyclus 10 s (minimum), IG-limiet al ~6x/u geraakt. Er is al een IG-koersstream (alleen voor het paneel). Voorstel: scalp op de stream laten reageren met een orderbudget; wacht op akkoord.
+
+laatste ronde: 13-10 11:05
+
