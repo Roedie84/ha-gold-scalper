@@ -37,7 +37,7 @@ from ..analysis.volatility import atr
 from .scalping import ScalpConfig, ScalpSignal
 
 #: In runs.strategy_version; een andere strategie is altijd een nieuwe run.
-STRATEGIE_VERSIE = "daghandel-1.4.0"  # 2.5.5: break-even 1 x ATR15 of +1,5 USD
+STRATEGIE_VERSIE = "daghandel-1.5.0"  # 2.5.7: winstslot. 2.5.5: 2.5.5: break-even 1 x ATR15 of +1,5 USD
 BREAKEVEN_ATR15 = 1.0
 
 KANAAL_BARS = 80

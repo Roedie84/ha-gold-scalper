@@ -121,15 +121,15 @@ def test_geen_tijdstop_wel_break_even_vanaf_1_atr():
     assert _uit(T + timedelta(hours=3), bid=4001.2).kind == "hold"  # 2.5.5: onder +1,5 USD
     # 2.5.1: break-even vanaf 1 x ATR15 (instap + 1,2 x kosten 0,9).
     a = _uit(T + timedelta(hours=3), bid=4008.0)
-    assert a.kind == "modify_stop" and abs(a.new_stop - 4001.08) < 1e-6
+    assert a.kind == "modify_stop" and abs(a.new_stop - 4005.6) < 1e-6  # 2.5.7: winstslot 70% van +8
 
 
 def test_volgstop_vanaf_2_atr_op_4_atr():
     """2.1.0: 4 x ATR (was 6)."""
     a = _uit(T + timedelta(hours=1), bid=4015.0)  # 3 x ATR winst
-    assert a.kind == "modify_stop" and a.new_stop == 4015.0 - 20.0
-    a = _uit(T + timedelta(hours=1), bid=4009.0)  # 1,8 x ATR: nog geen volgstop, wel break-even
-    assert a.kind == "modify_stop" and abs(a.new_stop - 4001.08) < 1e-6
+    assert a.kind == "modify_stop" and abs(a.new_stop - 4010.5) < 1e-6  # 2.5.7: winstslot strakker
+    a = _uit(T + timedelta(hours=1), bid=4009.0)  # 1,8 x ATR: nog geen volgstop
+    assert a.kind == "modify_stop" and abs(a.new_stop - 4006.3) < 1e-6  # 2.5.7: winstslot
 
 
 def test_dicht_om_2045_utc_en_na_een_dagwissel():

@@ -32,7 +32,7 @@ from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, BREAKEVEN_UITERLIJK_USD, E
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-1.6.0"  # 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
+VELDPROEF_VERSIE = "veldproef-1.7.0"  # 2.5.7: winstslot. 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")

@@ -48,6 +48,13 @@ BREAKEVEN_MIN_AFSTAND_USD = 0.6
 SCALP_BREAKEVEN_USD = 0.6
 #: 2.5.5: veldproef en daghandel uiterlijk vanaf 1,5 USD/oz winst.
 BREAKEVEN_UITERLIJK_USD = 1.5
+#: 2.5.7 (Ruud 13-10: "bij sommige posities wordt de winst nog niet snel
+#: genoeg veiliggesteld, zeker bij volatiliteit"): winstslot in USD/oz.
+#: Tussen break-even (+1,5) en de ATR-trailing (1,5 x ATR, bij ATR 5,4 pas
+#: +8 USD) stond de stop op de instap en kon alle winst teruglopen. Nu:
+#: vanaf +2 USD de helft van de lopende winst vast, vanaf +5 USD 70%.
+#: Schuift alleen mee (de stop gaat nooit terug).
+WINSTSLOT_TREDEN: tuple[tuple[float, float], ...] = ((2.0, 0.5), (5.0, 0.7))
 
 
 @dataclass(slots=True)
@@ -85,6 +92,8 @@ class ExitConfig:
     trailing_distance_atr: float = 1.2
     trailing_activate_atr: float = 1.5
     enable_trailing: bool = True
+    #: 2.5.7: winstslot in USD/oz (zie ``WINSTSLOT_TREDEN``).
+    winstslot: bool = True
 
     #: Sluit als de positie na deze tijd nog binnen de dode zone hangt.
     time_stop_seconds: int = 240
@@ -197,20 +206,34 @@ class ExitManager:
                 ),
             )
 
-        # --- Trailing stop ----------------------------------------------------
+        # --- Trailing stop en winstslot ----------------------------------------
         # Staat vóór break-even in de volgorde omdat hij op dit punt altijd
         # verder in de winst ligt; anders zou break-even hem terugtrekken.
+        # 2.5.7: de strakste van de twee wint.
+        kandidaten = []
         if self.config.enable_trailing and profit_atr >= self.config.trailing_activate_atr:
             trail = exit_price - direction * atr * self.config.trailing_distance_atr
-            if current_stop is None or (trail - current_stop) * direction > 0:
-                return ExitAction(
-                    "modify_stop",
-                    new_stop=round(trail, 3),
-                    reason=(
-                        f"trailing stop op {self.config.trailing_distance_atr}xATR; "
-                        f"winst staat op {profit_atr:.2f}xATR"
-                    ),
-                )
+            kandidaten.append((trail, (
+                f"trailing stop op {self.config.trailing_distance_atr}xATR; "
+                f"winst staat op {profit_atr:.2f}xATR"
+            )))
+        # Een openstaande deelsluiting gaat voor (die neemt de winst al).
+        deel_eerst = (
+            self.config.enable_partial_close
+            and not partial_taken
+            and profit_atr >= self.config.partial_close_trigger_atr
+        )
+        slot = (
+            winstslot_stop(side, open_price, exit_price)
+            if self.config.winstslot and not deel_eerst
+            else None
+        )
+        if slot is not None:
+            kandidaten.append(slot)
+        if kandidaten:
+            stop, reden = max(kandidaten, key=lambda k: k[0] * direction)
+            if current_stop is None or (stop - current_stop) * direction > 1e-9:
+                return ExitAction("modify_stop", new_stop=round(stop, 3), reason=reden)
 
         # --- Gedeeltelijk sluiten bij het eerste doel -------------------------
         if (
@@ -302,6 +325,27 @@ class ExitManager:
             ),
             "harde_limiet": f"{c.max_hold_seconds}s",
         }
+
+
+def winstslot_stop(side: str, open_price: float, exit_price: float,
+                   min_afstand: float = BREAKEVEN_MIN_AFSTAND_USD) -> "tuple[float, str] | None":
+    """2.5.7: de winstslotstop bij deze koers, of None onder de eerste trede.
+
+    Altijd minstens ``min_afstand`` van de koers (IG weigert een stop tegen
+    de koers aan)."""
+    d = 1.0 if side == "buy" else -1.0
+    winst = (exit_price - open_price) * d
+    fractie = None
+    for vanaf, f in WINSTSLOT_TREDEN:
+        if winst >= vanaf - 1e-9:
+            fractie = f
+    if fractie is None:
+        return None
+    vast = min(winst * fractie, winst - min_afstand)
+    if vast <= 0:
+        return None
+    return (open_price + d * vast,
+            f"winstslot: {fractie:.0%} van {winst:+.2f} USD/oz vast (+{vast:.2f})")
 
 
 def scalp_exit_config() -> "ExitConfig":

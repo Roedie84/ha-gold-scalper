@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 2.5.7
+
+* **Winstslot: winst sneller vastzetten, ook bij volatiliteit** (Ruud 13-10:
+  "bij sommige posities wordt de winst nog niet snel genoeg veiliggesteld,
+  zeker bij volaliteit"). Tussen break-even (+1,5 USD/oz) en de ATR-trailing
+  (pas vanaf 1,5 x ATR, bij ATR 5,4 dus +8 USD) stond de stop op de instap
+  en kon de hele winst teruglopen. Nu voor alle strategieën: vanaf +2 USD/oz
+  de helft van de lopende winst vast, vanaf +5 USD/oz 70%; altijd minstens
+  0,6 USD van de koers. De stop schuift alleen mee. Trailing en winstslot:
+  de strakste wint.
+* Strategieversies omhoog (nieuwe run): veldproef-1.7.0, daghandel-1.5.0,
+  combinatie-1.5.0, scalp-0.3.0.
+
 ## 2.5.6
 
 * **Bewezen verliezende veldproefopzetten gaan uit** (regel van Ruud: "een

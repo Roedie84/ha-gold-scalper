@@ -176,7 +176,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **2.5.6** (zie `CHANGELOG.md`).
+Huidige versie: **2.5.7** (zie `CHANGELOG.md`).
 
 Sinds 2.0.0 is de standaardstrategie **daghandel** (trend op uurbasis, uiterlijk
 20:45 UTC dicht); scalpen blijft kiesbaar via de instelling *Strategie*, en sinds 2.1.0 ook

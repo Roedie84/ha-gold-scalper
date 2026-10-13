@@ -64,7 +64,8 @@ def test_stop_moves_to_breakeven_right_after_a_partial():
     action = _decide(1.05, partial_taken=True)
     assert action.kind == "modify_stop"
     assert action.new_stop >= OPEN_PRICE
-    assert "deels genomen" in action.reason
+    # 2.5.7: de winstslot kan strakker zijn dan break-even.
+    assert "deels genomen" in action.reason or "winstslot" in action.reason
 
 
 def test_breakeven_after_partial_ignores_its_own_threshold():

@@ -43,4 +43,4 @@ def test_veldproef_en_daghandel_sneller():
     m = ExitManager(D.exit_config())
     a = m.evaluate("buy", 0.5, 4000.0, 3980.0, 4005.5, 4005.8, 5.0,
                    NU - timedelta(seconds=300), NU, 0.8)
-    assert a.kind == "modify_stop" and a.new_stop == round(4000.0 + 0.96, 3)
+    assert a.kind == "modify_stop" and abs(a.new_stop - 4003.85) < 1e-6  # 2.5.7: winstslot

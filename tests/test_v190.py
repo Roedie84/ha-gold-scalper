@@ -590,7 +590,8 @@ def test_schaduw_trailing_verplaatst_de_stop():
     t = _open(boek, stop=4397.0, doel=4450.0)
     boek.bijwerken(bid=4404.0, ask=4404.6, hoog=None, laag=None, atr=2.0,
                    nu=T0 + timedelta(seconds=20))
-    assert t.status == "open" and t.stop_loss == pytest.approx(4404.0 - 2.4)
+    # 2.5.7: de winstslot (50% van de winst) is strakker dan 1,2 x ATR.
+    assert t.status == "open" and t.stop_loss == pytest.approx(4402.15)
 
 
 def test_schaduw_vervalt_na_een_gat_in_de_data():
