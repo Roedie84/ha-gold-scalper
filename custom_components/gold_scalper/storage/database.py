@@ -941,6 +941,18 @@ class TradeDatabase:
             params.append(limit)
         return [self._row_to_trade(r) for r in self.conn.execute(query, params).fetchall()]
 
+    def netto_per_strategie(self, prefix: str) -> dict[str, list[float]]:
+        """2.5.6: netto per gesloten trade per strategie (over alle runs),
+        voor het uitzetten van bewezen verliezende veldproefopzetten."""
+        uit: dict[str, list[float]] = {}
+        for rij in self.conn.execute(
+            "SELECT strategie, net_pnl FROM trades WHERE close_time IS NOT NULL "
+            "AND net_pnl IS NOT NULL AND strategie LIKE ? ORDER BY close_time ASC",
+            (prefix + "%",),
+        ).fetchall():
+            uit.setdefault(rij[0], []).append(float(rij[1]))
+        return uit
+
     def closed_trades_since(self, sinds_iso: str, mode: str | None = None) -> list[Trade]:
         """2.4.3: gesloten trades sinds een moment, over alle runs. Voor de
         afstemming met de broker: een nieuwe run mag de laatste dagen van de

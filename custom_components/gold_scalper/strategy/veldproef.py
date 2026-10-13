@@ -32,7 +32,7 @@ from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, BREAKEVEN_UITERLIJK_USD, E
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-1.5.0"  # 2.5.5: break-even 0,5R of uiterlijk +1,5 USD
+VELDPROEF_VERSIE = "veldproef-1.6.0"  # 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
@@ -50,6 +50,37 @@ HOLD_BARS = 48
 MIN_BARS = 60
 #: Hoeveel bars per tijdvak in het geheugen.
 MAX_BARS = 400
+
+
+#: 2.5.6 (opdracht Ruud: "een opzet uitzetten bij >= 100 trades en t < -2"):
+#: een opzet met minstens zoveel gesloten trades en een t-statistiek van het
+#: netto resultaat per trade onder deze grens stapt niet meer in.
+UITZET_MIN_N = 100
+UITZET_MAX_T = -2.0
+
+
+def t_statistiek(netto: list[float]) -> float:
+    n = len(netto)
+    if n < 2:
+        return 0.0
+    gem = sum(netto) / n
+    var = sum((x - gem) ** 2 for x in netto) / (n - 1)
+    if var <= 0:
+        return 0.0
+    return gem / math.sqrt(var / n)
+
+
+def uitgezette_opzetten(per_opzet: dict[str, list[float]]) -> dict[str, dict]:
+    """2.5.6: welke opzetten bewezen verliezen (n >= UITZET_MIN_N en
+    t < UITZET_MAX_T, netto per trade). Geeft per opzet n, netto en t."""
+    uit: dict[str, dict] = {}
+    for naam, netto in per_opzet.items():
+        if not is_veldproef(naam) or len(netto) < UITZET_MIN_N:
+            continue
+        t = t_statistiek(netto)
+        if t < UITZET_MAX_T:
+            uit[naam] = {"n": len(netto), "netto": round(sum(netto), 2), "t": round(t, 2)}
+    return uit
 
 
 def namen() -> tuple[str, ...]:
@@ -314,7 +345,7 @@ def bars_uit_koersen(punten: list[tuple[float, float]], seconden: int) -> Candle
 def evalueer(
     naam: str, bars: MeerTijdvakken, bid: float, ask: float, cfg: ScalpConfig,
     open_position_count: int = 0, seconds_since_last_entry: float = 1e9,
-    laatste_bar: dict | None = None,
+    laatste_bar: dict | None = None, uitgezet=None,
 ) -> ScalpSignal:
     familie, tf = ontleed(naam)
 
@@ -323,6 +354,11 @@ def evalueer(
                            reject_reason=reden, reason=tekst,
                            components={"strategie": naam, **(onderdelen or {})})
 
+    if uitgezet and naam in uitgezet:
+        info = uitgezet[naam] if isinstance(uitgezet, dict) else {}
+        return weiger("opzet_uitgezet",
+                      f"{naam}: uitgezet (n={info.get('n', '?')}, t={info.get('t', '?')}, "
+                      f"grens n >= {UITZET_MIN_N} en t < {UITZET_MAX_T:g})")
     if ask - bid > cfg.max_spread:
         return weiger("spread_too_wide", f"Spread {ask - bid:.2f} boven {cfg.max_spread:.2f}")
     k = bars.kenmerken(tf)

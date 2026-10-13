@@ -556,6 +556,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.veldproef = veldproef_mod.MeerTijdvakken()
         self._exits_vp: dict[str, ExitManager] = {}
         self._vp_laatste_bar: dict[str, int] = {}
+        #: 2.5.6: bewezen verliezende opzetten (n >= 100, t < -2) en wanneer
+        #: die lijst weer uit de database gelezen wordt.
+        self._vp_uitgezet: dict[str, dict] = {}
+        self._vp_uitgezet_volgende = 0.0
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
         # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
         # bepaalde één uitschieter de p99.
@@ -1508,6 +1512,25 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return combinatie_mod.COMBINATIE_VERSIE
         return daghandel_mod.STRATEGIE_VERSIE if self.daghandel else STRATEGY_VERSION
 
+    async def _ververs_vp_uitgezet(self) -> None:
+        """2.5.6: lijst van uitgezette veldproefopzetten, elke 5 minuten uit de
+        database. Een fout laat de vorige lijst staan."""
+        nu = time.monotonic()
+        if nu < self._vp_uitgezet_volgende or self.db is None:
+            return
+        self._vp_uitgezet_volgende = nu + 300.0
+        try:
+            per_opzet = await self.hass.async_add_executor_job(
+                self.db.netto_per_strategie, veldproef_mod.PREFIX)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Uitgezette veldproefopzetten niet te lezen: %s", err)
+            return
+        nieuw = veldproef_mod.uitgezette_opzetten(per_opzet)
+        for naam in sorted(set(nieuw) - set(self._vp_uitgezet)):
+            _LOGGER.warning("Veldproefopzet %s uitgezet: n=%s, netto %s, t=%s",
+                            naam, nieuw[naam]["n"], nieuw[naam]["netto"], nieuw[naam]["t"])
+        self._vp_uitgezet = nieuw
+
     def _beslisser(self, now: datetime, strategie: str | None = None):
         strategie = strategie or self.primaire_strategie
         if strategie == STRATEGIE_SCALP:
@@ -1517,7 +1540,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
             def vp(candles, bid, ask, cfg, hour, eigen_open, sinds, *_a, **_k):
                 return veldproef_mod.evalueer(
-                    strategie, bars, bid, ask, cfg, eigen_open, sinds, laatste)
+                    strategie, bars, bid, ask, cfg, eigen_open, sinds, laatste,
+                    uitgezet=self._vp_uitgezet)
             return vp
         return functools.partial(
             daghandel_mod.evaluate_daghandel, minuut_utc=now.astimezone(timezone.utc).minute,
@@ -2565,6 +2589,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # alleen die van de daghandel, ook als scalp en veldproef handelden).
         redenen: dict[str, str | None] = {}
         vp_signalen = vp_ingestapt = 0
+        if self.alles:
+            await self._ververs_vp_uitgezet()
         per_richting = tel_per_richting(open_positions, pending)
         for ronde, strategie in enumerate(combinatie_mod.strategieen(self._strategie)):
             eigen = posities_per_strategie.get(strategie, [])
@@ -2730,6 +2756,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 f"{vp_ingestapt} van {vp_signalen} signalen ingestapt"
                 if vp_signalen else "geen signaal deze cyclus"
             )
+            if self._vp_uitgezet:
+                redenen["veldproef"] += " · uitgezet: " + ", ".join(
+                    f"{n[len(veldproef_mod.PREFIX):]} (n={v['n']}, t={v['t']})"
+                    for n, v in sorted(self._vp_uitgezet.items()))
         # 2.5.0: wat de turbo-scalp tussen twee cycli nodig heeft.
         self._turbo_ctx = {
             "balance": balance, "equity": equity,

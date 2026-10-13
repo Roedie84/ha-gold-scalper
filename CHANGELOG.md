@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 2.5.6
+
+* **Bewezen verliezende veldproefopzetten gaan uit** (regel van Ruud: "een
+  opzet uitzetten bij >= 100 trades en t < -2", netto per trade). Elke 5
+  minuten leest de coordinator per opzet het netto van alle gesloten trades
+  (over alle runs); een opzet met n >= 100 en t < -2 stapt niet meer in
+  (reden `opzet_uitgezet`). De lijst staat in de reden van de veldproef in het
+  paneel en elke nieuw uitgezette opzet komt als waarschuwing in het log.
+  Op 13-10 13:15 UTC+2 geldt dat voor `rsi_rev:1m` (n=100, netto -2.884 USD,
+  t -2,72); `momentum:1m` (n=86, t -3,42) volgt bij 100 trades.
+* Strategieversie veldproef-1.6.0: nieuwe run.
+* Tests: `test_v256.py`.
+
 ## 2.5.5
 
 * **Break-even uiterlijk bij +1,5 USD/oz, ook bij veldproef en daghandel**
