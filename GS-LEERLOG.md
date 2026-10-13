@@ -49,3 +49,15 @@ laatste ronde: 13-10 08:55
 
 laatste ronde: 13-10 10:00
 
+
+## 13-10 10:11 · ronde 4 (4-uurscontrole)
+- 2.4.9 actief (run 117 sinds 08:10 UTC; Ruud zette net take_profit_usd 1, scalp_reeks_doel 0,5). Demo, noodstop/dataprobleem uit, eq. 9.988.554. Na herstart IG rate limit (account allowance) ~5× in 4 min, hersteld.
+- Openingen/uur (UTC): 03u 52, 04u 53, 05u 93, 06u 55, 07u 91, 08u 29 (eerste 11 min) → ~60-90/uur, doel "veel trades" gehaald.
+- Sinds run 107 (n=385): netto −12.466, bruto +1.601, kosten 14.067 (kosten > 8× bruto), win 33 %, PF 0,55, t −4,1. Runs: 113 −59,8/tr (n=82), 114 −38 (n=23), 115 −61,5 (n=54).
+- Veldproef n=356 t −3,5 (bruto +3.058); per tijdvak: 1m n=182 t −4,75 (bruto +686, kosten 6.479); 3m n=68 t −2,5; 5m/15m/30m rond nul vóór kosten positief. Opzetten max n=56 (rsi_rev:1m, momentum:1m t −4,0) → < 100, nog niet uitzetten. Familie rsi_rev n=109 t −2,6, momentum n=110 t −2,4.
+- Scalp n=29 net −2.316, PF 0,09, ook bruto negatief (−1.457); uitstap 20× tijdslimiet. < 30: geen oordeel, maar slechtste onderdeel. Config-waarschuwing: doel 1,00 tegen stop ~5,7 (ATR) → 85 % winst nodig vóór kosten.
+- Afstemming 394/395; 1 afwijking (instap 4194,25: wij 4190,33, broker 4185,13). 4 verweesde trades (run 113/114) zijn op dezelfde prijs 4190,33 / 07:33:56 afgewikkeld → één sluitactiviteit met meerdere affectedDealIds (netting?). Mogelijk correct, mogelijk fout: volgende ronde activiteit van die tickets naast transactieoverzicht leggen. Nog 21 trades uit runs 23-98 staan > 46 u "open" in de db (buiten de wezen-grens; tellen nergens mee).
+- Instellingen: niets gewijzigd (Ruud stelde 2 min geleden zelf bij; nieuwe run, 24-u-regel). Geen release (geen bug met voldoende bewijs).
+- Volgende ronde: run 117 per strategie (scalpreeks met doel 0,5: winst% en netto per stuk), kosten/trade per tijdvak, 1m-veldproef richting 100 per opzet.
+
+laatste ronde: 13-10 10:11
