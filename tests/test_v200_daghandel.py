@@ -118,7 +118,7 @@ def _uit(nu, open_=T, bid=4000.0, stop=3980.0, atr=5.0):
 
 def test_geen_tijdstop_wel_break_even_vanaf_1_atr():
     assert _uit(T + timedelta(minutes=30)).kind == "hold"
-    assert _uit(T + timedelta(hours=3), bid=4004.0).kind == "hold"  # 0,8 x ATR
+    assert _uit(T + timedelta(hours=3), bid=4001.2).kind == "hold"  # 2.5.5: onder +1,5 USD
     # 2.5.1: break-even vanaf 1 x ATR15 (instap + 1,2 x kosten 0,9).
     a = _uit(T + timedelta(hours=3), bid=4008.0)
     assert a.kind == "modify_stop" and abs(a.new_stop - 4001.08) < 1e-6

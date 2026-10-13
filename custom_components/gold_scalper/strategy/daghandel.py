@@ -32,12 +32,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..analysis.signals import Candles
-from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, ExitConfig
+from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, BREAKEVEN_UITERLIJK_USD, ExitConfig
 from ..analysis.volatility import atr
 from .scalping import ScalpConfig, ScalpSignal
 
 #: In runs.strategy_version; een andere strategie is altijd een nieuwe run.
-STRATEGIE_VERSIE = "daghandel-1.3.0"  # 2.5.1: break-even vanaf 1 x ATR15
+STRATEGIE_VERSIE = "daghandel-1.4.0"  # 2.5.5: break-even 1 x ATR15 of +1,5 USD
 BREAKEVEN_ATR15 = 1.0
 
 KANAAL_BARS = 80
@@ -70,6 +70,7 @@ def exit_config() -> ExitConfig:
         # break-even vanaf 1 x ATR15 winst (= 0,25R); was uit.
         breakeven_trigger_atr=BREAKEVEN_ATR15,
         breakeven_min_afstand_usd=BREAKEVEN_MIN_AFSTAND_USD,
+        breakeven_trigger_usd=BREAKEVEN_UITERLIJK_USD,
         enable_partial_close=False,
         enable_trailing=True,
         trailing_activate_atr=VOLGSTOP_VANAF_ATR15,

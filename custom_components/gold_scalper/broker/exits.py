@@ -46,6 +46,8 @@ from ..const import CONTRACT_SIZE
 BREAKEVEN_MIN_AFSTAND_USD = 0.6
 #: 2.5.1: scalp zet de stop op de instap zodra 0,6 USD/oz winst staat.
 SCALP_BREAKEVEN_USD = 0.6
+#: 2.5.5: veldproef en daghandel uiterlijk vanaf 1,5 USD/oz winst.
+BREAKEVEN_UITERLIJK_USD = 1.5
 
 
 @dataclass(slots=True)
@@ -234,10 +236,14 @@ class ExitManager:
         # werelden - je hebt je winst begrensd én je verlies niet.
         if partial_taken:
             gehaald = profit_atr >= 0.0
-        elif self.config.breakeven_trigger_usd is not None:
-            gehaald = profit_per_oz >= self.config.breakeven_trigger_usd - 1e-9
         else:
-            gehaald = profit_atr >= self.config.breakeven_trigger_atr
+            # 2.5.5: wat het eerst gehaald wordt, de ATR/R-drempel of de vaste
+            # drempel in USD/oz (Ruud 13-10: veldproef 15m/30m stonden op +3 USD
+            # en de stop stond nog niet op de instap).
+            gehaald = profit_atr >= self.config.breakeven_trigger_atr or (
+                self.config.breakeven_trigger_usd is not None
+                and profit_per_oz >= self.config.breakeven_trigger_usd - 1e-9
+            )
         if gehaald:
             buffer = round_trip_cost_per_oz * self.config.breakeven_buffer_cost_multiple
             breakeven = open_price + direction * buffer
@@ -303,3 +309,31 @@ def scalp_exit_config() -> "ExitConfig":
     return ExitConfig(breakeven_trigger_usd=SCALP_BREAKEVEN_USD,
                       breakeven_buffer_cost_multiple=0.0,
                       breakeven_min_afstand_usd=BREAKEVEN_MIN_AFSTAND_USD)
+
+
+def omkeer_actie(side: str, open_price: float, bid: float, ask: float,
+                 current_stop: float | None, richting: int | None,
+                 min_afstand: float = BREAKEVEN_MIN_AFSTAND_USD) -> "ExitAction | None":
+    """2.5.5 (Ruud 13-10): draait het signaal of de trend van de eigen
+    strategie tegen de positie in, dan een positie in verlies sluiten en van
+    een positie in winst de winst vastzetten: stop zo dicht als IG toelaat
+    (``min_afstand`` van de koers). Te weinig winst om vast te zetten: sluiten.
+    Geen tegengesteld signaal: ``None``."""
+    d = 1 if side == "buy" else -1
+    if not richting or richting != -d:
+        return None
+    uit = bid if d == 1 else ask
+    winst = (uit - open_price) * d
+    if winst < min_afstand:
+        return ExitAction(
+            "close",
+            reason=(f"signaal gedraaid, {'verlies beperkt' if winst < 0 else 'kleine winst genomen'} "
+                    f"({winst:+.2f} USD/oz)"),
+        )
+    nieuwe_stop = round(uit - d * min_afstand, 3)
+    if current_stop is not None and (nieuwe_stop - current_stop) * d <= 0:
+        return None
+    return ExitAction(
+        "modify_stop", new_stop=nieuwe_stop,
+        reason=f"signaal gedraaid: winst vastgezet, stop {min_afstand:.2f} van de koers ({winst:+.2f} USD/oz)",
+    )

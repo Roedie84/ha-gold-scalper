@@ -1,5 +1,21 @@
 # Changelog — Gold Scalper
 
+## 2.5.5
+
+* **Break-even uiterlijk bij +1,5 USD/oz, ook bij veldproef en daghandel**
+  (Ruud 13-10: veldproef rsi_rev 15m/30m stonden op +3 USD en de stop stond nog
+  niet op de instap). De R- of ATR-drempel van 2.5.1 (0,5R / 1 x ATR15) is bij
+  15m/30m 3,5-5 USD; nu geldt wat het eerst gehaald wordt. Scalp blijft +0,6.
+  Nieuwe strategieversies (veldproef-1.5.0, daghandel-1.4.0, combinatie-1.4.0).
+* **Omkeer-exit: signaal of trend gedraaid** (Ruud 13-10: "als de trend of
+  het signaal verandert, posities in verlies sluiten; in winst de winst zoveel
+  mogelijk pakken"). Geeft de eigen strategie van een positie een signaal in de
+  andere richting (veldproefopzet, scalp, daghandel-uurtrend), dan: in verlies
+  of met minder dan 0,6 USD/oz winst sluiten; anders de stop op 0,6 USD/oz van
+  de koers zetten (zo dicht als IG toelaat). Gebruikt de signalen van de vorige
+  cyclus; een signaal zonder richting telt niet.
+* Tests: `test_v255.py`.
+
 ## 2.5.4
 
 * **Tot 100 posities per richting** (Ruud 13-10: "max posities mocht veel

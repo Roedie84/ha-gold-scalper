@@ -28,11 +28,11 @@ import math
 from dataclasses import dataclass, field
 
 from ..analysis.signals import Candles
-from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, ExitConfig
+from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, BREAKEVEN_UITERLIJK_USD, ExitConfig
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-1.4.0"  # 2.5.1: break-even 0,5R
+VELDPROEF_VERSIE = "veldproef-1.5.0"  # 2.5.5: break-even 0,5R of uiterlijk +1,5 USD
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
@@ -82,6 +82,7 @@ def exit_config(naam: str) -> ExitConfig:
     return ExitConfig(
         breakeven_trigger_atr=BREAKEVEN_R,
         breakeven_min_afstand_usd=BREAKEVEN_MIN_AFSTAND_USD,
+        breakeven_trigger_usd=BREAKEVEN_UITERLIJK_USD,
         enable_partial_close=False,
         enable_trailing=True,
         trailing_activate_atr=VOLGSTOP_VANAF_R,

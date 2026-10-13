@@ -44,7 +44,7 @@ SLUIT_BACKOFF = (10, 30, 60, 120)
 from .broker.schedule import (
     SPOT_GOLD, ClosureObservation, bij_roostergrens, cross_check, minutes_until_close,
 )
-from .broker.exits import ExitConfig, ExitManager, scalp_exit_config
+from .broker.exits import ExitConfig, ExitManager, omkeer_actie, scalp_exit_config
 from .broker.ig_capital import CapitalVenue, IgVenue
 from .broker.oanda import OandaVenue
 from .broker.public_data import PublicDataVenue
@@ -419,6 +419,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._turbo_stream = None
         #: 2.5.2: eigen uitbraaksignaal op de live ticks (zie strategy/turbo.py).
         self.turbo_signaal = turbo_mod.TickUitbraak()
+        #: 2.5.5: laatste signaalrichting per strategie (omkeer-exit).
+        self._richting_per_strategie: dict[str, int] = {}
         self._turbo_sig_instap = 0.0
         self.turbo_stats: dict = {"ticks": 0, "rondes": 0, "orders": 0,
                                   "bijkopen": 0, "laatste_order": None}
@@ -2713,6 +2715,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if ronde == 0:
                 reject_reason = r_reject
             if r_signal is not None:
+                # 2.5.5: richting per strategie, voor sluiten/vastzetten bij omkeer.
+                self._richting_per_strategie[strategie] = int(r_signal.direction or 0)
                 if veldproef_mod.is_veldproef(strategie):
                     if r_signal.direction:
                         vp_signalen += 1
@@ -3294,6 +3298,20 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         "%.4f", self.conversion.instrument,
                         self.conversion.account, koers,
                     )
+
+            # 2.5.5 (Ruud 13-10): signaal/trend van de eigen strategie gedraaid:
+            # verlies sluiten, winst vastzetten. Gaat voor 'hold'/stopverplaatsing.
+            if action.kind != "close":
+                omkeer = omkeer_actie(
+                    position.side, position.open_price, quote.bid, quote.ask,
+                    getattr(position, "stop_loss", None),
+                    self._richting_per_strategie.get(strategie),
+                )
+                if omkeer is not None and (
+                        omkeer.kind == "close" or action.kind != "modify_stop"
+                        or (omkeer.new_stop - (action.new_stop or 0))
+                        * (1 if position.side == "buy" else -1) > 0):
+                    action = omkeer
 
             # Pyramiden vóór de exitacties: bijkopen bij bevestiging is een
             # aparte beslissing van de vraag of je moet sluiten.

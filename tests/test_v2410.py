@@ -28,7 +28,7 @@ def test_r_uit_het_doel():
 
 def test_onder_halve_r_niets():
     # 2.5.1: break-even vanaf 0,5R (R = 4 -> +2 USD).
-    assert _eval(4190.9, 4185.0).kind == "hold"
+    assert _eval(4190.4, 4185.0).kind == "hold"   # 2.5.5: ook onder +1,5 USD
 
 
 def test_break_even_vanaf_1r():
