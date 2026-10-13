@@ -26,6 +26,8 @@ from .broker.public_data import PublicDataVenue
 from .broker.stooq import StooqVenue
 from .validation import reward_risk_warning
 from .const import (
+    CONF_SCALP_TURBO, CONF_SCALP_TURBO_ORDERS, DEFAULT_SCALP_TURBO,
+    DEFAULT_SCALP_TURBO_ORDERS,
     CONF_SCALP_REEKS, CONF_SCALP_REEKS_STAP, CONF_SCALP_REEKS_MAX,
     CONF_SCALP_REEKS_DOEL, DEFAULT_SCALP_REEKS, DEFAULT_SCALP_REEKS_STAP,
     DEFAULT_SCALP_REEKS_MAX, DEFAULT_SCALP_REEKS_DOEL,
@@ -763,6 +765,14 @@ class GoldScalperOptionsFlow(OptionsFlow):
                 CONF_SCALP_REEKS_DOEL,
                 default=default(CONF_SCALP_REEKS_DOEL, DEFAULT_SCALP_REEKS_DOEL),
             ): _number(0.1, 50, 0.1, "USD"),
+            # 2.5.0: turbo-scalp op de live koers van IG.
+            vol.Required(
+                CONF_SCALP_TURBO, default=default(CONF_SCALP_TURBO, DEFAULT_SCALP_TURBO)
+            ): BooleanSelector(),
+            vol.Required(
+                CONF_SCALP_TURBO_ORDERS,
+                default=default(CONF_SCALP_TURBO_ORDERS, DEFAULT_SCALP_TURBO_ORDERS),
+            ): _number(1, 60, 1),
 
             vol.Required(
                 CONF_SCALE_WITH_CONFIDENCE,

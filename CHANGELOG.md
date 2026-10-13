@@ -1,5 +1,21 @@
 # Changelog — Gold Scalper
 
+## 2.5.0
+
+* **Turbo-scalp** (Ruud 13-10: "turbo trading, bij wijze van seconden, moet
+  mogelijk zijn tijdens scalpen"). De scalp reageert nu ook op de live koers
+  van IG (dezelfde stroom als het paneel) in plaats van alleen op de cyclus
+  van 10 s: hooguit één ronde per seconde, met bijkopen in de scalpreeks en
+  nieuwe scalpposities. Dezelfde grendels als de cyclus (risico, wisselkoers,
+  sluiting, netting, spreiding, marge, vloer). Een *orderbudget per minuut*
+  (standaard 20) houdt de IG-limieten heel; de turbo gebruikt de posities
+  en het saldo van de laatste cyclus en vraagt alleen na een order de
+  posities opnieuw op. Draait nooit tegelijk met de cyclus. Alleen met IG in
+  demo/live en bij scalp/combinatie/alles. Twee nieuwe instellingen (staat
+  standaard aan); hoort bij de vingerafdruk: nieuwe run. Het paneel toont
+  onder de redenen een regel "Turbo-scalp" met het verbruik.
+* Tests: `test_v250.py`.
+
 ## 2.4.11
 
 * **Paneel: open posities uit een vorige run kregen het label "Daghandel".**

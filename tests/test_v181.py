@@ -506,7 +506,14 @@ def test_ws_command_registration_uses_admin_check_and_no_write():
 
 def test_stream_never_feeds_decisions():
     verboden = re.compile(r"broker_stream|dashboard\.stream|dashboard import stream|PriceStream|streaming_credentials")
-    for pad in [PKG / "coordinator.py", *(PKG / "strategy").rglob("*.py"),
+    # 2.5.0: de turbo-scalp (Ruud 13-10) leest de stroom bewust, maar alleen
+    # in _turbo_start; de rest van de coordinator, strategie, risico en
+    # exits blijven er los van.
+    co = (PKG / "coordinator.py").read_text(encoding="utf-8")
+    turbo = co.split("def _turbo_start", 1)[1].split("def _turbo_stop", 1)[0]
+    rest = co.replace(turbo, "")
+    assert verboden.search(turbo) and not verboden.search(rest)
+    for pad in [*(PKG / "strategy").rglob("*.py"),
                 *(PKG / "analysis").rglob("*.py"), PKG / "broker" / "risk.py",
                 PKG / "broker" / "exits.py", PKG / "broker" / "execution_safety.py"]:
         assert not verboden.search(pad.read_text(encoding="utf-8")), pad.name

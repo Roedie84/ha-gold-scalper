@@ -5,9 +5,10 @@ websocket van de Home Assistant-frontend. Alleen beheerders, net als de
 route ``/api/gold_scalper/broker``. Er is geen schrijfactie: het commando geeft
 alleen koersen en een status door.
 
-Alleen weergave. De koersstroom (``dashboard/stream.py``) wordt hier per
-configuratie bewaard in ``hass.data`` en door niets in de coordinator of de
-strategie gelezen. De handel blijft op REST en op de bestaande cyclus.
+De koersstroom (``dashboard/stream.py``) wordt hier per configuratie bewaard
+in ``hass.data``. Sinds 2.5.0 abonneert ook de turbo-scalp van de coordinator
+zich erop (``_turbo_start``); orders blijven via REST lopen, met een
+orderbudget per minuut. Strategie, risico en exits lezen de stroom niet.
 
 Beschikbaar met IG als broker in demo- of live-modus. In papiermodus, of met
 een andere databron, antwoordt het commando met ``not_supported`` en blijft

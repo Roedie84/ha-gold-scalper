@@ -55,6 +55,11 @@ from .broker.paper import Quote as PaperQuote
 from .broker.risk import RiskLimits, RiskManager, TradingState
 from .broker.saldosprong import SaldoSprongBewaker
 from .const import (
+    CONF_SCALP_TURBO,
+    CONF_SCALP_TURBO_ORDERS,
+    DEFAULT_SCALP_TURBO,
+    DEFAULT_SCALP_TURBO_ORDERS,
+    TURBO_MIN_INTERVAL_S,
     CONF_SCALP_REEKS,
     CONF_SCALP_REEKS_STAP,
     CONF_SCALP_REEKS_MAX,
@@ -401,6 +406,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             doel_usd=float(options.get(CONF_SCALP_REEKS_DOEL, DEFAULT_SCALP_REEKS_DOEL)
                            or DEFAULT_SCALP_REEKS_DOEL),
         )
+        # 2.5.0: turbo-scalp op de live koers (zie _turbo_tick).
+        self.turbo_aan = bool(options.get(CONF_SCALP_TURBO, DEFAULT_SCALP_TURBO))
+        self.turbo_orders_pm = max(1, _as_int(
+            options.get(CONF_SCALP_TURBO_ORDERS), DEFAULT_SCALP_TURBO_ORDERS))
+        self._turbo_orders: list[float] = []
+        self._turbo_laatst = 0.0
+        self._turbo_bezig = False
+        self._turbo_afmelden = None
+        self._turbo_ctx: dict | None = None
+        self._turbo_stream = None
+        self.turbo_stats: dict = {"ticks": 0, "rondes": 0, "orders": 0,
+                                  "bijkopen": 0, "laatste_order": None}
         #: Per ticket: hoeveel toevoegingen en op welke prijs de laatste.
         self._pyramid_state: dict[str, dict] = {}
         #: 2.2.0: tickets die zelf een bijkoop zijn (die piramiden niet verder).
@@ -1215,6 +1232,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         "sizing": "risk_based_sizing",
         "positielimiet": CONF_MAX_POSITIONS_PER_RICHTING,
         "scalp_reeks": CONF_SCALP_REEKS,
+        "scalp_turbo": CONF_SCALP_TURBO,
     }
 
     async def _notify(self, stats: dict) -> None:
@@ -1569,6 +1587,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                  "doel": self.reeks.doel_usd}
                 if getattr(self, "reeks", None) is not None and self.reeks.enabled
                 else None
+            ),
+            # 2.5.0: turbo-scalp verandert hoeveel en wanneer scalptrades openen.
+            "scalp_turbo": (
+                getattr(self, "turbo_orders_pm", None)
+                if getattr(self, "turbo_aan", False) else None
             ),
             # De groottemethode hoort erbij (1.1): vast of uit risico bepaald
             # verandert het resultaat per trade in dollars. Run 99 mengde beide.
@@ -2696,6 +2719,20 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             redenen["veldproef"] = (
                 f"{vp_ingestapt} van {vp_signalen} signalen ingestapt"
                 if vp_signalen else "geen signaal deze cyclus"
+            )
+        # 2.5.0: wat de turbo-scalp tussen twee cycli nodig heeft.
+        self._turbo_ctx = {
+            "balance": balance, "equity": equity,
+            "saldo_onbekend": saldo_onbekend, "tradeable": bool(tradeable),
+        }
+        if self.turbo_aan and self._turbo_afmelden is None:
+            self._turbo_start()
+        if self._turbo_afmelden is not None:
+            recent = self._turbo_recent(time.monotonic())
+            redenen["turbo"] = (
+                f"{recent}/{self.turbo_orders_pm} orders deze minuut, "
+                f"{self.turbo_stats['orders']} totaal, stream "
+                f"{getattr(self._turbo_stream, 'status', '?')}"
             )
         self._redenen_per_strategie = redenen
 
@@ -5322,6 +5359,170 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             geplaatst += 1
         return geplaatst
 
+    # -- 2.5.0: turbo-scalp ------------------------------------------------- #
+
+    def _turbo_start(self) -> None:
+        """Abonneer op de IG-koersstroom (dezelfde als het paneel)."""
+        if not (self.mode.places_orders and self._strategie in (
+                STRATEGIE_SCALP, STRATEGIE_COMBINATIE, STRATEGIE_ALLES)):
+            return
+        try:
+            from .broker_stream import _get_stream, stream_eligibility
+
+            ok, reden = stream_eligibility(self)
+            if not ok:
+                _LOGGER.debug("Turbo-scalp niet mogelijk: %s", reden)
+                self._turbo_afmelden = False  # niet elke cyclus opnieuw
+                return
+            self._turbo_stream = _get_stream(self.hass, self)
+            self._turbo_afmelden = self._turbo_stream.subscribe(self._turbo_op_tick)
+            _LOGGER.info("Turbo-scalp actief: max %s orders per minuut op de live koers.",
+                         self.turbo_orders_pm)
+        except Exception:  # noqa: BLE001 - de cyclus loopt altijd door
+            _LOGGER.warning("Turbo-scalp kon niet starten", exc_info=True)
+            self._turbo_afmelden = False
+
+    def _turbo_stop(self) -> None:
+        afmelden = self._turbo_afmelden
+        self._turbo_afmelden = None
+        if callable(afmelden):
+            try:
+                afmelden()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _turbo_recent(self, nu_m: float) -> int:
+        self._turbo_orders = [t for t in self._turbo_orders if nu_m - t < 60.0]
+        return len(self._turbo_orders)
+
+    def _turbo_op_tick(self, bericht: dict) -> None:
+        """Callback van de stroom (synchroon): hooguit één ronde tegelijk."""
+        if not isinstance(bericht, dict) or bericht.get("soort") != "tick":
+            return
+        if self._turbo_bezig or self._afgesloten:
+            return
+        self.turbo_stats["ticks"] += 1
+        self.hass.async_create_task(self._turbo_tick(bericht))
+
+    async def _turbo_tick(self, tick: dict) -> int:
+        """Eén turboronde op een live koers. Geeft het aantal orders."""
+        if self._turbo_bezig or self._cyclus_slot.locked():
+            return 0
+        nu_m = time.monotonic()
+        if nu_m - self._turbo_laatst < TURBO_MIN_INTERVAL_S:
+            return 0
+        bid, ask = tick.get("bied"), tick.get("laat")
+        if not bid or not ask or ask < bid:
+            return 0
+        markt = tick.get("markt")
+        if markt and str(markt).upper() not in ("TRADEABLE", "EDITS_ONLY_TRADEABLE"):
+            return 0
+        ctx = self._turbo_ctx
+        if (ctx is None or ctx.get("saldo_onbekend") or not ctx.get("tradeable")
+                or not self.mode.places_orders or not self._enabled
+                or not self.lifecycle.accepts_new_positions or self.koers_verouderd
+                or self._afwikkeling_mislukt or self.executor.has_pending):
+            return 0
+        budget = self.turbo_orders_pm - self._turbo_recent(nu_m)
+        if budget <= 0:
+            return 0
+        self._turbo_laatst = nu_m
+        self._turbo_bezig = True
+        try:
+            async with self._cyclus_slot:
+                return await self._turbo_ronde(float(bid), float(ask), budget, ctx)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - nooit de handel laten struikelen
+            _LOGGER.debug("Turboronde mislukt", exc_info=True)
+            return 0
+        finally:
+            self._turbo_bezig = False
+
+    async def _turbo_ronde(self, bid: float, ask: float, budget: int, ctx: dict) -> int:
+        now = datetime.now(timezone.utc)
+        quote = VenueQuote(bid=bid, ask=ask, time=now, tradeable=True)
+        self.turbo_stats["rondes"] += 1
+        open_positions = await self._open_positions()
+        geplaatst = 0
+
+        # 1. Scalpreeks: bijkopen op de live koers.
+        if self.reeks.enabled:
+            eigen_per_cyclus = self.reeks.per_cyclus
+            try:
+                for p in list(open_positions):
+                    if budget - geplaatst <= 0:
+                        break
+                    ticket = str(getattr(p, "ticket", None) or getattr(p, "id", ""))
+                    if await self._strategie_van(p) != STRATEGIE_SCALP:
+                        continue
+                    if await self._is_bijkoop(ticket):
+                        continue
+                    self.reeks.per_cyclus = min(eigen_per_cyclus, budget - geplaatst)
+                    n = await self._consider_reeks(p, quote, ticket)
+                    geplaatst += n
+                    self.turbo_stats["bijkopen"] += n
+            finally:
+                self.reeks.per_cyclus = eigen_per_cyclus
+
+        # 2. Nieuwe scalppositie.
+        if budget - geplaatst > 0 and self._candles is not None and len(self._candles) >= 60:
+            if geplaatst:
+                open_positions = await self._open_positions()
+            eigen = [p for p in open_positions
+                     if await self._strategie_van(p) == STRATEGIE_SCALP]
+            pending = list(self.executor.pending.values())
+            laatste = (self._laatste_instap.get(STRATEGIE_SCALP, 0.0)
+                       if self.combinatie else self._last_entry_ts)
+            sig = await self.hass.async_add_executor_job(
+                self._beslisser(now, STRATEGIE_SCALP), self._candles, bid, ask,
+                self.strategy_cfg, now.hour, len(eigen) + len(pending),
+                now.timestamp() - laatste, 0, tel_per_richting(eigen, pending),
+            )
+            if sig is not None and sig.should_trade and await self._turbo_mag_openen(
+                    sig, quote, now, open_positions, eigen, ctx):
+                sig.components = {**(sig.components or {}),
+                                  "strategie": STRATEGIE_SCALP, "turbo": True}
+                oud = self._geopend_in_cyclus
+                self._geopend_in_cyclus = 0
+                try:
+                    if await self._open_position(
+                            sig, quote, now, gelijktijdig_open=len(open_positions)):
+                        geplaatst += 1
+                finally:
+                    self._geopend_in_cyclus = oud
+
+        if geplaatst:
+            nu_m = time.monotonic()
+            self._turbo_orders.extend([nu_m] * geplaatst)
+            self.turbo_stats["orders"] += geplaatst
+            self.turbo_stats["laatste_order"] = now.isoformat(timespec="seconds")
+        return geplaatst
+
+    async def _turbo_mag_openen(self, sig, quote, now, open_positions, eigen, ctx) -> bool:
+        """Dezelfde grendels als in de cyclus: risico, wisselkoers, sluiting,
+        netting, spreiding, marge en vloer."""
+        allowed, _why = self.risk.can_open(
+            now=now, balance=ctx["balance"], equity=ctx["equity"],
+            starting_balance=self.starting_balance,
+            open_positions=len(open_positions) + len(self.executor.pending),
+            volume=self.units / CONTRACT_SIZE, spread=quote.spread,
+            last_tick_age=0.0, market_open=True, atr=self.state.atr.value,
+            opening_equity=self.opening_equity,
+        )
+        if not allowed:
+            return False
+        fx_ok, _ = self.conversion.usable_for_entry(now)
+        if not fx_ok:
+            return False
+        if self._use_schedule and self._close_buffer > 0:
+            resterend = minutes_until_close(SPOT_GOLD, now)
+            if resterend is not None and resterend <= self._close_buffer:
+                return False
+        blok, _reden = await self._toets_extra_positie(
+            sig, quote, now, open_positions, ctx["equity"], eigen=eigen)
+        return not blok
+
     async def _is_bijkoop(self, ticket: str) -> bool:
         """2.2.0: is deze positie zelf een bijkoop? Die piramidet niet verder."""
         if ticket in self._bijkopen:
@@ -5617,6 +5818,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if self._afgesloten:
                 return
             self._afgesloten = True
+            self._turbo_stop()
             try:
                 await self._persist()
             except Exception:  # noqa: BLE001 - afsluiten gaat altijd door

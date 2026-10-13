@@ -223,7 +223,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.4.11"
+INTEGRATION_VERSION: Final = "2.5.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
@@ -282,3 +282,12 @@ DEFAULT_SCALP_REEKS: Final = True
 DEFAULT_SCALP_REEKS_STAP: Final = 0.3
 DEFAULT_SCALP_REEKS_MAX: Final = 100
 DEFAULT_SCALP_REEKS_DOEL: Final = 1.0
+
+# 2.5.0: turbo-scalp - scalp reageert op de live koers (IG-stream) in plaats
+# van alleen op de cyclus van 10 s, met een orderbudget per minuut.
+CONF_SCALP_TURBO: Final = "scalp_turbo"
+CONF_SCALP_TURBO_ORDERS: Final = "scalp_turbo_orders_per_min"
+DEFAULT_SCALP_TURBO: Final = True
+DEFAULT_SCALP_TURBO_ORDERS: Final = 20
+#: Hooguit één turboronde per zoveel seconden (de stream levert vaker).
+TURBO_MIN_INTERVAL_S: Final = 1.0

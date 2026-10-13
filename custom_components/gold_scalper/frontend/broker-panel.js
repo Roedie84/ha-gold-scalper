@@ -998,7 +998,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
       `<div><span>Signaal</span><b>${sig ? `${esc(sig.richting)} · score ${fmt(sig.score)}` : "—"}</b></div>` +
       (st.redenen_per_strategie && Object.keys(st.redenen_per_strategie).length > 1
         ? Object.entries(st.redenen_per_strategie).map(([naam, r]) =>
-            `<div><span>${esc(naam === "daghandel" ? "Daghandel" : naam === "scalp" ? "Scalp" : naam === "veldproef" ? "Veldproef" : naam)}</span><b title="${esc(r || "")}">${esc(r || "—")}</b></div>`).join("")
+            `<div><span>${esc(naam === "daghandel" ? "Daghandel" : naam === "scalp" ? "Scalp" : naam === "veldproef" ? "Veldproef" : naam === "turbo" ? "Turbo-scalp" : naam)}</span><b title="${esc(r || "")}">${esc(r || "—")}</b></div>`).join("")
         : `<div><span>Waarom geen trade</span><b title="${esc(st.reden_geen_trade || "")}">${esc(st.reden_geen_trade || "—")}</b></div>`) +
       `<div><span>Candles</span><b>${d.candles ? d.candles.t.length : 0} × ${esc(d.instrument.timeframe || "")}</b></div>` +
       `</div>`;
