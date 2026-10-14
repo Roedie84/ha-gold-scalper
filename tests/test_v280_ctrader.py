@@ -246,3 +246,64 @@ def test_koppelingen():
     assert "async def async_step_ctrader" in flow and "async_lees_geheimen" in flow
     from gold_scalper.const import TRADING_VENUES, VENUE_CTRADER, VENUES
     assert VENUE_CTRADER in VENUES and VENUE_CTRADER in TRADING_VENUES
+
+
+@pytest.mark.asyncio
+async def test_remming_wordt_overgedaan_en_historie_gespreid(monkeypatch):
+    """2.9.0: "You are being rate limited" opnieuw proberen; historie <= 5/s."""
+    monkeypatch.setattr(ct, "REMMING_WACHT_S", 0.01)
+    monkeypatch.setattr(ct, "HISTORISCH_INTERVAL_S", 0.05)
+    geweigerd = {"n": 0}
+
+    def broker(bericht):
+        if bericht["payloadType"] == ct.TRENDBARS_REQ and geweigerd["n"] < 2:
+            geweigerd["n"] += 1
+            return [{"clientMsgId": bericht.get("clientMsgId"), "payloadType": ct.ERROR_RES,
+                     "payload": {"errorCode": "BLOCKED_PAYLOAD_TYPE",
+                                 "description": "You are being rate limited"}}]
+        return _broker(bericht)
+
+    sessie = NepSessie()
+    sessie.ws = NepWS(broker)
+    v = ct.CTraderVenue(sessie, "id", "geheim", "tok", "ververs", trader_login=4279676)
+    c = await v.candles("XAUUSD", "1m", 3)
+    assert len(c) == 3 and geweigerd["n"] == 2 and v._stats["geremd"] == 2
+    t0 = asyncio.get_running_loop().time()
+    for _ in range(3):
+        await v.candles("XAUUSD", "1m", 3)
+    assert asyncio.get_running_loop().time() - t0 >= 0.1
+    await v.sluit_verbinding()
+
+
+@pytest.mark.asyncio
+async def test_andere_fout_niet_overgedaan():
+    v, ws = _venue()
+    await v.account()
+    with pytest.raises(ct.VenueError):
+        await v._verzoek(9999, {})
+    assert sum(1 for b in ws.verstuurd if b["payloadType"] == 9999) == 1
+    await v.sluit_verbinding()
+
+
+def test_brokerkeuze_in_dashboard():
+    """2.9.0: knop in het dashboard om tussen brokers (entries) te wisselen."""
+    from types import SimpleNamespace
+    from pathlib import Path
+    from gold_scalper.http import broker_keuzes
+
+    def coord(eid, venue, titel, mode):
+        return SimpleNamespace(entry=SimpleNamespace(entry_id=eid, data={"venue": venue},
+                                                     options={}, title=titel),
+                               mode=SimpleNamespace(value=mode), data={"x": 1})
+    hass = SimpleNamespace(data={"gold_scalper": {
+        "a": coord("a", "ig", "CS.D.CFEGOLD.CEA.IP (ig demo)", "demo"),
+        "b": coord("b", "ctrader", "XAUUSD (Pepperstone demo)", "demo")}})
+    k = broker_keuzes(hass)
+    assert [x["naam"] for x in k] == ["IG", "Pepperstone"]
+    assert k[1]["entry"] == "b" and k[1]["modus"] == "demo" and k[1]["klaar"]
+    js = (Path(__file__).resolve().parents[1] / "custom_components" / "gold_scalper"
+          / "frontend" / "broker-panel.js").read_text(encoding="utf-8")
+    assert 'id="brokers"' in js and "_kiesBroker" in js and "entry=${encodeURIComponent(gevraagd)}" in js
+    http = (Path(__file__).resolve().parents[1] / "custom_components" / "gold_scalper"
+            / "http.py").read_text(encoding="utf-8")
+    assert '"brokers": brokers' in http

@@ -1,5 +1,25 @@
 # Changelog — Gold Scalper
 
+## 2.8.1 - 14-10-2026
+
+### cTrader: binnen de verzoeklimieten blijven
+- Eerste opstart van de Pepperstone-integratie faalde: `BLOCKED_PAYLOAD_TYPE: You are being rate limited` bij het opwarmen (validatie in de wizard plus oplopende historie-aanvragen en veldproef-opwarming vlak na elkaar).
+- Verzoeken worden nu gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
+- Bij "rate limited" tot 4 pogingen met oplopende wachttijd (1,5 s, 3 s, ...); orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
+
+## 2.9.0 - 14-10-2026
+
+### Dashboard: broker kiezen
+- **Wens Ruud:** één Gold Scalper-dashboard met een knop om de broker te kiezen; verder alles gelijk, per broker.
+- Knop **IG | Pepperstone** in de kop van het dashboard (verschijnt zodra er meer dan één Gold Scalper-integratie is). Alles daaronder - grafiek, posities, equity, statistiek, trades, schaduwtrades, live koers - komt van de gekozen integratie.
+- De keuze wordt per browser onthouden. Keuringsrapport en klassiek overzicht openen voor dezelfde broker.
+- API: `/api/gold_scalper/broker` geeft `brokers` (entry, naam, modus) mee; `?entry=` kiest de broker (bestond al).
+
+### cTrader: binnen de verzoeklimieten blijven
+- Eerste opstart van de Pepperstone-integratie faalde: `BLOCKED_PAYLOAD_TYPE: You are being rate limited` bij het opwarmen (validatie in de wizard plus oplopende historie-aanvragen vlak na elkaar).
+- Verzoeken worden gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
+- Bij "rate limited" tot 4 pogingen met oplopende wachttijd; orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
+
 ## 2.8.0 - 14-10-2026
 
 ### Pepperstone (cTrader Open API) naast IG

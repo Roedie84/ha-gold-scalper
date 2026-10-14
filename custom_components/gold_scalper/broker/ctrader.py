@@ -74,6 +74,14 @@ REFRESH_TOKEN_REQ, REFRESH_TOKEN_RES = 2173, 2174
 DEALS_BY_POSITION_REQ, DEALS_BY_POSITION_RES = 2179, 2180
 UNREALIZED_PNL_REQ, UNREALIZED_PNL_RES = 2187, 2188
 
+#: Historische verzoeken: cTrader staat er 5 per seconde toe (overige 50/s).
+HISTORISCH = frozenset({TRENDBARS_REQ, DEAL_LIST_REQ, DEALS_BY_POSITION_REQ})
+HISTORISCH_INTERVAL_S = 0.4
+ALGEMEEN_INTERVAL_S = 0.05
+#: Pogingen na "You are being rate limited" (BLOCKED_PAYLOAD_TYPE).
+REMMING_POGINGEN = 4
+REMMING_WACHT_S = 1.5
+
 PRIJS_SCHAAL = 100_000.0
 VOLUME_PER_OZ = 100
 #: Na zoveel seconden zonder koers geldt de markt als dicht.
@@ -236,6 +244,9 @@ class CTraderVenue(ExecutionVenue):
         self._hartslag: asyncio.Task | None = None
         self._lock = asyncio.Lock()
         self._wachtend: dict[str, asyncio.Future] = {}
+        self._tempo_lock = asyncio.Lock()
+        self._laatst_verzoek = 0.0
+        self._laatst_historisch = 0.0
         self._uitvoeringen: asyncio.Queue | None = None
         #: Alleen uitvoeringen bewaren als er op gewacht wordt; anders loopt de
         #: rij vol met stop- en doeltreffers die niemand ophaalt.
@@ -395,8 +406,36 @@ class CTraderVenue(ExecutionVenue):
             except Exception:  # noqa: BLE001
                 return
 
+    async def _tempo(self, soort: int) -> None:
+        """Houd de verzoeken onder de limieten van cTrader."""
+        async with self._tempo_lock:
+            nu = time.monotonic()
+            wacht = self._laatst_verzoek + ALGEMEEN_INTERVAL_S - nu
+            if soort in HISTORISCH:
+                wacht = max(wacht, self._laatst_historisch + HISTORISCH_INTERVAL_S - nu)
+            if wacht > 0:
+                await asyncio.sleep(wacht)
+            self._laatst_verzoek = time.monotonic()
+            if soort in HISTORISCH:
+                self._laatst_historisch = self._laatst_verzoek
+
     async def _verzoek(self, soort: int, payload: dict, verwacht: int | None = None,
                        timeout: float = VERZOEK_TIMEOUT_S) -> dict:
+        for poging in range(REMMING_POGINGEN):
+            try:
+                return await self._verzoek_eenmaal(soort, payload, verwacht, timeout)
+            except VenueError as err:
+                tekst = str(err)
+                if ("BLOCKED_PAYLOAD_TYPE" not in tekst and "rate limit" not in tekst.lower()) \
+                        or poging == REMMING_POGINGEN - 1:
+                    raise
+                self._stats["geremd"] = self._stats.get("geremd", 0) + 1
+                await asyncio.sleep(REMMING_WACHT_S * (poging + 1))
+        raise VenueError("cTrader: verzoek mislukt")  # pragma: no cover
+
+    async def _verzoek_eenmaal(self, soort: int, payload: dict, verwacht: int | None,
+                               timeout: float) -> dict:
+        await self._tempo(soort)
         if self._ws is None or self._ws.closed:
             raise VenueError("Geen verbinding met cTrader.")
         mid = f"gs{next(self._ids)}"

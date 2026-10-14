@@ -20,6 +20,9 @@ const HERABONNEER_MS = 30000;
 const LIVE_MAX_LEEFTIJD_MS = 60000;
 const REPORT_URL = "/api/gold_scalper/report";
 const OVERVIEW_URL = "/api/gold_scalper/overview";
+const BROKER_OPSLAG = "gold-scalper-broker-entry";   // 2.9.0: gekozen broker (per browser)
+const leesKeuze = () => { try { return localStorage.getItem(BROKER_OPSLAG) || null; } catch (_e) { return null; } };
+const bewaarKeuze = (v) => { try { localStorage.setItem(BROKER_OPSLAG, v); } catch (_e) { /* geen opslag */ } };
 
 const KLEUR = {
   tekst: "#eef3f6", tekst2: "#a9b8c3", tekst3: "#6f8394",
@@ -198,6 +201,8 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 .wissel button { font: inherit; font-size: 12px; font-weight: 700; color: var(--tekst2); background: none; border: 0; padding: 5px 11px; border-radius: 999px; cursor: pointer; }
 .wissel button[aria-pressed="true"] { background: linear-gradient(135deg, #ffe08a, var(--goud2)); color: #1a1204; }
 .wissel button:focus-visible { outline: 2px solid var(--goud); outline-offset: 1px; }
+.brokerkeuze { flex: 0 0 auto; align-self: center; }
+.brokerkeuze small { font-weight: 500; opacity: .7; margin-left: 3px; }
 .canvasvak { position: relative; margin: 0 12px; height: 470px; flex: 1 1 auto; min-height: 470px; border-radius: 12px; overflow: hidden; background: rgba(4, 10, 15, .55); border: 1px solid var(--rand); touch-action: pan-y; }
 .canvasvak canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
 .glegenda { display: flex; gap: 14px; flex-wrap: wrap; padding: 9px 16px 0; font-size: 11.5px; color: var(--tekst2); }
@@ -447,6 +452,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._data = null;
     this._key = null;
     this._fout = null;
+    this._entry = leesKeuze();   // gekozen Gold Scalper-entry (broker)
+    this._brokers = [];
     this._tfS = null;            // gekozen candletijd in seconden (null = basis)
     this._zoom = 8;          // pixels per bar
     this._offset = 0;        // bars vanaf rechts
@@ -520,7 +527,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
     const gen = ++this._subGen;
     try {
       const msg = { type: STREAM_TYPE };
-      if (this._data && this._data.entry) msg.entry = this._data.entry;
+      const entry = this._entry || (this._data && this._data.entry);
+      if (entry) msg.entry = entry;
       const unsub = await conn.subscribeMessage((m) => this._opStroom(m), msg);
       if (gen !== this._subGen || !this._actief) { try { unsub(); } catch (_e) { /* al weg */ } return; }
       this._unsub = unsub;
@@ -645,9 +653,18 @@ class GoldScalperBrokerPanel extends HTMLElement {
     if (this._bezig || !this._hass) return;
     this._bezig = true;
     try {
-      const q = this._key ? `?since=${encodeURIComponent(this._key)}` : "";
-      const d = await this._hass.callApi("GET", DATA_PATH + q);
+      const gevraagd = this._entry;
+      const p = [];
+      if (gevraagd) p.push(`entry=${encodeURIComponent(gevraagd)}`);
+      if (this._key) p.push(`since=${encodeURIComponent(this._key)}`);
+      const d = await this._hass.callApi("GET", DATA_PATH + (p.length ? `?${p.join("&")}` : ""));
+      if (gevraagd !== this._entry) return;   // intussen andere broker gekozen
       this._fout = null;
+      if (d && Array.isArray(d.brokers)) this._renderBrokers(d.brokers, d.entry);
+      if (d && d.entry && gevraagd && d.entry !== gevraagd) {
+        // De gekozen entry bestaat niet (meer): volg wat de server koos.
+        this._entry = d.entry;
+      }
       if (d && d.ongewijzigd) { this._laatst = Date.now(); this._tik(); return; }
       if (!d || d.api !== EXPECTED_API) { this._fout = "Onverwacht antwoord van de integratie; ververs de browser na de update."; this._render(); return; }
       this._data = d; this._key = d.sleutel; this._laatst = Date.now();
@@ -663,6 +680,36 @@ class GoldScalperBrokerPanel extends HTMLElement {
 
   _q(sel) { return this._root.querySelector(sel); }
 
+  // ------------------------------------------------ brokerkeuze (2.9.0) -- //
+  _renderBrokers(lijst, actief) {
+    this._brokers = lijst;
+    const el = this._q("#brokers");
+    if (!el) return;
+    const huidig = this._entry || actief;
+    el.hidden = lijst.length < 2;
+    const html = lijst.map((b) => {
+      const modus = b.modus && b.modus !== "live" ? ` <small>${esc(b.modus)}</small>` : "";
+      return `<button type="button" data-entry="${esc(b.entry)}" aria-pressed="${b.entry === huidig}" title="${esc(b.titel || b.naam)}">${esc(b.naam)}${modus}</button>`;
+    }).join("");
+    if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+  }
+  _kiesBroker(entry) {
+    if (!entry || entry === this._entry && this._data && this._data.entry === entry) return;
+    this._entry = entry;
+    bewaarKeuze(entry);
+    this._data = null; this._key = null; this._offset = 0;
+    const bk = this._brokers.find((b) => b.entry === entry);
+    this._fout = `Gegevens van ${bk ? bk.naam : "de broker"} laden…`;
+    this._afmelden();
+    clearTimeout(this._herTimer); this._herTimer = null;
+    this._streamNiet = false;
+    this._renderBrokers(this._brokers, entry);
+    this._zetLive("uit", null);
+    this._render();
+    this._bezig = false;
+    this._laad().then(() => this._abonneer());
+  }
+
   _bouw() {
     this._root.innerHTML = `<style>${STIJL}</style>
 <div class="root"><div class="wrap">
@@ -670,6 +717,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     <span class="menu-plek"></span>
     <div class="merk"><div class="logo">${MERK_SVG}</div>
       <div><div class="merknaam">GOLD <b>SCALPER</b></div><div class="merksub" id="merksub">Broker-terminal</div></div></div>
+    <div class="wissel brokerkeuze" id="brokers" role="group" aria-label="Broker" hidden></div>
     <div class="kop-mid" id="chips"></div>
     <div class="kop-r"><span id="livestatus"></span><div class="quote" id="quote"></div>
       <div class="klok"><div class="tijd" id="tijd">--:--</div><div class="datum" id="datum">&nbsp;</div></div></div>
@@ -706,6 +754,10 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._vak = this._q("#vak");
     this._cv = this._q("#cv");
     this._koppelGrafiek();
+    this._q("#brokers").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b && b.dataset.entry) this._kiesBroker(b.dataset.entry);
+    });
     this._q("#tf").addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -779,7 +831,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
 
   _renderKop(d) {
     const st = d.status, ins = d.instrument;
-    this._q("#merksub").textContent = `Broker-terminal · ${ins.symbool}`;
+    const bk = (this._brokers || []).find((b) => b.entry === d.entry);
+    this._q("#merksub").textContent = `${bk ? bk.naam : "Broker-terminal"} · ${ins.symbool}`;
     const geld = st.geld === "echt" ? '<span class="chip echt">ECHT GELD</span>'
       : st.geld === "demo" ? '<span class="chip demo">DEMO</span>'
       : '<span class="chip papier">PAPIER</span>';
@@ -1204,7 +1257,7 @@ ${tl}
     const geld = d.status.geld === "echt" ? '<span class="neg">Live — echt geld</span>'
       : d.status.geld === "demo" ? '<span class="demo">Demo — geen echt geld</span>' : '<span class="demo">Papierhandel — geen echt geld</span>';
     this._q("#voet").innerHTML = `<span>Gold Scalper v${esc(d.versie)} · bronnen: broker (koers, posities, saldo; koers live via IG-streaming als dat beschikbaar is), eigen database (trades, equity) · alleen weergave</span>` +
-      `<span>${geld} · <a href="${REPORT_URL}" target="_blank" rel="noopener">Keuringsrapport</a> · <a href="${OVERVIEW_URL}" target="_blank" rel="noopener">Klassiek overzicht</a></span>`;
+      `<span>${geld} · <a href="${REPORT_URL}?entry=${encodeURIComponent(d.entry || "")}" target="_blank" rel="noopener">Keuringsrapport</a> · <a href="${OVERVIEW_URL}?entry=${encodeURIComponent(d.entry || "")}" target="_blank" rel="noopener">Klassiek overzicht</a></span>`;
   }
 
   // ---------------------------------------------------------- grafiek -- //

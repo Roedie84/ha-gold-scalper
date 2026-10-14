@@ -223,7 +223,10 @@ def test_route_payload_shape_and_cache(tmp_path):
     # Zelfde cyclus: niet opnieuw bouwen, en met since een klein antwoord.
     jobs = hass.jobs
     status, klein = _get(view, since=body["sleutel"])
-    assert klein == {"api": 1, "sleutel": body["sleutel"], "ongewijzigd": True}
+    # 2.9.0: ook de gekozen entry en de brokerkeuzes.
+    assert {k: v for k, v in klein.items() if k not in ("entry", "brokers")} == {
+        "api": 1, "sleutel": body["sleutel"], "ongewijzigd": True}
+    assert klein["entry"] == body["entry"] and isinstance(klein["brokers"], list)
     assert hass.jobs == jobs
     # Nieuwe cyclus: nieuwe sleutel.
     hass.data[DOMAIN]["e1"].data = _data()

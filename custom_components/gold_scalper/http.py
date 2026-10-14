@@ -144,6 +144,32 @@ class GoldScalperOverviewView(HomeAssistantView):
         )
 
 
+#: Naam van de broker in de keuzeknop van het dashboard (2.9.0).
+BROKER_NAMEN = {"ig": "IG", "ctrader": "Pepperstone", "paper": "Papier"}
+
+
+def broker_keuzes(hass: HomeAssistant) -> list[dict]:
+    """Alle Gold Scalper-entries als keuzes voor het dashboard."""
+    keuzes = []
+    for c in hass.data.get(DOMAIN, {}).values():
+        entry = getattr(c, "entry", None)
+        if entry is None:
+            continue
+        venue = (getattr(entry, "data", None) or {}).get("venue") \
+            or getattr(getattr(c, "venue", None), "name", "")
+        mode = getattr(getattr(c, "mode", None), "value", None) \
+            or (getattr(entry, "options", None) or {}).get("mode")
+        keuzes.append({
+            "entry": entry.entry_id,
+            "naam": BROKER_NAMEN.get(venue, str(venue or getattr(entry, "title", "") or "?")),
+            "venue": venue,
+            "modus": mode,
+            "titel": getattr(entry, "title", None),
+            "klaar": bool(getattr(c, "data", None)),
+        })
+    return keuzes
+
+
 def _pick_coordinator(hass: HomeAssistant, wanted: str | None):
     coordinators = list(hass.data.get(DOMAIN, {}).values())
     if not coordinators:
@@ -288,12 +314,14 @@ class GoldScalperBrokerView(HomeAssistantView):
             self._cache[entry_id] = cache
 
         payload = cache["payload"]
+        brokers = broker_keuzes(self._hass)
         if request.query.get("since") == payload["sleutel"]:
             return web.json_response(
-                {"api": payload["api"], "sleutel": payload["sleutel"], "ongewijzigd": True},
+                {"api": payload["api"], "sleutel": payload["sleutel"], "ongewijzigd": True,
+                 "entry": entry_id, "brokers": brokers},
                 headers=_GEEN_CACHE,
             )
-        return web.json_response(payload, headers=_GEEN_CACHE)
+        return web.json_response({**payload, "brokers": brokers}, headers=_GEEN_CACHE)
 
     async def _bouw(self, coordinator) -> dict:
         from homeassistant.util import dt as dt_util
