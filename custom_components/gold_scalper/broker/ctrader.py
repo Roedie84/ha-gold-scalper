@@ -26,6 +26,7 @@ import logging
 import math
 import time
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Callable
 
 import aiohttp
@@ -501,11 +502,81 @@ class CTraderVenue(ExecutionVenue):
             except asyncio.TimeoutError as err:
                 raise VenueError("Nog geen koers van cTrader (markt gesloten?)") from err
         leeftijd = time.time() - self._koers_t
+        # 2.9.5: het handelsrooster van de broker zelf telt. Alleen de
+        # leeftijd van de koers volstond niet: na het begin van de dagpauze
+        # (22:59) bleef de markt 5 min "open" -> NOODSTOP "geen tickdata", en
+        # na een herverbinding gaf de momentopname een verse tijd.
+        rooster = self.markt_open()
         return VenueQuote(
             bid=self._bid, ask=self._ask,
             time=datetime.fromtimestamp(self._koers_t, tz=timezone.utc),
-            tradeable=leeftijd < KOERS_OUD_S,
+            tradeable=leeftijd < KOERS_OUD_S and rooster is not False,
         )
+
+    # -- handelsrooster (2.9.5) ------------------------------------------- #
+    def _rooster(self):
+        """(tijdzone, [(start, eind), ...]) in seconden vanaf zondag 00:00."""
+        s = self.symbool or {}
+        blokken = [(int(b.get("startSecond") or 0), int(b.get("endSecond") or 0))
+                   for b in s.get("schedule") or [] if b.get("endSecond")]
+        if not blokken:
+            return None
+        try:
+            tz = ZoneInfo(s.get("scheduleTimeZone") or "UTC")
+        except Exception:  # noqa: BLE001
+            tz = timezone.utc
+        return tz, blokken
+
+    @staticmethod
+    def _week_seconde(moment: datetime, tz) -> int:
+        lokaal = moment.astimezone(tz)
+        zondag0 = (lokaal.weekday() + 1) % 7
+        return zondag0 * 86400 + lokaal.hour * 3600 + lokaal.minute * 60 + lokaal.second
+
+    def _feestdag(self, moment: datetime) -> bool:
+        for h in (self.symbool or {}).get("holiday") or []:
+            try:
+                tz = ZoneInfo(h.get("scheduleTimeZone") or "UTC")
+                lokaal = moment.astimezone(tz)
+                dag = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(
+                    days=int(h.get("holidayDate") or 0))
+                zelfde = ((lokaal.month, lokaal.day) == (dag.month, dag.day)
+                          if h.get("isRecurring") else lokaal.date() == dag.date())
+                if not zelfde:
+                    continue
+                sec = lokaal.hour * 3600 + lokaal.minute * 60 + lokaal.second
+                start = int(h.get("startSecond") or 0)
+                eind = int(h.get("endSecond") or 86400)
+                if start <= sec < eind:
+                    return True
+            except Exception:  # noqa: BLE001 - onleesbare feestdag negeren
+                continue
+        return False
+
+    def markt_open(self, moment: datetime | None = None) -> bool | None:
+        """Volgens het rooster van de broker; None als dat onbekend is."""
+        r = self._rooster()
+        if r is None:
+            return None
+        moment = moment or datetime.now(timezone.utc)
+        tz, blokken = r
+        sec = self._week_seconde(moment, tz)
+        if not any(a <= sec < b for a, b in blokken):
+            return False
+        return not self._feestdag(moment)
+
+    def minuten_tot_sluiting(self, moment: datetime | None = None) -> float | None:
+        """Minuten tot het einde van het lopende handelsblok; None als dicht/onbekend."""
+        r = self._rooster()
+        if r is None:
+            return None
+        moment = moment or datetime.now(timezone.utc)
+        tz, blokken = r
+        sec = self._week_seconde(moment, tz)
+        for a, b in blokken:
+            if a <= sec < b:
+                return (b - sec) / 60.0
+        return None
 
     async def candles(self, symbol: str, timeframe: str, count: int) -> Candles:
         await self._klaar()

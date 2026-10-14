@@ -414,3 +414,41 @@ def test_recente_trades_ook_uit_vorige_run(tmp_path):
     rijen = _trade_rows(d["gesloten"])
     assert {r["run"] for r in rijen} == {3, 4}
     assert [r["eerdere_run"] for r in rijen if r["run"] == 3] == [True]
+
+
+ROOSTER = {"scheduleTimeZone": "America/New_York", "schedule": [
+    {"startSecond": 64860, "endSecond": 147540}, {"startSecond": 151260, "endSecond": 233940},
+    {"startSecond": 237660, "endSecond": 320340}, {"startSecond": 324060, "endSecond": 406740},
+    {"startSecond": 410460, "endSecond": 492900}]}
+
+
+def test_rooster_pepperstone():
+    """2.9.5: dagpauze 16:59-18:01 New York = 22:59-00:01 Amsterdam (zomertijd)."""
+    v, _ = _venue()
+    v.symbool = dict(ROOSTER)
+    wo = datetime(2026, 10, 14, tzinfo=timezone.utc)          # woensdag
+    assert v.markt_open(wo.replace(hour=20, minute=58)) is True
+    assert v.markt_open(wo.replace(hour=20, minute=59, second=30)) is False
+    assert v.markt_open(wo.replace(hour=22, minute=0, second=30)) is False
+    assert v.markt_open(wo.replace(hour=22, minute=1, second=30)) is True
+    assert v.minuten_tot_sluiting(wo.replace(hour=20, minute=49)) == pytest.approx(10.0)
+    za = datetime(2026, 10, 17, 12, tzinfo=timezone.utc)
+    assert v.markt_open(za) is False
+    v.symbool = {}
+    assert v.markt_open(wo) is None and v.minuten_tot_sluiting(wo) is None
+    # Feestdag (eigen tijdzone, dagen sinds 1970).
+    v.symbool = {**ROOSTER, "holiday": [{"scheduleTimeZone": "UTC", "holidayDate": 20740,
+                                          "isRecurring": False, "startSecond": 0,
+                                          "endSecond": 86399}]}
+    assert v.markt_open(datetime(2026, 10, 14, 12, tzinfo=timezone.utc)) is False
+
+
+@pytest.mark.asyncio
+async def test_koers_volgt_rooster():
+    v, _ = _venue()
+    await v.account()
+    v.symbool = {"scheduleTimeZone": "UTC", "schedule": []}
+    assert (await v.quote("XAUUSD")).tradeable                  # geen rooster: leeftijd
+    v.symbool = {"scheduleTimeZone": "UTC", "schedule": [{"startSecond": 0, "endSecond": 1}]}
+    assert not (await v.quote("XAUUSD")).tradeable              # buiten rooster: dicht
+    await v.sluit_verbinding()

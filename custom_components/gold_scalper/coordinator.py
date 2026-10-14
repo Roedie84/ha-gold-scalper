@@ -2583,7 +2583,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # staat: dit is de enige bron die niet op een aanname rust.
         self.closures.record(now, quote.tradeable)
 
-        if self._use_schedule:
+        # 2.9.5: een venue met een eigen rooster (cTrader) heeft dat al in
+        # quote.tradeable verwerkt; het IG-rooster ernaast gaf alleen ruis
+        # (Pepperstone pauzeert 22:59-00:01, IG 23:00-24:00).
+        if self._use_schedule and self._venue_rooster(now) is None:
             tradeable, note = cross_check(quote.tradeable, SPOT_GOLD, now)
             if note:
                 self.schedule_note = note
@@ -2810,7 +2813,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     # de sluiting overvallen: je zit dan tot de volgende sessie
                     # vast, en die opent met een gat waar geen stop tussen zit.
                     if allowed and self._use_schedule and self._close_buffer > 0:
-                        resterend = minutes_until_close(SPOT_GOLD, now)
+                        resterend = self._minuten_tot_sluiting(now)
                         if resterend is not None and resterend <= self._close_buffer:
                             allowed = False
                             schaduw_reden = None
@@ -5755,6 +5758,28 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     # -- 2.5.0: turbo-scalp ------------------------------------------------- #
 
+    def _venue_rooster(self, now: datetime):
+        """2.9.5: open/dicht volgens het rooster van de venue; None = onbekend."""
+        f = getattr(self.venue, "markt_open", None)
+        if not callable(f):
+            return None
+        try:
+            uit = f(now)
+        except Exception:  # noqa: BLE001
+            return None
+        return uit if isinstance(uit, bool) else None
+
+    def _minuten_tot_sluiting(self, now: datetime) -> float | None:
+        """2.9.5: eerst het rooster van de venue, anders het eigen (IG) rooster."""
+        if self._venue_rooster(now) is not None:
+            f = getattr(self.venue, "minuten_tot_sluiting", None)
+            try:
+                uit = f(now) if callable(f) else None
+            except Exception:  # noqa: BLE001
+                uit = None
+            return uit if isinstance(uit, (int, float)) else None
+        return minutes_until_close(SPOT_GOLD, now)
+
     def _commissie(self, units: float | None) -> float:
         """2.9.3: commissie rondreis (open + dicht) in USD voor ``units`` oz."""
         per_lot = _commissie_venue(self.venue)
@@ -5947,7 +5972,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if not fx_ok:
             return False
         if self._use_schedule and self._close_buffer > 0:
-            resterend = minutes_until_close(SPOT_GOLD, now)
+            resterend = self._minuten_tot_sluiting(now)
             if resterend is not None and resterend <= self._close_buffer:
                 return False
         blok, _reden = await self._toets_extra_positie(

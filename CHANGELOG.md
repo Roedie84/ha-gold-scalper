@@ -7,6 +7,14 @@
 - Verzoeken worden nu gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
 - Bij "rate limited" tot 4 pogingen met oplopende wachttijd (1,5 s, 3 s, ...); orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
 
+## 2.9.5 - 14-10-2026
+
+### Pepperstone: handelsrooster van de broker
+- Melding Ruud: markt lijkt eerder te sluiten bij Pepperstone. Klopt: XAUUSD bij Pepperstone pauzeert 16:59-18:01 New York = 22:59-00:01 Amsterdam (IG: 23:00-24:00); vrijdag dicht om 16:55 NY. Gelezen uit het symbool (`schedule`, `scheduleTimeZone` America/New_York, `holiday`).
+- Gevolg tot nu toe: om 22:59 bleef de markt voor Gold Scalper nog 5 min "open" (alleen koersleeftijd) -> NOODSTOP "geen tickdata gedurende 31s tijdens handelsuren"; na een herverbinding in de pauze gaf de momentopname een verse koerstijd.
+- Nu: `CTraderVenue.markt_open()` / `minuten_tot_sluiting()` uit het rooster (incl. feestdagen); `quote.tradeable` = rooster open én koers < 5 min oud. Het IG-rooster wordt voor zo'n venue niet meer ernaast gelegd; de "geen nieuwe posities vlak voor sluiting"-regel gebruikt het rooster van de venue.
+- Volgstop nagekeken: werkt. Stops bij de broker staan op de door het exitbeheer gezette niveaus (bv. 4101,30 = break-even + marge); de volgstop begint pas bij 1,5R. Tijdens de dagpauze wordt niets verschoven (markt dicht).
+
 ## 2.9.4 - 14-10-2026
 
 ### Dashboard: recente trades bleven staan
