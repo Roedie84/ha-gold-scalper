@@ -1,5 +1,47 @@
 # Changelog — Gold Scalper
 
+## 2.7.0 — verbeterplan fase P0-P6 (meetketen, risico, onderzoek)
+
+Opdracht Ruud 14-10 ("Gold Scalper verbeterplan"). Geen strategie- of
+parameterwijziging; de live-poort is alleen strenger geworden.
+
+* **P0 afstemming over alle pagina's.** Het IG-transactieoverzicht werd met
+  één pagina van 500 opgehaald. Gevolg: van de 2.014 gesloten trades van de
+  laatste 7 dagen was 55 % (1.117) nooit met de broker afgestemd (13-10 alleen
+  al 1.576 trades). Waar wel afgestemd, klopte het (897 trades, gemiddeld
+  0,002 EUR verschil). Nu alle pagina's (max 20 x 500), en staat er een oudere
+  trade nog niet afgestemd, dan kijkt de afstemming tot daar terug (max 10
+  dagen).
+* **P0 instapprijs** van open posities wordt naast de broker gelegd
+  (`instap_verschilt`).
+* **Live-poort strenger:** nieuwe eis `boekhouding_klopt_met_broker` - geen
+  afwijkingen bij gesloten trades en geen kritieke bevinding bij open posities.
+  Nog niet afgestemd = dicht. Demo verandert niet.
+* **P2 risicolimieten over alle posities samen** (`strategy/posities.py`):
+  totaal open risico <= max(0,5 %, 5 x risico per trade) en per richting
+  <= max(0,3 %, 3 x risico per trade) van het startsaldo, notional per richting
+  <= 10 x startsaldo (hefboomgrens), en hooguit 3 nieuwe posities per richting in 5
+  minuten over alle strategieën (één marktbeweging = één cluster). Een stop op
+  break-even of in de winst telt niet als risico.
+* **P3 execution ledger** (tabel `uitvoering`, `broker/uitvoering.py`): per
+  order signaalmoment en bid/ask, ouderdom van koers en candle bij het besluit,
+  verzendmoment en verzendkoers (live tick als die <= 5 s oud is), gevraagde
+  prijs, fill, bevestigingsmoment, latency signaal->order, order->fill en
+  broker-rondreis, spread bij signaal en verzending, slippage, stop, doel,
+  ticket. Per veld de herkomst: gemeten / broker / berekend / geschat /
+  ontbreekt. Alleen meten: geen grens op ouderdom of latency.
+* **P4-P6 onderzoek op echte trades** (`learning/onderzoek.py`): netto
+  expectancy per trade en per cluster (per richting, gat 10 min, over alle
+  strategieën), t over clusters, bruto, kosten en kosten als % van bruto,
+  profit factor, payoff, gemiddelde winst/verlies, drawdown, % afgestemd;
+  segmenten (richting, sessie, volatiliteit, spread, regime, strategie) als
+  meting, niet als filter; eerlijk oordeel ("te weinig data", "geen aantoonbare
+  edge", "aantoonbare edge", "aantoonbaar verliesgevend"). Twee vooraf
+  geregistreerde hypotheses (H-GS-001 veldproef 15m/30m, H-GS-002 5m) met
+  gescheiden discovery (tot 14-10 04:32 UTC) en confirmation (daarna) en een
+  vaste rejection rule. Samenvatting als attribuut `onderzoek` van de sensor
+  Oordeel, volledig in de diagnostiek.
+
 ## 2.6.3
 
 * **Veldproef-uitstap in R in plaats van vaste USD** (Ruud 14-10: "gold scalper

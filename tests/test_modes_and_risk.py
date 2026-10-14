@@ -41,7 +41,8 @@ GOOD_ROBUSTNESS = {"verdict": "houdbaar", "explanation": "consistent over de tij
 
 def test_gate_opens_when_everything_passes():
     r = LiveGate().evaluate(
-        good_stats(), good_run(), good_daily(), GOOD_ROBUSTNESS
+        good_stats(), good_run(), good_daily(), GOOD_ROBUSTNESS,
+        {"afwijkingen": 0, "kritiek_open": 0},  # 2.7.0: boekhouding klopt
     )
     assert r.unlocked, r.reasons
 

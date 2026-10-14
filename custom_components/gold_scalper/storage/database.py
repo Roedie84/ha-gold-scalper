@@ -282,7 +282,54 @@ CREATE TABLE IF NOT EXISTS tijdstop_varianten (
 );
 CREATE INDEX IF NOT EXISTS idx_varianten_run ON tijdstop_varianten(run_id, status);
 CREATE INDEX IF NOT EXISTS idx_varianten_ref ON tijdstop_varianten(trade_ref);
+-- 2.7.0: execution ledger - per order wat er werkelijk gebeurde. `herkomst`
+-- (JSON) zegt per veld: gemeten / broker / berekend / geschat / ontbreekt.
+CREATE TABLE IF NOT EXISTS uitvoering (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id                 INTEGER,
+    strategie              TEXT,
+    broker_ticket          TEXT,
+    client_ref             TEXT,
+    richting               INTEGER,
+    units_gevraagd         REAL,
+    units_gevuld           REAL,
+    signaal_ts             TEXT,
+    signaal_bid            REAL,
+    signaal_ask            REAL,
+    koers_leeftijd_s       REAL,
+    candle_leeftijd_s      REAL,
+    verzend_ts             TEXT,
+    verzend_bid            REAL,
+    verzend_ask            REAL,
+    gevraagde_prijs        REAL,
+    fill_prijs             REAL,
+    bevestiging_ts         TEXT,
+    latentie_signaal_order_ms REAL,
+    latentie_order_fill_ms REAL,
+    latentie_broker_ms     REAL,
+    spread_signaal         REAL,
+    spread_verzending      REAL,
+    slippage_usd           REAL,
+    stop_loss              REAL,
+    take_profit            REAL,
+    resultaat              TEXT,
+    fout                   TEXT,
+    herkomst               TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_uitvoering_ticket ON uitvoering(broker_ticket);
+CREATE INDEX IF NOT EXISTS idx_uitvoering_run ON uitvoering(run_id);
 """
+
+#: 2.7.0: kolommen van de execution ledger (zonder id).
+UITVOERING_KOLOMMEN = (
+    "run_id", "strategie", "broker_ticket", "client_ref", "richting",
+    "units_gevraagd", "units_gevuld", "signaal_ts", "signaal_bid", "signaal_ask",
+    "koers_leeftijd_s", "candle_leeftijd_s", "verzend_ts", "verzend_bid",
+    "verzend_ask", "gevraagde_prijs", "fill_prijs", "bevestiging_ts",
+    "latentie_signaal_order_ms", "latentie_order_fill_ms", "latentie_broker_ms",
+    "spread_signaal", "spread_verzending", "slippage_usd", "stop_loss",
+    "take_profit", "resultaat", "fout", "herkomst",
+)
 
 
 def _now() -> str:
@@ -953,6 +1000,33 @@ class TradeDatabase:
             uit.setdefault(rij[0], []).append(float(rij[1]))
         return uit
 
+    def gesloten_als_dict(self, mode: str, sinds_iso: str) -> list[dict]:
+        """2.7.0: gesloten trades als dict, voor het onderzoeksrapport."""
+        kolommen = {r[1] for r in self.conn.execute("PRAGMA table_info(trades)").fetchall()}
+        gewenst = [k for k in (
+            "id", "run_id", "strategie", "side", "volume", "open_time", "close_time",
+            "open_price", "close_price", "open_spread", "gross_pnl", "total_cost",
+            "net_pnl", "net_pnl_account", "fx_rate", "broker_ticket", "regime",
+            "entry_atr", "reconciliation_status", "close_reason", "cost_source",
+        ) if k in kolommen]
+        rijen = self.conn.execute(
+            f"SELECT {', '.join(gewenst)} FROM trades WHERE close_time IS NOT NULL "
+            "AND net_pnl IS NOT NULL AND mode=? AND open_time >= ? ORDER BY open_time",
+            (mode, sinds_iso),
+        ).fetchall()
+        return [dict(zip(gewenst, rij)) for rij in rijen]
+
+    def oudste_niet_afgestemd(self, mode: str, niet_voor_iso: str) -> str | None:
+        """2.7.0: open_time van de oudste gesloten brokertrade zonder afstemming."""
+        rij = self.conn.execute(
+            "SELECT MIN(open_time) FROM trades WHERE close_time IS NOT NULL AND mode=? "
+            "AND broker_ticket IS NOT NULL AND broker_ticket NOT LIKE '%-deel' "
+            "AND (reconciliation_status IS NULL OR reconciliation_status='pending') "
+            "AND open_time >= ?",
+            (mode, niet_voor_iso),
+        ).fetchone()
+        return rij[0] if rij and rij[0] else None
+
     def closed_trades_since(self, sinds_iso: str, mode: str | None = None) -> list[Trade]:
         """2.4.3: gesloten trades sinds een moment, over alle runs. Voor de
         afstemming met de broker: een nieuwe run mag de laatste dagen van de
@@ -970,6 +1044,32 @@ class TradeDatabase:
     def _row_to_trade(row: sqlite3.Row) -> Trade:
         fields = {f for f in Trade.__dataclass_fields__}
         return Trade(**{k: row[k] for k in row.keys() if k in fields})
+
+    # -- 2.7.0: execution ledger ---------------------------------------------- #
+
+    def log_uitvoering(self, rij: dict) -> None:
+        """Eén order in de execution ledger. Onbekende sleutels vallen weg."""
+        waarden = []
+        for k in UITVOERING_KOLOMMEN:
+            v = rij.get(k)
+            if k == "herkomst" and isinstance(v, dict):
+                v = json.dumps(v, sort_keys=True)
+            waarden.append(v)
+        self.conn.execute(
+            f"INSERT INTO uitvoering ({', '.join(UITVOERING_KOLOMMEN)}) "
+            f"VALUES ({', '.join('?' for _ in UITVOERING_KOLOMMEN)})",
+            waarden,
+        )
+        self.conn.commit()
+
+    def uitvoeringen(self, run_id: int | None = None, limiet: int = 500) -> list[dict]:
+        q = "SELECT * FROM uitvoering"
+        p: tuple = ()
+        if run_id is not None:
+            q += " WHERE run_id=?"
+            p = (run_id,)
+        q += " ORDER BY id DESC LIMIT ?"
+        return [dict(r) for r in self.conn.execute(q, p + (limiet,)).fetchall()]
 
     # -- signals ------------------------------------------------------------ #
 

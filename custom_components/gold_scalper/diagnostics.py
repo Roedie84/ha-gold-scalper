@@ -72,6 +72,15 @@ async def async_get_config_entry_diagnostics(
         },
         "performance": stats,
         "daily": daily[-30:],
+        # 2.7.0: volledig onderzoeksrapport en de laatste orders uit de
+        # execution ledger.
+        "onderzoek": getattr(coordinator, "onderzoek", None),
+        "risico_info": getattr(coordinator, "risico_info", None),
+        "uitvoering": (
+            await hass.async_add_executor_job(
+                coordinator.db.uitvoeringen, coordinator.run_id, 50)
+            if coordinator.db is not None and hasattr(coordinator.db, "uitvoeringen") else []
+        ),
 
         # De leerlaag en de periodecijfers zaten wel in de sensorgegevens maar
         # niet in deze export, omdat dit antwoord met de hand wordt opgebouwd.

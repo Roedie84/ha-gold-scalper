@@ -117,6 +117,7 @@ class LiveGate:
     def evaluate(
         self, stats: dict, run: dict, daily: list[dict],
         robustness: dict | None = None,
+        boekhouding: dict | None = None,
     ) -> GateResult:
         checks: dict[str, bool] = {}
         reasons: list[str] = []
@@ -219,6 +220,23 @@ class LiveGate:
                 reasons.append(
                     f"consistentietoets: {verdict}. "
                     + toelichting.split("\n")[0]
+                )
+
+        # 2.7.0 (verbeterplan Ruud 14-10): live kan alleen als de boekhouding
+        # aantoonbaar klopt met de broker. Onbekend telt als niet in orde.
+        b = boekhouding or {}
+        afwijkingen = b.get("afwijkingen")
+        kritiek = b.get("kritiek_open")
+        checks["boekhouding_klopt_met_broker"] = (
+            boekhouding is not None and afwijkingen == 0 and kritiek == 0
+        )
+        if not checks["boekhouding_klopt_met_broker"]:
+            if boekhouding is None:
+                reasons.append("afstemming met de broker nog niet uitgevoerd")
+            else:
+                reasons.append(
+                    f"boekhouding wijkt af van de broker ({afwijkingen or 0} afwijking(en) "
+                    f"bij gesloten trades, {kritiek or 0} kritiek bij open posities)"
                 )
 
         unlocked = all(checks.values())

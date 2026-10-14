@@ -186,7 +186,8 @@ def test_gate_allows_run_with_real_costs():
     run = {"started_at": "2026-01-01T00:00:00+00:00",
            "config_json": json.dumps({"venue": "oanda", "simulated": False})}
     daily = [{"date": f"2026-06-{i+1:02d}", "trades": 30, "net_pnl": 50.0} for i in range(20)]
-    assert LiveGate().evaluate(stats, run, daily, {"verdict": "houdbaar", "explanation": "consistent"}).unlocked
+    assert LiveGate().evaluate(stats, run, daily, {"verdict": "houdbaar", "explanation": "consistent"},
+                             {"afwijkingen": 0, "kritiek_open": 0}).unlocked
 
 
 @pytest.mark.parametrize("state,expected", [

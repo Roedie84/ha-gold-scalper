@@ -45,6 +45,8 @@ from .broker.schedule import (
     SPOT_GOLD, ClosureObservation, bij_roostergrens, cross_check, minutes_until_close,
 )
 from .broker.exits import ExitConfig, ExitManager, omkeer_actie, scalp_exit_config
+from .broker import uitvoering as uitvoering_mod
+from .learning import onderzoek as onderzoek_mod
 from .broker.ig_capital import CapitalVenue, IgVenue
 from .broker.oanda import OandaVenue
 from .broker.public_data import PublicDataVenue
@@ -124,7 +126,8 @@ from .strategy import combinatie as combinatie_mod
 from .strategy import daghandel as daghandel_mod
 from .strategy.aggregator import BAR_SECONDS
 from .strategy.posities import (
-    marge_en_vloer_ok, netting_uit_posities, richting_van, spreiding_ok,
+    marge_en_vloer_ok, netting_uit_posities, richting_van, risicolimieten_ok,
+    spreiding_ok,
     tel_per_richting,
 )
 from .strategy.tijdstopvarianten import VariantenBoek, VariantTrade
@@ -141,6 +144,8 @@ from .strategy.scalp_reeks import ReeksConfig, stukken_nu
 from .strategy.sizing import SizingConfig, position_size
 from .strategy.streaming import StreamState
 
+#: 2.7.0: de afstemming kijkt hooguit zo ver terug voor nog niet afgestemde trades.
+AFSTEMMING_MAX_DAGEN = 10.0
 _LOGGER = logging.getLogger(__name__)
 
 #: Standaard voor ``_on_bars_closed``: dezelfde bars archiveren als binnenkomen.
@@ -574,6 +579,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.paper: PaperBroker | None = None
         self._candles: Candles | None = None
         self._last_bar_ts: int = 0
+        #: 2.7.0: (tijd, bid, ask) van de laatste live tick.
+        self._laatste_tick: tuple | None = None
+        #: 2.7.0: onderzoeksrapport (learning/onderzoek.py).
+        self.onderzoek: dict = {}
+        self._onderzoek_volgende = 0.0
+        #: 2.7.0: (tijdstempel, richting) van recente instappen; risico-info.
+        self._recente_instappen: list[tuple[float, int]] = []
+        self.risico_info: dict = {}
         self._last_entry_ts: float = 0.0
         #: Tickets waarvan al een deel is afgeroomd.
         #:
@@ -1698,7 +1711,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         run = await self.hass.async_add_executor_job(self.db.get_run, self.run_id)
         daily = performance.daily_breakdown(trades)
         self.gate = LiveGate().evaluate(
-            stats, run or {}, daily, self.robustness
+            stats, run or {}, daily, self.robustness, self._boekhouding_status(),
         ).as_dict()
 
         # De venue mag alleen handelen als álles klopt: live modus, poort open,
@@ -2605,6 +2618,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         vp_signalen = vp_ingestapt = 0
         if self.alles:
             await self._ververs_vp_uitgezet()
+        await self._ververs_onderzoek()
         per_richting = tel_per_richting(open_positions, pending)
         for ronde, strategie in enumerate(combinatie_mod.strategieen(self._strategie)):
             eigen = posities_per_strategie.get(strategie, [])
@@ -2929,6 +2943,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 for k, v in self._signalen.items() if v is not None
             } if self.combinatie else {},
             "gate": self.gate,
+            # 2.7.0: onderzoeksrapport (samenvatting), risicolimieten.
+            "onderzoek": onderzoek_mod.samenvatting(self.onderzoek) if self.onderzoek else None,
+            "risico_limieten": self.risico_info,
             "risk": self.risk.as_dict(),
             "lifecycle": {
                 **self.lifecycle.as_dict(),
@@ -3494,6 +3511,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 # Het dict rechtstreeks doorgeven; de controle kent beide
                 # vormen. Er hoeft geen klasse uit gefabriceerd te worden.
                 require_live_unlocked(self.mode, self.gate)
+                # 2.7.0: execution ledger - verzendmoment.
+                verzend_ts = datetime.now(timezone.utc)
                 # Via de veiligheidslaag: garandeert een stop, voorkomt een
                 # tweede order na een verbroken verbinding.
                 result, notes = await self.executor.open_protected(
@@ -3502,6 +3521,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     context=(signal, quote, side, now),
                 )
                 self.executor_notes = notes[-10:]
+                await self._log_uitvoering(
+                    signal, quote, side, units, now, verzend_ts,
+                    datetime.now(timezone.utc), result, strategie,
+                )
                 # Na het plaatsen is de gecachte lijst verouderd.
                 self._positions_cache = None
                 for note in notes:
@@ -3562,6 +3585,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     (trade.volume or 0) * CONTRACT_SIZE, signal, now,
                 )
             self.risk.record_open()
+            # 2.7.0: voor de clusterlimiet.
+            self._recente_instappen = [
+                x for x in self._recente_instappen if now.timestamp() - x[0] <= 3600
+            ] + [(now.timestamp(), richting)]
             self._last_entry_ts = now.timestamp()
             self._laatste_instap[strategie] = now.timestamp()
             self._geopend_in_cyclus += 1
@@ -3583,6 +3610,63 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return bedrag
         koers = self.conversion.risk_rate or self.conversion.rate
         return bedrag * koers if koers else bedrag
+
+    async def _ververs_onderzoek(self) -> None:
+        """2.7.0: onderzoeksrapport (learning/onderzoek.py) elke 30 minuten,
+        over de gesloten trades van de laatste 30 dagen. Alleen meten."""
+        nu = time.monotonic()
+        if nu < self._onderzoek_volgende or self.db is None:
+            return
+        self._onderzoek_volgende = nu + 1800.0
+        try:
+            sinds = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            rijen = await self.hass.async_add_executor_job(
+                self.db.gesloten_als_dict, self.mode.value, sinds)
+            self.onderzoek = await self.hass.async_add_executor_job(
+                onderzoek_mod.rapport, rijen)
+        except Exception as err:  # noqa: BLE001 - onderzoek mag de handel niet raken
+            _LOGGER.debug("Onderzoeksrapport niet bijgewerkt: %s", err)
+
+    def _boekhouding_status(self) -> dict | None:
+        """2.7.0: stand van de afstemming voor de live-poort. None = nog niet
+        afgestemd (de poort blijft dan dicht)."""
+        rec = getattr(self, "reconciliation", None) or {}
+        audit = getattr(self, "audit", None) or {}
+        if not rec and not audit:
+            return None
+        afw = rec.get("afwijkingen")
+        if isinstance(afw, list):
+            afw = len(afw)
+        kritiek = audit.get("critical") if isinstance(audit, dict) else None
+        if isinstance(kritiek, list):
+            kritiek = len(kritiek)
+        return {
+            "afwijkingen": int(afw or 0) if rec else None,
+            "kritiek_open": int(kritiek or 0) if audit else 0,
+        }
+
+    async def _log_uitvoering(self, signal, quote, side, units, signaal_ts,
+                              verzend_ts, bevestiging_ts, result, strategie) -> None:
+        """2.7.0: één rij in de execution ledger; mag de handel nooit raken."""
+        if self.db is None:
+            return
+        try:
+            candle_ts = (
+                datetime.fromtimestamp(self._last_bar_ts, timezone.utc)
+                if self._last_bar_ts else None
+            )
+            rij = uitvoering_mod.ledger_rij(
+                run_id=self.run_id, strategie=strategie, side=side,
+                units_gevraagd=units, signaal_ts=signaal_ts,
+                signaal_bid=quote.bid, signaal_ask=quote.ask,
+                koers_ts=getattr(quote, "time", None), candle_ts=candle_ts,
+                verzend_ts=verzend_ts, tick=self._laatste_tick,
+                bevestiging_ts=bevestiging_ts, result=result,
+                stop_loss=signal.stop_loss, take_profit=signal.take_profit,
+            )
+            await self.hass.async_add_executor_job(self.db.log_uitvoering, rij)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Execution ledger niet bijgewerkt: %s", err)
 
     def _vaste_grootte(self, signal, entry_price: float) -> float:
         """2.6.2: vaste scalpgrootte; veldproef op risico (zie
@@ -3654,6 +3738,19 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 "hedgen staat uit tot een herstart"
             )
         instap = quote.ask if richting == 1 else quote.bid
+        # 2.7.0: risicolimieten over alle posities samen (verbeterplan).
+        units_nieuw = self._grootte(signal, quote, equity)
+        ok, reden, self.risico_info = risicolimieten_ok(
+            richting=richting,
+            nieuw_risico=abs(instap - (signal.stop_loss or instap)) * units_nieuw,
+            nieuw_notional=units_nieuw * quote.mid,
+            open_posities=open_positions, koers=quote.mid,
+            equity_ref=self.starting_balance, naar_account=self._naar_account,
+            recente_instappen=self._recente_instappen, nu_ts=now.timestamp(),
+            per_trade_pct=getattr(self.sizing, "risk_per_trade_pct", None),
+        )
+        if not ok:
+            return "risicolimiet", reden
         # 2.6.2: niet te veel veldproefposities met risico in één richting.
         naam = (getattr(signal, "components", None) or {}).get("strategie")
         if veldproef_mod.is_veldproef(naam):
@@ -4017,6 +4114,21 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if haal is None or self.run_id is None:
             return {}
         nu = datetime.now(timezone.utc)
+        # 2.7.0: staat er een oudere trade nog niet afgestemd, dan het venster
+        # tot daar verruimen (hooguit AFSTEMMING_MAX_DAGEN).
+        try:
+            oudste = await self.hass.async_add_executor_job(
+                self.db.oudste_niet_afgestemd, self.mode.value,
+                (nu - timedelta(days=AFSTEMMING_MAX_DAGEN)).isoformat(),
+            )
+        except Exception:  # noqa: BLE001
+            oudste = None
+        if oudste:
+            try:
+                leeftijd = (nu - datetime.fromisoformat(oudste)).total_seconds() / 86400 + 0.1
+                dagen = min(AFSTEMMING_MAX_DAGEN, max(dagen, leeftijd))
+            except ValueError:
+                pass
         transacties = await haal(nu - timedelta(days=dagen), nu)
         grens = nu - timedelta(days=dagen)
         # 2.4.3: over alle runs, niet alleen de lopende. Na een runwissel
@@ -5516,6 +5628,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 bericht.get("bied"), bericht.get("laat"))
         except (TypeError, ValueError):
             pass
+        # 2.7.0: laatste live koers, voor de verzendkoers in de execution ledger.
+        if bericht.get("bied") and bericht.get("laat"):
+            t = bericht.get("tijd")
+            self._laatste_tick = (
+                float(t) if isinstance(t, (int, float)) else time.time(),
+                bericht.get("bied"), bericht.get("laat"),
+            )
         if self._turbo_bezig or self._afgesloten:
             return
         self.turbo_stats["ticks"] += 1

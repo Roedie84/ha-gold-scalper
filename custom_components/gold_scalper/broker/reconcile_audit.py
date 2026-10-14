@@ -209,6 +209,20 @@ def compare_positions(
                 ticket,
             ))
 
+        # 2.7.0: ook de instapprijs (verbeterplan Ruud 14-10).
+        broker_instap = getattr(position, "open_price", None)
+        if (
+            trade.open_price and broker_instap
+            and abs(float(trade.open_price) - float(broker_instap)) > PRICE_TOLERANCE
+        ):
+            audit.findings.append(Finding(
+                "waarschuwing", "instap_verschilt",
+                f"Positie {ticket}: instap bij de broker {broker_instap}, in de "
+                f"database {trade.open_price}. Resultaat en R van deze trade "
+                "rekenen met een onzekere instap.",
+                ticket,
+            ))
+
         if position.side != trade.side:
             audit.findings.append(Finding(
                 "kritiek", "richting_verschilt",

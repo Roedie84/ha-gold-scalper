@@ -121,7 +121,8 @@ def test_gate_allows_real_data_run():
         "config_json": json.dumps({"venue": "oanda", "simulated": False}),
     }
     daily = [{"date": f"2026-06-{i+1:02d}", "trades": 30, "net_pnl": 50.0} for i in range(20)]
-    assert LiveGate().evaluate(stats, run, daily, {"verdict": "houdbaar", "explanation": "consistent"}).unlocked
+    assert LiveGate().evaluate(stats, run, daily, {"verdict": "houdbaar", "explanation": "consistent"},
+                             {"afwijkingen": 0, "kritiek_open": 0}).unlocked
 
 
 def test_gate_blocks_when_config_unparseable_but_mentions_simulator():

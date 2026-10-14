@@ -161,6 +161,86 @@ def positie_risico(positie, units_fallback: float | None = None,
     return afstand * units
 
 
+#: 2.7.0 (verbeterplan Ruud 14-10): risicolimieten over alle posities samen,
+#: als percentage van de referentie-equity (het startsaldo van de run).
+#: Gelijktijdige posities zijn geen onafhankelijke risico's.
+MAX_TOTAAL_OPEN_RISICO_PCT = 0.5
+MAX_RICHTING_RISICO_PCT = 0.3
+#: Notional (units x koers) in de richting van de nieuwe positie, als veelvoud
+#: van de referentie-equity: een hefboomgrens (bij 5 % marge is 10x de helft van de
+#: equity aan marge).
+MAX_NOTIONAL_X_EQUITY = 10.0
+#: Hooguit zoveel nieuwe posities per richting binnen dit venster, over alle
+#: strategieën samen: één marktbeweging is één cluster, geen tien
+#: onafhankelijke waarnemingen (13-10 18:05: vijf shorts binnen een minuut).
+MAX_INSTAPPEN_PER_CLUSTER = 3
+CLUSTER_VENSTER_S = 300
+
+
+def risicolimieten_ok(
+    *, richting: int, nieuw_risico: float, nieuw_notional: float,
+    open_posities: Iterable, koers: float, equity_ref: float | None,
+    naar_account=lambda x: x, recente_instappen: Iterable = (), nu_ts: float = 0.0,
+    per_trade_pct: float | None = None,
+) -> tuple[bool, str | None, dict]:
+    """2.7.0: totaal open risico, risico per richting, notional en clusters.
+
+    ``nieuw_risico``/``nieuw_notional`` in instrumentvaluta; ``naar_account``
+    rekent om naar de valuta van ``equity_ref``. ``recente_instappen``:
+    (tijdstempel, richting) van eerdere instappen. Geeft (ok, reden, info).
+    Alleen posities waarvan de stop nog aan de verlieskant staat, tellen als
+    risico (een stop op break-even of in de winst riskeert niets meer).
+    """
+    totaal = per_richting = notional = 0.0
+    for p in open_posities:
+        r = positie_risico(p)
+        totaal += r
+        if richting_van(getattr(p, "side", "buy")) == richting:
+            per_richting += r
+        units = getattr(p, "units", None)
+        if units is None:
+            units = (getattr(p, "volume", 0) or 0) * 100.0
+        if richting_van(getattr(p, "side", "buy")) != richting:
+            continue
+        try:
+            notional += abs(float(units)) * float(koers)
+        except (TypeError, ValueError):
+            pass
+    cluster = sum(
+        1 for ts, rcht in recente_instappen
+        if rcht == richting and nu_ts - ts <= CLUSTER_VENSTER_S
+    )
+    info = {
+        "open_risico": round(naar_account(totaal), 2),
+        "richting_risico": round(naar_account(per_richting), 2),
+        "notional": round(naar_account(notional), 2),
+        "cluster": cluster,
+    }
+    if cluster >= MAX_INSTAPPEN_PER_CLUSTER:
+        return False, (f"cluster: al {cluster} instappen in deze richting in "
+                       f"{CLUSTER_VENSTER_S // 60} min (max {MAX_INSTAPPEN_PER_CLUSTER})"), info
+    if not equity_ref or equity_ref <= 0:
+        return True, None, info
+    # Nooit krapper dan wat de instelling per trade toestaat: hooguit 5 volle
+    # trades samen en 3 per richting.
+    pct_totaal = max(MAX_TOTAAL_OPEN_RISICO_PCT, 5 * (per_trade_pct or 0.0))
+    pct_richting = max(MAX_RICHTING_RISICO_PCT, 3 * (per_trade_pct or 0.0))
+    info["grens_totaal_pct"], info["grens_richting_pct"] = pct_totaal, pct_richting
+    grens_totaal = equity_ref * pct_totaal / 100
+    grens_richting = equity_ref * pct_richting / 100
+    grens_notional = equity_ref * MAX_NOTIONAL_X_EQUITY
+    if naar_account(totaal + nieuw_risico) > grens_totaal:
+        return False, (f"open risico {naar_account(totaal + nieuw_risico):.0f} boven "
+                       f"{pct_totaal:g}% ({grens_totaal:.0f})"), info
+    if naar_account(per_richting + nieuw_risico) > grens_richting:
+        return False, (f"risico in deze richting {naar_account(per_richting + nieuw_risico):.0f} "
+                       f"boven {pct_richting:g}% ({grens_richting:.0f})"), info
+    if naar_account(notional + nieuw_notional) > grens_notional:
+        return False, (f"notional in deze richting {naar_account(notional + nieuw_notional):.0f} boven "
+                       f"{MAX_NOTIONAL_X_EQUITY:g}x equity ({grens_notional:.0f})"), info
+    return True, None, info
+
+
 def marge_en_vloer_ok(
     *,
     units: float,

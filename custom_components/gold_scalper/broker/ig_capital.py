@@ -433,6 +433,11 @@ def _als_getal(waarde) -> float | None:
         return None
 
 
+
+#: 2.7.0: paginering van het transactieoverzicht (afstemming).
+TRANSACTIE_PAGINA = 500
+TRANSACTIE_MAX_PAGINAS = 20
+
 class IgStyleVenue(ExecutionVenue):
     #: Marktnummer voor het klantsentiment; komt mee met de koersopvraging.
     _market_id: str | None = None
@@ -1332,16 +1337,32 @@ class IgStyleVenue(ExecutionVenue):
         Voor de dagelijkse afstemming: één verzoek voor een hele dag in plaats
         van één per trade.
         """
-        payload = await self._request(
-            "GET", "/history/transactions", version="2",
-            params={
-                "type": "ALL_DEAL",
-                "from": van.strftime("%Y-%m-%dT%H:%M:%S"),
-                "to": tot.strftime("%Y-%m-%dT%H:%M:%S"),
-                "pageSize": 500,
-            },
-        )
-        return payload.get("transactions") or []
+        # 2.7.0 (P0-audit 14-10): ALLE pagina's. Met alleen de eerste 500
+        # bleef 55 % van de gesloten trades van de laatste 7 dagen
+        # (1.117 van 2.014) zonder afstemming: op 13-10 alleen al 1.576 trades
+        # plus deelsluitingen, ruim boven één pagina.
+        alles: list = []
+        pagina = 1
+        while pagina <= TRANSACTIE_MAX_PAGINAS:
+            payload = await self._request(
+                "GET", "/history/transactions", version="2",
+                params={
+                    "type": "ALL_DEAL",
+                    "from": van.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "to": tot.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "pageSize": TRANSACTIE_PAGINA,
+                    "pageNumber": pagina,
+                },
+            )
+            deel = payload.get("transactions") or []
+            alles.extend(deel)
+            meta = ((payload.get("metadata") or {}).get("pageData") or {})
+            totaal = meta.get("totalPages")
+            if not deel or (totaal is not None and pagina >= int(totaal)) or \
+                    (totaal is None and len(deel) < TRANSACTIE_PAGINA):
+                break
+            pagina += 1
+        return alles
 
     async def raw_responses(self) -> dict:
         """De werkelijke antwoorden van de broker, voor tests.

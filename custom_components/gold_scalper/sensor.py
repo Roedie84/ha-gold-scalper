@@ -231,6 +231,9 @@ SENSORS: tuple[ScalperSensor, ...] = (
             # 1.9.5 (L-GS-007): toets per uurblok naast de clusters; alleen
             # ter informatie.
             "per_tijdblok": _stats(d).get("per_tijdblok"),
+            # 2.7.0: onderzoek op de echte trades (geclusterd, na kosten) en
+            # de vooraf geregistreerde hypotheses.
+            "onderzoek": d.get("onderzoek"),
         },
     ),
     ScalperSensor(
