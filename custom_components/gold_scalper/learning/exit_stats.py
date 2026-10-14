@@ -115,6 +115,9 @@ def exit_stats(trades: Sequence) -> dict:
     gesloten = [t for t in trades if getattr(t, "close_time", None)]
     noemer = len(gesloten)
     telling = {"take_profit": 0, "stop_loss": 0, "eigen_exit": 0, "unknown": 0}
+    # 2.7.2 (Ruud 14-10: "een stop hoeft niet altijd rood te zijn"): een stop
+    # die na break-even, winstslot of volgstop sluit, is vastgezette winst.
+    stop_winst = 0
     afgestemd = 0
     achteraf = 0
     for t in gesloten:
@@ -128,6 +131,8 @@ def exit_stats(trades: Sequence) -> dict:
             telling["take_profit"] += 1
         elif reden == "stop_loss":
             telling["stop_loss"] += 1
+            if (getattr(t, "net_pnl", None) or 0.0) > 0:
+                stop_winst += 1
         elif reden == "unknown":
             telling["unknown"] += 1
         else:
@@ -144,6 +149,9 @@ def exit_stats(trades: Sequence) -> dict:
             soort: {"n": n, "pct": deel(n)}
             for soort, n in telling.items()
         },
+        "stop_winst": {"n": stop_winst, "pct": deel(stop_winst)},
+        "stop_verlies": {"n": telling["stop_loss"] - stop_winst,
+                         "pct": deel(telling["stop_loss"] - stop_winst)},
         "toelichting": (
             f"Van {noemer} gesloten trades is bij {telling['unknown']} de "
             "sluitreden niet te bewijzen. Het doeltreffer- en "

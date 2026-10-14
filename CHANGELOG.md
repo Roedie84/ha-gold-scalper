@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 2.7.2 - 14-10-2026
+
+### Afstemming: deelsluiting en rest van een positie verwisseld (P1)
+- **Gevonden:** een deelsluiting en de rest van dezelfde positie hebben bij IG dezelfde instapprijs, hetzelfde openingsmoment en (bij de helft) dezelfde omvang. De koppeling pakte dan de eerste transactie: de rest kreeg de uitstapprijs en het bedrag van de deelsluiting.
+- **Bewijs:** 14-10 08:25: drie restposities met exact de uitstap en P&L van hun deelsluiting (+39,22 / +27,16 / +26,23 USD) en negatieve "gemeten" kosten (-11,69 / -22,53 / -20,28). In de hele database 50 trades met negatieve kosten sinds 26-08. Het resultaat van de deelsluiting telde dubbel, dat van de rest ontbrak.
+- **Wijziging:** bij gelijke prijs/omvang beslist het sluitmoment welke transactie bij welke trade hoort (alle drie de aanroepen). Negatieve kosten gelden als fout: bij de volgende afstemming worden prijs, bedrag en kosten opnieuw van de broker overgenomen en gemeten. Trades binnen het afstemvenster (10 dagen) herstellen zo vanzelf; oudere blijven zoals ze zijn.
+
+### Paneel: stop met winst
+- "Hoe trades eindigden" splitst de stop in **stop met winst** (na break-even, winstslot of volgstop) en **stop met verlies**; in de tradelijst staat bij een winnende stop "winst vastgezet".
+
+### Tests
+- `tests/test_v272.py`.
+
 ## 2.7.1 - 14-10-2026
 
 ### H-GS-003: uitsluiting veldproef 1m/3m en scalp, getoetst op ongeziene data

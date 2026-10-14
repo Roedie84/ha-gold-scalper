@@ -4289,7 +4289,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             units = (trade.volume or 0) * CONTRACT_SIZE
             match = match_transaction(
                 transacties, trade.broker_ticket, trade.open_price,
-                trade.side, units or None, trade.open_time,
+                trade.side, units or None, trade.open_time, trade.close_time,
             )
             uitstap = (match or {}).get("exit_price")
             gesloten = (match or {}).get("closed_at")

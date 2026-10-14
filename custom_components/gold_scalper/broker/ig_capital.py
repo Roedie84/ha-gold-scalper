@@ -179,7 +179,7 @@ def broker_loopt_achter(transacties: list, moment: datetime) -> bool:
 def match_transaction(
     transacties: list, ticket, open_price: float | None,
     side: str | None, units: float | None,
-    open_time=None,
+    open_time=None, close_time=None,
 ) -> dict | None:
     """Zoek in een transactieoverzicht de transactie die bij een trade hoort.
 
@@ -271,8 +271,22 @@ def match_transaction(
             kandidaten.append((0.0, "ticket", niveau, tx))
 
     if kandidaten:
-        # De dichtstbijzijnde. Bij gelijke afstand maakt het niet uit.
-        kandidaten.sort(key=lambda k: k[0])
+        # De dichtstbijzijnde.
+        #
+        # 2.7.2: bij gelijke afstand beslist het sluitmoment. Een deelsluiting
+        # en de rest van dezelfde positie hebben dezelfde instapprijs, hetzelfde
+        # openingsmoment en (bij de helft) dezelfde omvang; zonder dit kreeg de
+        # rest de uitstapprijs en het bedrag van de deelsluiting (14-10: rest
+        # +39,22 USD met kosten -11,69 - dezelfde transactie twee keer geteld).
+        eigen_sluit = _utc(close_time)
+
+        def sluit_afstand(tx) -> float:
+            if eigen_sluit is None:
+                return 0.0
+            b = _utc(tx.get("dateUtc"))
+            return abs((b - eigen_sluit).total_seconds()) if b is not None else 1e12
+
+        kandidaten.sort(key=lambda k: (round(k[0], 6), sluit_afstand(k[3])))
         _, hoe, niveau, tx = kandidaten[0]
         return {
             "exit_price": float(niveau),
@@ -1506,7 +1520,7 @@ class IgStyleVenue(ExecutionVenue):
         # De RICHTING sluit dat uit: de ene grootte is negatief, de andere
         # positief. Samen met de prijs is dat eenduidig.
         gevonden = match_transaction(
-            transacties, ticket, open_price, side, units, open_time,
+            transacties, ticket, open_price, side, units, open_time, around or nu,
         )
         if gevonden:
             return gevonden

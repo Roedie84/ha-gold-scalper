@@ -1114,6 +1114,9 @@ ${tl}
       `<div class="nu" style="left:${tPos(s.t)}%"></div></div>` : "";
     const doel = s.doel_pct || 0, stop = s.stop_pct || 0, onb = s.onbekend_pct || 0;
     const rest = Math.max(0, 100 - doel - stop - onb);
+    // 2.7.2: stop met vastgezette winst apart van stop met verlies.
+    const gesplitst = isNum(s.stop_winst_pct) && isNum(s.stop_verlies_pct);
+    const stopW = gesplitst ? s.stop_winst_pct : 0, stopV = gesplitst ? s.stop_verlies_pct : stop;
     const lat = s.latency_n ? `${fmt(s.latency_p50, 0)} / ${fmt(s.latency_p99, 0)} ms` : "—";
     const af = s.afstemming;
     const checks = Object.entries(s.poort || {}).map(([k, v]) => `<span class="chip ${v ? "ok" : "neutraal"}">${v ? "✓" : "✗"} ${esc(k.replace(/_/g, " "))}</span>`).join("");
@@ -1131,8 +1134,8 @@ ${tl}
       `<div class="meter" style="--accent:var(--goud)"><b style="width:${cl.toFixed(1)}%"></b></div></div>` +
       `<div><div class="lbl" style="display:flex;justify-content:space-between"><span>t-statistiek (clusters)</span><span class="num ${toon(s.t)}" style="letter-spacing:0">${fmtS(s.t)}</span></div>${tschaal}</div>` +
       `<div><div class="lbl">Hoe trades eindigden${s.exits_noemer ? ` · ${s.exits_noemer}` : ""}</div><div class="verdeling" style="margin-top:7px">` +
-      `<b style="width:${doel}%;background:var(--groen)"></b><b style="width:${stop}%;background:var(--rood)"></b><b style="width:${rest}%;background:rgba(160,200,220,.35)"></b><b style="width:${onb}%;background:rgba(255,255,255,.12)"></b></div>` +
-      `<div class="vlegenda"><span><i style="background:var(--groen)"></i>doel ${fmt(doel, 0)}%</span><span><i style="background:var(--rood)"></i>stop ${fmt(stop, 0)}%</span><span><i style="background:rgba(160,200,220,.35)"></i>overig ${fmt(rest, 0)}%</span><span><i style="background:rgba(255,255,255,.12)"></i>onbekend ${fmt(onb, 0)}%</span></div></div>` +
+      `<b style="width:${doel}%;background:var(--groen)"></b><b style="width:${stopW}%;background:var(--groen);opacity:.5"></b><b style="width:${stopV}%;background:var(--rood)"></b><b style="width:${rest}%;background:rgba(160,200,220,.35)"></b><b style="width:${onb}%;background:rgba(255,255,255,.12)"></b></div>` +
+      `<div class="vlegenda"><span><i style="background:var(--groen)"></i>doel ${fmt(doel, 0)}%</span>${gesplitst ? `<span title="Stop na break-even, winstslot of volgstop: vastgezette winst"><i style="background:var(--groen);opacity:.5"></i>stop met winst ${fmt(stopW, 0)}%</span><span><i style="background:var(--rood)"></i>stop met verlies ${fmt(stopV, 0)}%</span>` : `<span><i style="background:var(--rood)"></i>stop ${fmt(stop, 0)}%</span>`}<span><i style="background:rgba(160,200,220,.35)"></i>overig ${fmt(rest, 0)}%</span><span><i style="background:rgba(255,255,255,.12)"></i>onbekend ${fmt(onb, 0)}%</span></div></div>` +
       `<div class="rijen"><div><span>Afstemming met broker</span><b class="${af ? (af.in_orde ? "pos" : "neg") : ""}" title="${esc(af ? (af.tekst || "") + (af.moment ? " · laatste afstemming " + af.moment : "") + (af.hersteld ? " (bewaard van vóór de herstart)" : "") : "")}">${af ? (af.in_orde ? "in orde" : `${af.afwijkingen} afwijking(en)`) : "nog niet"}</b></div></div>` +
       (checks ? `<div><div class="lbl" style="margin-bottom:7px">Live-poort (alleen informatie)</div><div class="checks">${checks}</div></div>` : "");
   }
@@ -1150,7 +1153,7 @@ ${tl}
         cel("Richting", `<span class="tag ${t.richting}">${t.richting.toUpperCase()}</span>`) +
         cel("Units", fmt(t.units), "r") + cel("Instap", fmt(t.instap), "r") + cel("Uitstap", fmt(t.uitstap), "r") +
         cel("P&amp;L", `<b>${fmtS(t.pnl)}</b>${pa}`, `r ${toon(t.pnl)}`) +
-        cel("Reden", esc(t.reden) + (t.reden_bron === "afstemming" ? ' <span class="dim" title="achteraf ingevuld uit de afstemming met de broker">*</span>' : ""), "", "", t.reden_lang) +
+        cel("Reden", esc(t.reden) + (t.reden === "Stop" && isNum(t.pnl) && t.pnl > 0 ? ' <span class="dim">· winst vastgezet</span>' : "") + (t.reden_bron === "afstemming" ? ' <span class="dim" title="achteraf ingevuld uit de afstemming met de broker">*</span>' : ""), "", "", t.reden_lang) +
         cel("Kosten", `${fmt(t.kosten)} <span class="tag ${b}">${b}</span>`, "r breed") +
         cel("Duur", duur(t.duur_s), "r") + "</tr>";
     }).join("");

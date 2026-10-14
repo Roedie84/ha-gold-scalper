@@ -175,7 +175,7 @@ def stem_af(
         units = (trade.volume or 0) * contract_size
         match = match_transaction(
             transacties, trade.broker_ticket, trade.open_price,
-            trade.side, units or None, trade.open_time,
+            trade.side, units or None, trade.open_time, trade.close_time,
         )
 
         if match is None:
@@ -290,7 +290,11 @@ def stem_af(
                 k: v for k, v in reden.items() if k != "close_reason"
             })
 
-        if trade.cost_source != "measured" and broker_uit is not None and prijs_klopt:
+        # 2.7.2: negatieve kosten zijn onmogelijk en wijzen op een eerdere
+        # verkeerde koppeling (deelsluiting); dan opnieuw meten.
+        kosten_fout = trade.total_cost is not None and trade.total_cost < -0.01
+        if ((trade.cost_source != "measured" or kosten_fout)
+                and broker_uit is not None and prijs_klopt):
             kosten = meet_kosten(meet_op, broker_uit, contract_size)
             if kosten is not None:
                 netto = velden.get("net_pnl", trade.net_pnl)

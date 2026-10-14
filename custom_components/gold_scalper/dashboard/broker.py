@@ -735,6 +735,8 @@ def build_payload(
             "oordeel_tekst": stats.get("verdict_text"),
             "doel_pct": (exits.get("take_profit") or {}).get("pct"),
             "stop_pct": (exits.get("stop_loss") or {}).get("pct"),
+            "stop_winst_pct": (exits.get("stop_winst") or {}).get("pct"),
+            "stop_verlies_pct": (exits.get("stop_verlies") or {}).get("pct"),
             "onbekend_pct": (exits.get("unknown") or {}).get("pct"),
             "exits_noemer": exits.get("noemer"),
             "latency_p50": _num(lat.get("median"), 0),
