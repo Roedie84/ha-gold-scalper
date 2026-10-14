@@ -259,6 +259,8 @@ class CTraderVenue(ExecutionVenue):
         self._ask: float | None = None
         self._koers_t: float = 0.0
         self._koers_event = asyncio.Event()
+        #: 2.9.1: luisteraars op elke koers (live koers in het dashboard).
+        self._koers_luisteraars: list[Callable[[float, float, float], None]] = []
         self._stats = {"verzoeken": 0, "fouten": 0, "herverbindingen": 0,
                        "tokens_ververst": 0, "laatste_fout": None}
 
@@ -378,6 +380,11 @@ class CTraderVenue(ExecutionVenue):
             if self._bid and self._ask:
                 self._koers_t = time.time()
                 self._koers_event.set()
+                for luisteraar in list(self._koers_luisteraars):
+                    try:
+                        luisteraar(self._bid, self._ask, self._koers_t)
+                    except Exception:  # noqa: BLE001
+                        _LOGGER.debug("cTrader: koersluisteraar faalde", exc_info=True)
             return
         if (soort in (EXECUTION_EVENT, ORDER_ERROR_EVENT) and self._uitvoeringen is not None
                 and self._wachters > 0):
@@ -452,6 +459,15 @@ class CTraderVenue(ExecutionVenue):
             raise VenueError(f"cTrader: onverwacht antwoord {ontvangen} op {soort}")
         return antw
 
+    def luister_koers(self, luisteraar: Callable[[float, float, float], None]) -> Callable[[], None]:
+        """Roep ``luisteraar(bied, laat, tijd)`` aan bij elke koers; geeft afmelden terug."""
+        self._koers_luisteraars.append(luisteraar)
+
+        def afmelden() -> None:
+            if luisteraar in self._koers_luisteraars:
+                self._koers_luisteraars.remove(luisteraar)
+        return afmelden
+
     async def _klaar(self) -> None:
         if not self.verbonden:
             if self._lezer is not None:
@@ -499,7 +515,9 @@ class CTraderVenue(ExecutionVenue):
         antw = await self._verzoek(TRENDBARS_REQ, {
             "ctidTraderAccountId": self.ctid, "symbolId": self.symbol_id,
             "period": periode, "fromTimestamp": nu - terug, "toTimestamp": nu,
-            "count": int(count),
+            # cTrader telt terug vanaf toTimestamp maar laat de lopende bar
+            # soms weg: iets ruimer vragen, daarna afkappen (2.9.1).
+            "count": int(count) + 5,
         }, TRENDBARS_RES)
         candles = trendbars_naar_candles(antw.get("trendbar") or [])
         if len(candles) > count:

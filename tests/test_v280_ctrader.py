@@ -307,3 +307,33 @@ def test_brokerkeuze_in_dashboard():
     http = (Path(__file__).resolve().parents[1] / "custom_components" / "gold_scalper"
             / "http.py").read_text(encoding="utf-8")
     assert '"brokers": brokers' in http
+
+
+@pytest.mark.asyncio
+async def test_live_koers_van_ctrader_naar_dashboard(monkeypatch):
+    """2.9.1: Pepperstone-koersen live naar het paneel, zoals bij IG."""
+    from types import SimpleNamespace
+    from gold_scalper.broker_stream import stream_eligibility
+    from gold_scalper.dashboard.stream import VenueTickStream
+
+    v, ws = _venue()
+    await v.account()
+    coord = SimpleNamespace(venue=v, mode=SimpleNamespace(value="demo"))
+    assert stream_eligibility(coord) == (True, "")
+    coord.mode = SimpleNamespace(value="paper")
+    assert not stream_eligibility(coord)[0]
+
+    stroom = VenueTickStream(v)
+    ontvangen = []
+    afmelden = stroom.subscribe(ontvangen.append)
+    await asyncio.sleep(0)
+    v._verwerk({"payloadType": ct.SPOT_EVENT, "payload": {"symbolId": 41, "bid": 409600000,
+                                                          "ask": 409608000}})
+    await asyncio.sleep(0.01)
+    ticks = [m for m in ontvangen if m.get("soort") == "tick"]
+    assert stroom.status == "live" and ticks
+    assert ticks[-1]["bied"] == 4096.0 and ticks[-1]["spread"] == pytest.approx(0.08)
+    afmelden()
+    await stroom.async_stop()
+    assert not v._koers_luisteraars
+    await v.sluit_verbinding()

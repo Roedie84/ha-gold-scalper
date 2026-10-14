@@ -7,6 +7,16 @@
 - Verzoeken worden nu gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
 - Bij "rate limited" tot 4 pogingen met oplopende wachttijd (1,5 s, 3 s, ...); orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
 
+## 2.9.1 - 14-10-2026
+
+### Live koers ook bij Pepperstone
+- Vraag Ruud: waarom live koers per tick alleen bij IG? Omdat de stroom op IG-streaming (Lightstreamer) gebouwd was. cTrader pusht de koersen al over de bestaande verbinding (spot-abonnement), dus geen tweede verbinding nodig.
+- Nieuw: `VenueTickStream` (dashboard/stream.py) - zelfde gedrag als de IG-stroom (status, max. ticks per seconde, replay), gevoed door `CTraderVenue.luister_koers`. Zonder koers > 60 s: status terugval (markt dicht).
+- Daardoor werkt ook de turbo-scalp (als scalp aan staat) bij Pepperstone op de live koers, net als bij IG.
+- Tekst in het paneel: "live van de broker" in plaats van "via IG-streaming".
+- Trendbars: 5 extra gevraagd en afgekapt; cTrader liet de lopende bar weg (119 i.p.v. 120), waardoor het opwarmen bij 119 stopte.
+- Test `test_every_called_method_exists` volgt nu basisklassen uit hetzelfde bestand.
+
 ## 2.9.0 - 14-10-2026
 
 ### Dashboard: broker kiezen

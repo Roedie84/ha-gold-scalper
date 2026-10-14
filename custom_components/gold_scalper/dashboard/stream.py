@@ -774,3 +774,50 @@ class PriceStream:
 
     def _bij_live(self) -> None:
         self._zet_status("live", None)
+
+
+#: Zonder koers zo lang: status ``terugval`` (markt dicht of verbinding weg).
+VENUE_STIL_SECONDS = 60.0
+
+
+class VenueTickStream(PriceStream):
+    """Live koers uit een broker die zelf al koersen pusht (cTrader, 2.9.1).
+
+    Geen eigen verbinding: de venue heeft er al één met een spot-abonnement.
+    Zelfde gedrag naar buiten als ``PriceStream`` (status, smoorklep,
+    replay), dus het paneel en de turbo-scalp merken geen verschil.
+    """
+
+    def __init__(self, venue, *, create_task=None, clock: Callable[[], float] = time.time,
+                 naam: str = "Gold Scalper") -> None:
+        super().__init__(lambda: None, None, create_task=create_task, clock=clock, naam=naam)
+        self._venue = venue
+
+    def _van_venue(self, bied: float, laat: float, tijd: float) -> None:
+        mid = (bied + laat) / 2
+        tick = {
+            "soort": "tick", "bied": bied, "laat": laat, "mid": round(mid, 4),
+            "spread": round(laat - bied, 4), "verandering": None, "pct": None,
+            "hoog": None, "laag": None, "markt": "TRADEABLE", "broker_tijd": None,
+            "tijd": round(tijd, 3),
+        }
+        if self.status != "live":
+            self._bij_live()
+        self._op_tick(tick)
+
+    async def _run(self) -> None:
+        afmelden = self._venue.luister_koers(self._van_venue)
+        try:
+            while True:
+                if not getattr(self._venue, "verbonden", True):
+                    try:
+                        await self._venue._klaar()
+                    except Exception as err:  # noqa: BLE001
+                        self._zet_status("terugval", f"geen verbinding: {err}"[:200])
+                t = self._laatste_tick
+                if self.status == "live" and (
+                        t is None or self._clock() - (t.get("tijd") or 0) > VENUE_STIL_SECONDS):
+                    self._zet_status("terugval", "geen koers van de broker (markt dicht?)")
+                await asyncio.sleep(5)
+        finally:
+            afmelden()

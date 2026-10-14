@@ -617,7 +617,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     const el = this._q("#livestatus");
     if (!el) return;
     el.innerHTML = this._liveStatus === "live"
-      ? '<span class="chip live" title="Koers live via IG-streaming. Live bedragen zijn indicatief; het officiële bedrag komt per cyclus van de broker."><span class="stip live"></span>LIVE</span>'
+      ? '<span class="chip live" title="Koers live van de broker. Live bedragen zijn indicatief; het officiële bedrag komt per cyclus van de broker."><span class="stip live"></span>LIVE</span>'
       : `<span class="chip neutraal" title="${esc(this._liveStatus === "verbinden" ? "Live koers wordt verbonden…" : this._liveReden || "Live koers niet beschikbaar")}"><span class="stip"></span>elke 5 s</span>`;
   }
   // Gegevens met de live koers erin verwerkt; zonder live: de poll-gegevens.
@@ -1256,7 +1256,7 @@ ${tl}
   _renderVoet(d) {
     const geld = d.status.geld === "echt" ? '<span class="neg">Live — echt geld</span>'
       : d.status.geld === "demo" ? '<span class="demo">Demo — geen echt geld</span>' : '<span class="demo">Papierhandel — geen echt geld</span>';
-    this._q("#voet").innerHTML = `<span>Gold Scalper v${esc(d.versie)} · bronnen: broker (koers, posities, saldo; koers live via IG-streaming als dat beschikbaar is), eigen database (trades, equity) · alleen weergave</span>` +
+    this._q("#voet").innerHTML = `<span>Gold Scalper v${esc(d.versie)} · bronnen: broker (koers, posities, saldo; koers live van de broker als dat beschikbaar is), eigen database (trades, equity) · alleen weergave</span>` +
       `<span>${geld} · <a href="${REPORT_URL}?entry=${encodeURIComponent(d.entry || "")}" target="_blank" rel="noopener">Keuringsrapport</a> · <a href="${OVERVIEW_URL}?entry=${encodeURIComponent(d.entry || "")}" target="_blank" rel="noopener">Klassiek overzicht</a></span>`;
   }
 

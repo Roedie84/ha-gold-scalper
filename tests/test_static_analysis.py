@@ -570,21 +570,32 @@ def test_every_called_method_exists():
     problemen = []
     for path in PKG.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        for klasse in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
-            gedefinieerd = {
+        klassen = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)}
+
+        def eigen(klasse):
+            namen = {
                 n.name for n in klasse.body
                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
             }
             # Alleen attributen die worden *toegewezen* tellen mee. Elk
             # gebruik meetellen maakt de controle waardeloos: dan geldt de
             # aanroep zelf als bewijs dat de methode bestaat.
-            gedefinieerd |= {
+            namen |= {
                 t.attr for n in ast.walk(klasse)
                 if isinstance(n, (ast.Assign, ast.AnnAssign))
                 for t in ast.walk(n)
                 if isinstance(t, ast.Attribute)
                 and isinstance(t.value, ast.Name) and t.value.id == "self"
             }
+            # 2.9.1: basisklassen uit hetzelfde bestand erven mee.
+            for basis in klasse.bases:
+                if isinstance(basis, ast.Name) and basis.id in klassen \
+                        and klassen[basis.id] is not klasse:
+                    namen |= eigen(klassen[basis.id])
+            return namen
+
+        for klasse in klassen.values():
+            gedefinieerd = eigen(klasse)
             for node in ast.walk(klasse):
                 if (isinstance(node, ast.Call)
                         and isinstance(node.func, ast.Attribute)

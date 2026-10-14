@@ -31,10 +31,12 @@ _WS_REGISTERED_KEY = f"{DOMAIN}_ws_registered"
 
 
 def stream_eligibility(coordinator) -> tuple[bool, str]:
-    """(beschikbaar, reden). Alleen IG, alleen demo of live."""
+    """(beschikbaar, reden). IG of cTrader (2.9.1), alleen demo of live."""
     venue = getattr(coordinator, "venue", None)
-    if getattr(venue, "name", None) != "ig" or not hasattr(venue, "streaming_credentials"):
-        return False, "live koers alleen met IG als broker"
+    naam = getattr(venue, "name", None)
+    if not ((naam == "ig" and hasattr(venue, "streaming_credentials"))
+            or (naam == "ctrader" and hasattr(venue, "luister_koers"))):
+        return False, "live koers alleen met IG of Pepperstone als broker"
     mode = getattr(getattr(coordinator, "mode", None), "value", None)
     if mode not in ("demo", "live"):
         return False, "live koers alleen in demo- of live-modus, niet op papier"
@@ -63,6 +65,12 @@ def _get_stream(hass: HomeAssistant, coordinator):
         return hass.async_create_background_task(
             coro, f"{DOMAIN} koersstroom {entry_id}")
 
+    if getattr(venue, "name", None) == "ctrader":
+        from .dashboard.stream import VenueTickStream
+
+        stream = VenueTickStream(venue, create_task=_taak)
+        streams[entry_id] = stream
+        return stream
     stream = PriceStream(venue.streaming_credentials, _open, create_task=_taak)
     streams[entry_id] = stream
     return stream
