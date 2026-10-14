@@ -28,7 +28,8 @@ def test_drempel():
 
 
 def test_alle_strategieen_nemen_de_helft_vanaf_3_usd():
-    for cfg in (scalp_exit_config(), V.exit_config("vp:pullback:15m"), D.exit_config()):
+    # 2.6.3: de veldproef neemt deelwinst op 1R (zie test_v263).
+    for cfg in (scalp_exit_config(), D.exit_config()):
         a = _eval(cfg, 4003.0, atr=20.0)
         assert a.kind == "partial_close" and a.close_fraction == 0.5, cfg
 

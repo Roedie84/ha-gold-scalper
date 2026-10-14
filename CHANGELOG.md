@@ -1,5 +1,17 @@
 # Changelog — Gold Scalper
 
+## 2.6.3
+
+* **Veldproef-uitstap in R in plaats van vaste USD** (Ruud 14-10: "gold scalper
+  verbeteren"). Nacht 13/14-10, 58 trades op 5m-30m (stops 4-12 USD/oz):
+  59 % winst, maar winnaars gemiddeld +18 USD tegen verliezers -89 USD
+  (netto -1.208 incl. +308 deelwinst). De vaste drempels (break-even +1,5,
+  winstslot vanaf +2, deelwinst vanaf +3 USD) sneden de winnaars af bij
+  ~0,2R terwijl een verlies 1R kost. Nu voor de veldproef: break-even op
+  0,5R, de helft dicht op 1R, winstslot vanaf 1R 50 % en vanaf 2R 70 % van de
+  winst, volgstop vanaf 1,5R op 1R. Scalp en daghandel ongewijzigd.
+* Strategieversies: veldproef-2.1.0, combinatie-1.9.0 (nieuwe run).
+
 ## 2.6.2
 
 * **Kleinere verliezen per trade** (Ruud 13-10: "verliezen per trade zijn te

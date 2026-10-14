@@ -101,6 +101,10 @@ class ExitConfig:
     enable_trailing: bool = True
     #: 2.5.7: winstslot in USD/oz (zie ``WINSTSLOT_TREDEN``).
     winstslot: bool = True
+    #: 2.6.3: eigen treden (vanaf, fractie); None = ``WINSTSLOT_TREDEN``.
+    winstslot_treden: tuple | None = None
+    #: 2.6.3: treden in veelvouden van de 'atr' (bij de veldproef: R).
+    winstslot_in_atr: bool = False
 
     #: Sluit als de positie na deze tijd nog binnen de dode zone hangt.
     time_stop_seconds: int = 240
@@ -239,7 +243,11 @@ class ExitManager:
             and self._deel_gehaald(profit_atr, profit_per_oz)
         )
         slot = (
-            winstslot_stop(side, open_price, exit_price)
+            winstslot_stop(
+                side, open_price, exit_price,
+                treden=self.config.winstslot_treden or WINSTSLOT_TREDEN,
+                schaal=atr if self.config.winstslot_in_atr else 1.0,
+            )
             if self.config.winstslot and not deel_eerst
             else None
         )
@@ -343,7 +351,9 @@ class ExitManager:
 
 
 def winstslot_stop(side: str, open_price: float, exit_price: float,
-                   min_afstand: float = BREAKEVEN_MIN_AFSTAND_USD) -> "tuple[float, str] | None":
+                   min_afstand: float = BREAKEVEN_MIN_AFSTAND_USD,
+                   treden: tuple = WINSTSLOT_TREDEN,
+                   schaal: float = 1.0) -> "tuple[float, str] | None":
     """2.5.7: de winstslotstop bij deze koers, of None onder de eerste trede.
 
     Altijd minstens ``min_afstand`` van de koers (IG weigert een stop tegen
@@ -351,8 +361,8 @@ def winstslot_stop(side: str, open_price: float, exit_price: float,
     d = 1.0 if side == "buy" else -1.0
     winst = (exit_price - open_price) * d
     fractie = None
-    for vanaf, f in WINSTSLOT_TREDEN:
-        if winst >= vanaf - 1e-9:
+    for vanaf, f in treden:
+        if winst >= vanaf * schaal - 1e-9:
             fractie = f
     if fractie is None:
         return None

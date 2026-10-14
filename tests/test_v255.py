@@ -25,7 +25,8 @@ def test_veldproef_15m_met_3_usd_winst():
     m = ExitManager(_zonder_deel(V.exit_config("vp:rsi_rev:15m")))
     a = m.evaluate("buy", 0.5, 4180.59, 4173.68, 4183.63, 4184.03, 6.91,
                    NU - timedelta(minutes=30), NU, 0.8)
-    assert a.kind == "modify_stop" and a.new_stop > 4180.59
+    # 2.6.3: in R; +3,04 is 0,44R, onder de break-even van 0,5R.
+    assert a.kind == "hold"
 
 
 def test_onder_15_usd_en_onder_halve_r_niets():

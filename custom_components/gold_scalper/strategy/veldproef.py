@@ -28,11 +28,11 @@ import math
 from dataclasses import dataclass, field
 
 from ..analysis.signals import Candles
-from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, BREAKEVEN_UITERLIJK_USD, ExitConfig, deelwinst_velden
+from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, DEELWINST_FRACTIE, ExitConfig
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
 
-VELDPROEF_VERSIE = "veldproef-2.0.0"  # 2.6.2: grootte op risico, max 3 met risico per richting. 2.6.1: 2.6.1: groepsregel per tijdvak. 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
+VELDPROEF_VERSIE = "veldproef-2.1.0"  # 2.6.3: uitstap in R. 2.6.2: 2.6.2: grootte op risico, max 3 met risico per richting. 2.6.1: 2.6.1: groepsregel per tijdvak. 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
@@ -161,6 +161,9 @@ def ontleed(naam: str) -> tuple[str, str]:
 #: veldproefpositie R door op de plek van de ATR (zie :func:`r_van`).
 #: 2.5.1 (Ruud 13-10: "relatief snel stop naar entry"): 0,5R (was 1R).
 BREAKEVEN_R = 0.5
+#: 2.6.3: de helft dicht op 1R; winstslot vanaf 1R 50 %, vanaf 2R 70 % (in R).
+DEELWINST_R = 1.0
+WINSTSLOT_R = ((1.0, 0.5), (2.0, 0.7))
 VOLGSTOP_VANAF_R = 1.5
 VOLGSTOP_AFSTAND_R = 1.0
 
@@ -170,11 +173,21 @@ def exit_config(naam: str) -> ExitConfig:
     vanaf 1,5R op 1R afstand, en de maximale duur. Geen tijdstop, geen
     deelsluiting. Afstanden in R: de coordinator geeft R door als 'atr'."""
     _, tf = ontleed(naam)
+    # 2.6.3 (Ruud 14-10: "gold scalper verbeteren"): alles in R in plaats van
+    # vaste USD. Nacht 13/14-10 (58 trades, 5m-30m, stops 4-12 USD): winnaars
+    # gemiddeld +18 USD tegen verliezers -89 USD bij 59 % winst. De vaste
+    # drempels (break-even +1,5, winstslot vanaf +2, deelwinst vanaf +3 USD)
+    # sneden de winnaars af bij ~0,2R terwijl het verlies 1R bleef.
     return ExitConfig(
         breakeven_trigger_atr=BREAKEVEN_R,
         breakeven_min_afstand_usd=BREAKEVEN_MIN_AFSTAND_USD,
-        breakeven_trigger_usd=BREAKEVEN_UITERLIJK_USD,
-        **deelwinst_velden(),  # 2.5.9
+        breakeven_trigger_usd=None,
+        enable_partial_close=True,
+        partial_close_fraction=DEELWINST_FRACTIE,
+        partial_close_trigger_atr=DEELWINST_R,
+        partial_close_trigger_usd=None,
+        winstslot_treden=WINSTSLOT_R,
+        winstslot_in_atr=True,
         enable_trailing=True,
         trailing_activate_atr=VOLGSTOP_VANAF_R,
         trailing_distance_atr=VOLGSTOP_AFSTAND_R,

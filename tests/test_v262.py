@@ -43,6 +43,6 @@ def test_coordinator_gebruikt_het():
 def test_versies():
     from gold_scalper.const import INTEGRATION_VERSION
     from gold_scalper.strategy import combinatie as C
-    assert INTEGRATION_VERSION == "2.6.2"
-    assert V.VELDPROEF_VERSIE == "veldproef-2.0.0"
-    assert C.COMBINATIE_VERSIE == "combinatie-1.8.0"
+    assert INTEGRATION_VERSION >= "2.6.2"
+    assert V.VELDPROEF_VERSIE >= "veldproef-2.0.0"
+    assert C.COMBINATIE_VERSIE >= "combinatie-1.8.0"

@@ -44,7 +44,7 @@ def test_break_even_vanaf_1r():
 
 def test_volgstop_vanaf_1_5r():
     a = _eval(4195.5, 4189.8)  # 1,625R winst
-    assert a.kind == "modify_stop" and abs(a.new_stop - 4193.55) < 1e-6  # 2.5.7: winstslot strakker
+    assert a.kind == "modify_stop" and abs(a.new_stop - 4192.25) < 1e-6  # 2.6.3: winstslot in R (50 % van 1,6R)
 
 
 def test_geen_tijdstop_wel_maximale_duur():
