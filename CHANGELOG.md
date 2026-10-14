@@ -7,6 +7,12 @@
 - Verzoeken worden nu gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
 - Bij "rate limited" tot 4 pogingen met oplopende wachttijd (1,5 s, 3 s, ...); orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
 
+## 2.9.2 - 14-10-2026
+
+### Pepperstone: noodstop na deelsluiting
+- Twee keer NOODSTOP (20:59 en 21:15): "broker meldt 25.0, database 24.50" en "10.0 tegen 9.50". Oorzaak: de deelsluiting vraagt de helft (49 oz -> 24,5); cTrader sluit in hele ounces en sloot 24. De database boekte 24,5 dicht, dus bleef 24,5 open tegen 25 bij de broker.
+- Nu wordt geboekt wat de broker bevestigde (`deel_units`): nooit meer dan gevraagd, zonder bevestiging het gevraagde (IG ongewijzigd).
+
 ## 2.9.1 - 14-10-2026
 
 ### Live koers ook bij Pepperstone

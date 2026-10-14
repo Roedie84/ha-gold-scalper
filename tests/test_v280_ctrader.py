@@ -337,3 +337,13 @@ async def test_live_koers_van_ctrader_naar_dashboard(monkeypatch):
     await stroom.async_stop()
     assert not v._koers_luisteraars
     await v.sluit_verbinding()
+
+
+def test_deelsluiting_boekt_wat_de_broker_sloot():
+    """2.9.2: NOODSTOP 14-10 - helft van 49 oz = 24,5 gevraagd, cTrader sloot 24."""
+    from gold_scalper.coordinator import deel_units
+    assert deel_units(24.5, 24.0) == 24.0
+    assert deel_units(24.5, None) == 24.5
+    assert deel_units(24.5, 0) == 24.5
+    assert deel_units(24.5, 49.0) == 24.5   # nooit meer dan gevraagd
+    assert ct.naar_volume(24.5) == 2400

@@ -221,6 +221,22 @@ class _TicketOnly:
     ticket: str
 
 
+
+def deel_units(gevraagd: float, bevestigd) -> float:
+    """Hoeveel er bij een deelsluiting echt dicht ging (2.9.2).
+
+    De broker bevestigt soms minder dan gevraagd (afronding op de volumestap);
+    nooit meer dan gevraagd boeken, en zonder bevestigd aantal het gevraagde.
+    """
+    try:
+        b = float(bevestigd)
+    except (TypeError, ValueError):
+        return gevraagd
+    if b <= 0 or b > gevraagd + 1e-9:
+        return gevraagd
+    return b
+
+
 class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     """Houdt de handelslus, de administratie en alle bewaking bij elkaar."""
 
@@ -3501,8 +3517,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         # niet mee in de bewijsfase.
                         # 1.7.9: alleen wat de broker bevestigde.
                         if getattr(deel, "success", False):
+                            # 2.9.2: boek wat de broker werkelijk sloot. cTrader
+                            # sluit in hele ounces (24,5 -> 24); de gevraagde
+                            # helft boeken liet database en broker uiteenlopen
+                            # (NOODSTOP 14-10, 25,0 tegen 24,50).
+                            gesloten = deel_units(units, getattr(deel, "units", None))
                             await self._record_partial(
-                                ticket, units, action.reason,
+                                ticket, gesloten, action.reason,
                                 datetime.now(timezone.utc),
                             )
                         else:
