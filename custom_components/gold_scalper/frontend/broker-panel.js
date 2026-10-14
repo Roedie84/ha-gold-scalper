@@ -1202,7 +1202,8 @@ ${tl}
       const b = BRON[t.kostenbron] || "onbekend";
       const pa = isNum(t.pnl_account) && t.valuta_account && t.valuta_account !== d.instrument.valuta
         ? ` <span class="dim">(${fmtS(t.pnl_account)} ${esc(t.valuta_account)})</span>` : "";
-      return `<tr>${cel("Gesloten", esc(this._dhm(t.sluit_t)), "breed")}` +
+      const run = t.eerdere_run ? ` <span class="dim" title="Trade uit run ${esc(String(t.run))}; telt niet mee in de statistiek van de lopende run">· run ${esc(String(t.run))}</span>` : "";
+      return `<tr>${cel("Gesloten", esc(this._dhm(t.sluit_t)) + run, "breed")}` +
         cel("Richting", `<span class="tag ${t.richting}">${t.richting.toUpperCase()}</span>`) +
         cel("Units", fmt(t.units), "r") + cel("Instap", fmt(t.instap), "r") + cel("Uitstap", fmt(t.uitstap), "r") +
         cel("P&amp;L", `<b>${fmtS(t.pnl)}</b>${pa}`, `r ${toon(t.pnl)}`) +

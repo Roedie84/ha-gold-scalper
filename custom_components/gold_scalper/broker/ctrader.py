@@ -692,9 +692,17 @@ class CTraderVenue(ExecutionVenue):
                                error=self._fout(payload))
         deal = payload.get("deal") or {}
         positie = payload.get("position") or {}
+        ticket = str(positie.get("positionId") or deal.get("positionId"))
+        vul = float(deal.get("executionPrice") or positie.get("price") or gevraagd)
+        # 2.9.4: cTrader zet stop en doel bij een marktorder relatief tot de
+        # vulprijs; bij slippage liggen ze dan niet op de gevraagde niveaus en
+        # klopten stop-slippage en kosten niet (-5 USD "kosten", 14-10).
+        # Daarom na de vulling op de gevraagde niveaus zetten, als die aan de
+        # goede kant van de vulprijs liggen; anders blijven de relatieve staan.
+        await self._zet_niveaus(ticket, side, vul, stop_loss, take_profit)
         return OrderResult(
-            success=True, ticket=str(positie.get("positionId") or deal.get("positionId")),
-            fill_price=float(deal.get("executionPrice") or positie.get("price") or gevraagd),
+            success=True, ticket=ticket,
+            fill_price=vul,
             requested_price=gevraagd,
             units=float(deal.get("filledVolume") or volume) / VOLUME_PER_OZ,
             latency_ms=latentie, client_ref=comment or None,
@@ -745,6 +753,23 @@ class CTraderVenue(ExecutionVenue):
         except VenueError as err:
             return OrderResult(success=False, ticket=ticket, error=str(err))
         return OrderResult(success=True, ticket=ticket)
+
+    async def _zet_niveaus(self, ticket: str, kant: str, vul: float,
+                           stop_loss: float | None, take_profit: float | None) -> None:
+        if not ticket or ticket == "None" or (stop_loss is None and take_profit is None):
+            return
+        teken = 1 if kant == "buy" else -1
+        sl = stop_loss if stop_loss is not None and (vul - stop_loss) * teken > 0 else None
+        tp = take_profit if take_profit is not None and (take_profit - vul) * teken > 0 else None
+        if sl is None and tp is None:
+            return
+        try:
+            uit = await self._wijzig(ticket, sl, tp)
+        except Exception as err:  # noqa: BLE001 - de relatieve niveaus staan er al
+            _LOGGER.debug("cTrader: niveaus na vulling niet gezet: %s", err)
+            return
+        if not uit.success:
+            _LOGGER.debug("cTrader: niveaus na vulling niet gezet: %s", uit.error)
 
     async def _huidig_niveau(self, ticket: str, veld: str):
         for p in await self._ruwe_posities():

@@ -372,3 +372,45 @@ def test_commissie_en_scalp_handmatig_uit():
     co = (Path(__file__).resolve().parents[1] / "custom_components" / "gold_scalper"
           / "coordinator.py").read_text(encoding="utf-8")
     assert "self.scalp_handmatig_uit" in co and "CONF_SCALP_UIT" in co
+
+
+@pytest.mark.asyncio
+async def test_niveaus_na_vulling_absoluut():
+    """2.9.4: na de vulling stop en doel op de gevraagde niveaus (niet relatief)."""
+    v, ws = _venue(trading_enabled=True, max_units=50)
+    uit = await v.place_order("XAUUSD", "buy", 2, stop_loss=4085.08, take_profit=4115.08)
+    assert uit.success
+    wijz = [b["payload"] for b in ws.verstuurd if b["payloadType"] == ct.AMEND_SLTP_REQ]
+    assert wijz and wijz[-1]["stopLoss"] == 4085.08 and wijz[-1]["takeProfit"] == 4115.08
+    # Stop aan de verkeerde kant van de vulprijs: niet zetten (relatieve blijft).
+    n = len(wijz)
+    await v.place_order("XAUUSD", "buy", 2, stop_loss=4096.0, take_profit=None)
+    assert len([b for b in ws.verstuurd if b["payloadType"] == ct.AMEND_SLTP_REQ]) == n
+    await v.sluit_verbinding()
+
+
+def test_recente_trades_ook_uit_vorige_run(tmp_path):
+    """2.9.4: na een runwissel blijven sluitende trades zichtbaar, met runlabel."""
+    import sqlite3
+    from datetime import datetime, timezone
+    from gold_scalper.dashboard.broker import read_database, _trade_rows, _TRADE_KOLOMMEN
+    db = tmp_path / "t.db"
+    c = sqlite3.connect(db)
+    kol = [k.strip() for k in _TRADE_KOLOMMEN.split(",")]
+    c.execute(f"CREATE TABLE trades ({', '.join(kol)}, mode TEXT)")
+    c.execute("CREATE TABLE equity (run_id, ts, balance, equity)")
+    nu = datetime.now(timezone.utc).isoformat()
+    for i, run in ((1, 3), (2, 4)):
+        rij = {k: None for k in kol}
+        rij.update(id=i, run_id=run, side="buy", volume=0.1, open_time=nu, close_time=nu,
+                   open_price=1.0, close_price=2.0, net_pnl=1.0, broker_ticket=str(i))
+        c.execute(f"INSERT INTO trades ({', '.join(kol)}) VALUES ({', '.join('?' * len(kol))})",
+                  [rij[k] for k in kol])
+    c.commit(); c.close()
+    try:
+        d = read_database(db, 4)
+    except sqlite3.OperationalError as err:   # schema van _reeks e.d. ontbreekt
+        pytest.skip(str(err))
+    rijen = _trade_rows(d["gesloten"])
+    assert {r["run"] for r in rijen} == {3, 4}
+    assert [r["eerdere_run"] for r in rijen if r["run"] == 3] == [True]

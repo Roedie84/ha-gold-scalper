@@ -157,7 +157,7 @@ _TRADE_KOLOMMEN = (
     "id, broker_ticket, side, volume, open_time, open_price, close_time, "
     "close_price, close_reason, reconciled_close_reason, net_pnl, "
     "net_pnl_account, account_currency, total_cost, cost_source, "
-    "duration_seconds, stop_loss, take_profit, exit_regime"
+    "duration_seconds, stop_loss, take_profit, exit_regime, run_id"
 )
 
 #: 1.10.0: optioneel, alleen als de kolom er al is (een database die nog
@@ -197,8 +197,13 @@ def read_database(path: str | Path, run_id: int) -> dict:
             "AND open_time >= datetime('now', '-2 days')))",
             (run_id,),
         ).fetchall()
+        # 2.9.4: ook trades van eerdere runs die de laatste 2 dagen sloten.
+        # Een optiewijziging start een nieuwe run; posities uit de vorige run
+        # lopen door en sluiten later. Alleen de lopende run tonen liet de
+        # lijst stilstaan terwijl er wel trades sloten (Pepperstone 14-10).
         gesloten = conn.execute(
-            f"SELECT {kolommen} FROM trades WHERE run_id=? AND close_time IS NOT NULL "
+            f"SELECT {kolommen} FROM trades WHERE close_time IS NOT NULL AND ("
+            "run_id=? OR close_time >= datetime('now', '-2 days')) "
             "ORDER BY close_time DESC LIMIT ?",
             (run_id, max(RECENT_TRADES, MARKER_TRADES)),
         ).fetchall()
@@ -235,7 +240,8 @@ def read_database(path: str | Path, run_id: int) -> dict:
     return {
         "delen": delen,
         "open": [dict(r) for r in open_rijen],
-        "gesloten": [dict(r) for r in gesloten],
+        "gesloten": [{**dict(r), "eerdere_run": dict(r).get("run_id") not in (None, run_id)}
+                     for r in gesloten],
         "equity": [dict(r) for r in equity],
         "equity_rijen": aantal,
         "reeks": reeks,
@@ -454,6 +460,8 @@ def _trade_rows(rijen: list[dict]) -> list[dict]:
             "looptijd_s": looptijd,
             "kostenbron": r.get("cost_source") or "unknown",
             "duur_s": r.get("duration_seconds"),
+            "run": r.get("run_id"),
+            "eerdere_run": bool(r.get("eerdere_run")),
         })
     return uit
 

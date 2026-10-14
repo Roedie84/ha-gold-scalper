@@ -7,6 +7,16 @@
 - Verzoeken worden nu gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
 - Bij "rate limited" tot 4 pogingen met oplopende wachttijd (1,5 s, 3 s, ...); orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
 
+## 2.9.4 - 14-10-2026
+
+### Dashboard: recente trades bleven staan
+- Melding Ruud: "recente trades lijken niet te updaten". Oorzaak: de lijst toonde alleen de lopende run. Een optiewijziging (turbo uit, 22:44) startte run 4; posities uit run 3 sloten daarna wel (20:52, 20:55 UTC), maar vielen buiten de lijst.
+- Nu: de laatste gesloten trades van de lopende run én trades uit eerdere runs die de laatste 2 dagen sloten, met "· run N" erachter. Statistiek, equity en bewijsfase blijven per run.
+
+### Pepperstone: stop en doel op het gevraagde niveau
+- Drie 1m-shorts sloten op de stop met "kosten -5,00": cTrader zet stop en doel bij een marktorder relatief tot de vulprijs, dus bij slippage niet op het niveau in de administratie; de kostenmeting rekende dan tegen een stop die er niet lag.
+- Na de vulling worden stop en doel nu op de gevraagde niveaus gezet (`AmendPositionSLTP`), als die aan de goede kant van de vulprijs liggen; anders blijven de relatieve staan.
+
 ## 2.9.3 - 14-10-2026
 
 ### Pepperstone na de eerste 99 trades (besluit Ruud: advies 1, 2, 3)
