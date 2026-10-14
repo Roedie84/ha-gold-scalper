@@ -138,6 +138,7 @@ from .learning.robustness import evaluate_robustness
 from .learning.sessions import build_news_impact, build_sessions
 from .strategy.aggregator import BAR_SECONDS, QuoteAggregator, closed_only
 from .strategy import veldproef as veldproef_mod
+from .strategy import uitgezet_schaduw as uitgezet_mod
 from .strategy import turbo as turbo_mod
 from .strategy.pyramid import PyramidConfig, consider_addition
 from .strategy.scalp_reeks import ReeksConfig, stukken_nu
@@ -566,6 +567,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._vp_uitgezet: dict[str, dict] = {}
         #: 2.6.1: scalp (incl. turbo) als groep uitgezet; None = aan.
         self._scalp_uitgezet: dict | None = None
+        #: 2.7.1 (H-GS-003): schaduwtrades van uitgezette groepen.
+        self.uitgezet_schaduw = uitgezet_mod.UitgezetBoek()
         self._vp_uitgezet_volgende = 0.0
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
         # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
@@ -2468,6 +2471,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 1.9.0: schaduwtrades met dezelfde koers en bars; geen extra
             # verzoek bij de broker.
             await self._werk_schaduw_bij(quote, now)
+            # 2.7.1: schaduwtrades van uitgezette groepen (H-GS-003).
+            await self._werk_uitgezet_bij(quote, now)
             # 1.9.5: tijdstopvarianten, idem. Alleen meting.
             await self._werk_varianten_bij(quote, now)
 
@@ -2760,6 +2765,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         open_positions, equity,
                     )
 
+                # 2.7.1 (H-GS-003): een geldig signaal van een uitgezette groep
+                # als schaduwtrade volgen; nooit een echte order.
+                if (quote.tradeable and not self.koers_verouderd and not uitgevoerd
+                        and getattr(r_signal, "geldig", False) and (
+                            r_signal.reject_reason == "opzet_uitgezet"
+                            or (strategie == STRATEGIE_SCALP and self._scalp_uitgezet
+                                and self.alles and r_signal.should_trade))):
+                    await self._open_uitgezet(strategie, r_signal, quote, now, equity)
+
                 # 2.4.0: van de veldproef alleen signalen met een richting
                 # (anders 47 rijen per cyclus).
                 if not (veldproef_mod.is_veldproef(strategie) and not r_signal.direction):
@@ -2946,6 +2960,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 2.7.0: onderzoeksrapport (samenvatting), risicolimieten.
             "onderzoek": onderzoek_mod.samenvatting(self.onderzoek) if self.onderzoek else None,
             "risico_limieten": self.risico_info,
+            "uitgezet_schaduw": {
+                "open": len(self.uitgezet_schaduw.open_trades),
+                "gesloten_sinds_start": len(self.uitgezet_schaduw.gesloten),
+                "vervallen": self.uitgezet_schaduw.vervallen,
+                "herkomst": uitgezet_mod.HERKOMST,
+            },
             "risk": self.risk.as_dict(),
             "lifecycle": {
                 **self.lifecycle.as_dict(),
@@ -3622,8 +3642,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             sinds = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
             rijen = await self.hass.async_add_executor_job(
                 self.db.gesloten_als_dict, self.mode.value, sinds)
+            schaduw = []
+            try:
+                schaduw = [uitgezet_mod.als_onderzoeksrij(r) for r in
+                           await self.hass.async_add_executor_job(self.db.uitgezet_gesloten, sinds)]
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Uitgezette schaduwtrades niet te lezen: %s", err)
             self.onderzoek = await self.hass.async_add_executor_job(
-                onderzoek_mod.rapport, rijen)
+                onderzoek_mod.rapport, rijen, schaduw)
         except Exception as err:  # noqa: BLE001 - onderzoek mag de handel niet raken
             _LOGGER.debug("Onderzoeksrapport niet bijgewerkt: %s", err)
 
@@ -3883,11 +3909,53 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if len(self.schaduw.gesloten) + self.schaduw.vervallen != voor:
             self._schaduw_stats = self.schaduw.statistiek()
 
+    async def _open_uitgezet(self, strategie: str, signal, quote: VenueQuote,
+                             now: datetime, equity: float | None) -> None:
+        """2.7.1: schaduwtrade voor een uitgezette groep (H-GS-003)."""
+        if self.db is None:
+            return
+        try:
+            trade = self.uitgezet_schaduw.openen(
+                strategie=strategie, signal=signal, bid=quote.bid, ask=quote.ask,
+                nu=now, units=self._grootte(signal, quote, equity), run_id=self.run_id,
+            )
+            if trade is not None:
+                await self.hass.async_add_executor_job(self.db.bewaar_uitgezet, trade)
+        except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
+            _LOGGER.debug("Schaduwtrade uitgezette groep niet vastgelegd: %s", err)
+
+    def _maat_uitgezet(self, t) -> float:
+        if veldproef_mod.is_veldproef(t.strategie):
+            return veldproef_mod.r_van(t.open_price, t.take_profit) or 0.0
+        return self.state.atr.value or 0.0
+
+    async def _werk_uitgezet_bij(self, quote: VenueQuote, now: datetime) -> None:
+        if not self.uitgezet_schaduw.open_trades or self.db is None or self.koers_verouderd:
+            return
+        try:
+            pq = self._paper_quote(quote)
+            gewijzigd = self.uitgezet_schaduw.bijwerken(
+                bid=quote.bid, ask=quote.ask, hoog=pq.high, laag=pq.low, nu=now,
+                exits_voor=self._exits_voor, maat_voor=self._maat_uitgezet,
+            )
+            for t in gewijzigd:
+                await self.hass.async_add_executor_job(self.db.bewaar_uitgezet, t)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Schaduwtrades uitgezette groepen niet bijgewerkt: %s", err)
+
     async def _laad_schaduw(self) -> None:
         """Schaduwtrades van de actieve run uit de eigen tabel."""
         self.schaduw.open_trades = []
         self.schaduw.gesloten = []
         self.schaduw.vervallen = 0
+        # 2.7.1: open schaduwtrades van uitgezette groepen zijn na een
+        # herstart of runwissel niet eerlijk verder te volgen.
+        self.uitgezet_schaduw = uitgezet_mod.UitgezetBoek()
+        if self.db is not None:
+            try:
+                await self.hass.async_add_executor_job(self.db.uitgezet_open_laten_vervallen)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("Uitgezette schaduwtrades niet afgesloten: %s", err)
         if self.db is None or self.run_id is None:
             self._schaduw_stats = self.schaduw.statistiek()
             return

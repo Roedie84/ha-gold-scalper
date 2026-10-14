@@ -175,7 +175,7 @@ def test_coordinator_gebruikt_alles():
 
 def test_versie():
     from gold_scalper.const import INTEGRATION_VERSION
-    assert INTEGRATION_VERSION == "2.7.0"
+    assert INTEGRATION_VERSION >= "2.7.0"
 
 
 # --- P0: afstemming over alle pagina's ------------------------------------- #

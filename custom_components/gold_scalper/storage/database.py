@@ -250,6 +250,38 @@ CREATE TABLE IF NOT EXISTS schaduw_trades (
 );
 CREATE INDEX IF NOT EXISTS idx_schaduw_run ON schaduw_trades(run_id, status);
 
+-- 2.7.1: schaduwtrades van uitgezette groepen (hypothese H-GS-003). Geschat,
+-- eigen tabel: telt nergens mee in het echte resultaat of de live-poort.
+CREATE TABLE IF NOT EXISTS uitgezet_schaduw (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id            INTEGER,
+    strategie         TEXT NOT NULL,
+    bar               TEXT,
+    richting          INTEGER NOT NULL CHECK (richting IN (1, -1)),
+    open_time         TEXT NOT NULL,
+    open_price        REAL NOT NULL,
+    open_mid          REAL NOT NULL,
+    open_spread       REAL NOT NULL,
+    units             REAL NOT NULL,
+    stop_loss         REAL,
+    take_profit       REAL,
+    reden             TEXT NOT NULL,
+    reden_tekst       TEXT,
+    score             REAL,
+    status            TEXT NOT NULL DEFAULT 'open',
+    close_time        TEXT,
+    close_price       REAL,
+    close_mid         REAL,
+    close_reason      TEXT,
+    bruto             REAL,
+    kosten            REAL,
+    netto             REAL,
+    mfe               REAL,
+    mae               REAL,
+    laatst_bijgewerkt TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_uitgezet_schaduw ON uitgezet_schaduw(status, open_time);
+
 -- 1.9.5: tijdstopvarianten (L-GS-008). Elke echte trade nagespeeld met een
 -- andere tijdstop (240/480/720 s en zonder). Alleen meting: eigen tabel,
 -- telt nergens mee in het echte resultaat, de bewijsfase of de live-poort.
@@ -1015,6 +1047,39 @@ class TradeDatabase:
             (mode, sinds_iso),
         ).fetchall()
         return [dict(zip(gewenst, rij)) for rij in rijen]
+
+    # -- 2.7.1: schaduwtrades van uitgezette groepen ------------------------ #
+
+    def bewaar_uitgezet(self, trade) -> int:
+        kolommen = ("strategie", "bar") + SCHADUW_KOLOMMEN
+        waarden = [getattr(trade, k) for k in kolommen]
+        if getattr(trade, "id", None) is None:
+            cur = self.conn.execute(
+                f"INSERT INTO uitgezet_schaduw ({', '.join(kolommen)}) "
+                f"VALUES ({', '.join('?' for _ in kolommen)})", waarden,
+            )
+            trade.id = int(cur.lastrowid)
+        else:
+            self.conn.execute(
+                f"UPDATE uitgezet_schaduw SET {', '.join(f'{k}=?' for k in kolommen)} WHERE id=?",
+                (*waarden, trade.id),
+            )
+        self.conn.commit()
+        return trade.id
+
+    def uitgezet_gesloten(self, sinds_iso: str) -> list[dict]:
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM uitgezet_schaduw WHERE status='gesloten' AND open_time >= ? "
+            "ORDER BY open_time, id", (sinds_iso,)).fetchall()]
+
+    def uitgezet_open_laten_vervallen(self) -> int:
+        """Bij een herstart of nieuwe run: open schaduwtrades zijn niet eerlijk
+        verder te volgen."""
+        cur = self.conn.execute(
+            "UPDATE uitgezet_schaduw SET status='vervallen', "
+            "close_reason='niet te volgen (herstart)' WHERE status='open'")
+        self.conn.commit()
+        return cur.rowcount
 
     def oudste_niet_afgestemd(self, mode: str, niet_voor_iso: str) -> str | None:
         """2.7.0: open_time van de oudste gesloten brokertrade zonder afstemming."""

@@ -1022,6 +1022,10 @@ class GoldScalperBrokerPanel extends HTMLElement {
       const slPt = isNum(p.sl) && isNum(p.instap) ? (p.richting === "long" ? p.sl - p.instap : p.instap - p.sl) : null;
       const bijSl = slPt !== null && isNum(p.units) ? slPt * p.units * (omzet !== null ? omzet : 1) : null;
       const bijSlV = omzet !== null ? vl : iv;
+      // 2.7.1 (Ruud 14-10: "bij TP ook toevoegen"): resultaat als het doel geraakt wordt.
+      const tpPt = isNum(p.tp) && isNum(p.instap) ? (p.richting === "long" ? p.tp - p.instap : p.instap - p.tp) : null;
+      const bijTp = tpPt !== null && isNum(p.units) ? tpPt * p.units * (omzet !== null ? omzet : 1) : null;
+      const verh = bijTp !== null && bijSl !== null && bijSl < 0 ? bijTp / -bijSl : null;
       // 2.5.9: al genomen deelwinst.
       const ger = isNum(p.gerealiseerd_account) ? p.gerealiseerd_account
         : isNum(p.gerealiseerd) ? p.gerealiseerd * (omzet !== null ? omzet : 1) : null;
@@ -1039,10 +1043,13 @@ class GoldScalperBrokerPanel extends HTMLElement {
         cel("Bij SL", bijSl === null ? "—" : `<b>${fmtS(bijSl)}</b> <span class="dim">${esc(bijSlV || "")}</span>` +
           `<div class="dim">${bijSl >= 0 ? "vastgezet" : "risico"}</div>`,
           `r ${bijSl === null ? "" : toon(bijSl)}`) +
+        cel("Bij TP", bijTp === null ? "—" : `<b>${fmtS(bijTp)}</b> <span class="dim">${esc(bijSlV || "")}</span>` +
+          `<div class="dim">doel${verh !== null ? ` · ${fmt(verh, 1)}× risico` : ""}</div>`,
+          `r ${bijTp === null ? "" : toon(bijTp)}`) +
         cel("Duur", duur(this._nu() - p.geopend), "r", `op-duur-${i}`) +
         cel("Uitstap", esc(this._uitTekst(p)), "breed", `op-uit-${i}`) + "</tr>";
     }).join("");
-    this._q("#posities").innerHTML = `<table><thead><tr><th>Ticket</th><th>Richting</th><th>Strategie</th><th class="r">Units</th><th class="r">Instap</th><th class="r">Koers</th><th class="r">SL</th><th class="r">TP</th><th class="r">P&amp;L</th><th class="r" title="Al genomen deelwinst van deze positie">Gerealiseerd</th><th class="r">Punten</th><th class="r" title="Resultaat als de stop nu geraakt wordt: vastgezette winst of het risico">Bij SL</th><th class="r">Duur</th><th>Uitstapregime</th></tr></thead><tbody>${rijen}</tbody></table>`;
+    this._q("#posities").innerHTML = `<table><thead><tr><th>Ticket</th><th>Richting</th><th>Strategie</th><th class="r">Units</th><th class="r">Instap</th><th class="r">Koers</th><th class="r">SL</th><th class="r">TP</th><th class="r">P&amp;L</th><th class="r" title="Al genomen deelwinst van deze positie">Gerealiseerd</th><th class="r">Punten</th><th class="r" title="Resultaat als de stop nu geraakt wordt: vastgezette winst of het risico">Bij SL</th><th class="r" title="Resultaat als het doel (TP) nu geraakt wordt, op de resterende units">Bij TP</th><th class="r">Duur</th><th>Uitstapregime</th></tr></thead><tbody>${rijen}</tbody></table>`;
   }
 
   _renderEquity(d) {

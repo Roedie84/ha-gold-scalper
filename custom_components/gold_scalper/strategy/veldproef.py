@@ -428,10 +428,21 @@ def evalueer(
                            components={"strategie": naam, **(onderdelen or {})})
 
     if uitgezet and naam in uitgezet:
+        # 2.7.1 (H-GS-003): het signaal wordt nog wel bepaald, zodat het als
+        # schaduwtrade (strategy/uitgezet_schaduw) gevolgd kan worden; er komt
+        # nooit een echte order van.
         info = uitgezet[naam] if isinstance(uitgezet, dict) else {}
-        return weiger("opzet_uitgezet",
-                      f"{naam}: uitgezet (n={info.get('n', '?')}, t={info.get('t', '?')}, "
-                      f"grens n >= {UITZET_MIN_N} en t < {UITZET_MAX_T:g})")
+        tekst = (f"{naam}: uitgezet (n={info.get('n', '?')}, t={info.get('t', '?')}, "
+                 f"grens n >= {UITZET_MIN_N} en t < {UITZET_MAX_T:g})")
+        sig = evalueer(naam, bars, bid, ask, cfg, 0, seconds_since_last_entry,
+                       laatste_bar, None)
+        if sig.should_trade and sig.geldig:
+            sig.should_trade = False
+            sig.reject_reason = "opzet_uitgezet"
+            sig.reason = tekst
+            sig.components = {**(sig.components or {}), "uitgezet": True}
+            return sig
+        return weiger("opzet_uitgezet", tekst)
     if ask - bid > cfg.max_spread:
         return weiger("spread_too_wide", f"Spread {ask - bid:.2f} boven {cfg.max_spread:.2f}")
     k = bars.kenmerken(tf)

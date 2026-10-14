@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 2.7.1 - 14-10-2026
+
+### H-GS-003: uitsluiting veldproef 1m/3m en scalp, getoetst op ongeziene data
+- **Gevonden:** 1m, 3m en scalp staan sinds 2.6.1 (13-10 ~17:47 UTC) uit via de groepsregel (n >= 200, t < -3). Dat besluit is niet vooraf als hypothese vastgelegd en er kwam daarna geen data meer van die groepen: het was niet te bevestigen.
+- **Bewijs (30 dagen demo):** bruto per oz 1m -0,06, 3m -0,07, scalp -0,16 USD tegen ~0,8 USD/oz kosten (spread 0,76 + slippage ~0,03); per cluster t = -3,3 / -3,3 / -2,9.
+- **Wijziging:** H-GS-003 geregistreerd (verwachting negatief; ontdekking tot 13-10 17:48 UTC, bevestiging vanaf 14-10 06:00 UTC; verworpen bij netto per cluster >= 0 of t > -1, bevestigd bij netto < 0 en t <= -2, na >= 30 clusters). Eerlijk vermeld: registratie achteraf voor het besluit, vooraf voor de bevestiging.
+- **Bevestiging zonder echte orders:** geldige signalen van uitgezette opzetten worden als schaduwtrade gevolgd (`strategy/uitgezet_schaduw.py`, tabel `uitgezet_schaduw`): per opzet één tegelijk en één per bar, instap incl. gemeten spread, gemeten gemiddelde slippage 0,02/oz per zijde, eigen uitstapregels (veldproef in R; geen deelsluiting), grootte als een echte order. Herkomst `geschat`; telt nergens mee in het echte resultaat, de bewijsfase of de live-poort. Echte orders zouden de risico-/clusterlimieten van H-GS-001/002 opeten.
+- Onderzoeksrapport: hypotheses kunnen een negatieve verwachting en een eigen bevestigingsbron hebben; H-GS-001/002 ongewijzigd.
+
+### Paneel
+- Open posities: kolom **Bij TP** - resultaat als het doel nu geraakt wordt (resterende units, accountvaluta) en de verhouding tot het risico bij SL.
+
+### Tests
+- `tests/test_v271.py`.
+
 ## 2.7.0 — verbeterplan fase P0-P6 (meetketen, risico, onderzoek)
 
 Opdracht Ruud 14-10 ("Gold Scalper verbeterplan"). Geen strategie- of

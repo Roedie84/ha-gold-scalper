@@ -258,6 +258,15 @@ class Hypothese:
     min_clusters: int = MIN_CLUSTERS
     economische_logica: str = ""
     extra: dict = field(default_factory=dict)
+    #: 2.7.1: "positief" (de opzet verdient na kosten) of "negatief" (de
+    #: opzet verliest na kosten; bv. een uitsluiting).
+    verwachting: str = "positief"
+    #: 2.7.1: losse strategienamen naast ``strategie_prefix`` (bv. "scalp").
+    strategieen: tuple = ()
+    #: 2.7.1: waar de bevestiging vandaan komt: "trades" (echte brokertrades)
+    #: of "schaduw_uitgezet" (gesimuleerd, geschat; zie
+    #: strategy/uitgezet_schaduw).
+    bron_bevestiging: str = "trades"
 
 
 #: Vastgelegd op 14-10-2026, vóór de bevestigingsperiode begon. Niet achteraf
@@ -293,11 +302,43 @@ HYPOTHESEN: tuple[Hypothese, ...] = (
                         "de netto per cluster <= 0 is of t < 1,0"),
         economische_logica="Tussen 3m (te klein t.o.v. de kosten) en 15m in; open vraag.",
     ),
+    Hypothese(
+        hypothesis_id="H-GS-003",
+        beschrijving=("Veldproef 1m, veldproef 3m en scalp hebben na alle kosten een negatieve "
+                      "netto expectancy per cluster; uitsluiten is terecht."),
+        strategy_version="veldproef-2.1.0 / scalp 2.6.x",
+        entry_definition="ongewijzigd: de 9 veldproeffamilies op 1m en 3m, en scalp (cyclus, zonder turbo).",
+        exit_definition="ongewijzigd per opzet; in de schaduw zonder deelsluiting.",
+        expected_market_regime="alle; geen filter",
+        strategie_prefix="vp:", tijdvakken=("1m", "3m"), strategieen=("scalp",),
+        discovery_tot="2026-10-13T17:48:00+00:00",
+        confirmation_vanaf="2026-10-14T06:00:00+00:00",
+        verwachting="negatief",
+        bron_bevestiging="schaduw_uitgezet",
+        rejection_rule=(f"verworpen als na >= {MIN_CLUSTERS} clusters in de bevestigingsperiode "
+                        "de netto per cluster >= 0 is of t > -1,0 (dan opnieuw bekijken); "
+                        "bevestigd bij netto < 0 en t <= -2"),
+        economische_logica=(
+            "Kosten zijn per ounce vast (~0,76 USD spread + ~0,03 slippage bij IG) en de "
+            "beweging per trade schaalt met het tijdvak. Gemeten bruto per oz: 1m -0,06, "
+            "3m -0,07, scalp -0,16 USD tegen ~0,8 USD kosten; 15m +0,50. Op 1m/3m/scalp "
+            "is de spread groter dan elke bruto edge die er zou kunnen zijn."),
+        extra={
+            "besluit_genomen": "2.6.1, 13-10-2026 ~17:47 UTC (groepsregel n >= 200, t < -3)",
+            "eerlijk": ("registratie achteraf: het uitsluitingsbesluit is genomen vóór deze "
+                        "registratie; alleen de bevestiging is vooraf vastgelegd"),
+            "bevestiging": ("gesimuleerde trades van de uitgezette opzetten op de echte "
+                            "koersen, inclusief gemeten spread en gemeten gemiddelde "
+                            "slippage; netto in USD; herkomst 'geschat'"),
+        },
+    ),
 )
 
 
 def _hoort_bij(h: Hypothese, t: dict) -> bool:
     s = str(t.get("strategie") or "")
+    if s in h.strategieen:
+        return True
     if not s.startswith(h.strategie_prefix):
         return False
     if h.tijdvakken and s.split(":")[-1] not in h.tijdvakken:
@@ -307,15 +348,31 @@ def _hoort_bij(h: Hypothese, t: dict) -> bool:
     return True
 
 
-def toets(h: Hypothese, trades: list[dict]) -> dict:
+def _uitslag_negatief(h: Hypothese, kb: dict) -> str:
+    waarde = kb.get(h.primary_metric)
+    t = kb.get("t_clusters")
+    if waarde is None or t is None or waarde >= 0 or t > -1.0:
+        return "verworpen"
+    if t <= -T_GRENS:
+        return "bevestigd"
+    return "niet verworpen, niet bevestigd"
+
+
+def toets(h: Hypothese, trades: list[dict], schaduw: list[dict] | None = None) -> dict:
     """Discovery en confirmation apart; het oordeel gaat alleen over de
-    bevestigingsperiode."""
+    bevestigingsperiode. 2.7.1: bij ``bron_bevestiging='schaduw_uitgezet'``
+    komt de bevestiging uit ``schaduw`` (gesimuleerd, geschat)."""
     eigen = [t for t in trades if _hoort_bij(h, t)]
     ontdekking = [t for t in eigen if str(t.get("open_time") or "") < h.discovery_tot]
-    bevestiging = [t for t in eigen if str(t.get("open_time") or "") >= h.confirmation_vanaf]
+    bron = eigen
+    if h.bron_bevestiging == "schaduw_uitgezet":
+        bron = [t for t in (schaduw or []) if _hoort_bij(h, t)]
+    bevestiging = [t for t in bron if str(t.get("open_time") or "") >= h.confirmation_vanaf]
     kd, kb = kengetallen(ontdekking), kengetallen(bevestiging)
     if kb["clusters"] < h.min_clusters:
         uitslag = "loopt (te weinig clusters)"
+    elif h.verwachting == "negatief":
+        uitslag = _uitslag_negatief(h, kb)
     else:
         waarde = kb.get(h.primary_metric) or 0.0
         t = kb.get("t_clusters")
@@ -330,19 +387,21 @@ def toets(h: Hypothese, trades: list[dict]) -> dict:
         "uitslag": uitslag,
         "discovery": kd,
         "confirmation": kb,
+        "bron_bevestiging": h.bron_bevestiging,
         "definitie": {k: v for k, v in asdict(h).items() if k != "extra"},
     }
 
 
-def rapport(trades: list[dict]) -> dict:
-    """Het volledige onderzoeksrapport over de gegeven gesloten trades."""
+def rapport(trades: list[dict], schaduw: list[dict] | None = None) -> dict:
+    """Het volledige onderzoeksrapport over de gegeven gesloten trades.
+    ``schaduw``: gesloten schaduwtrades van uitgezette groepen (2.7.1)."""
     totaal = kengetallen(trades)
     return {
         "versie": ONDERZOEK_VERSIE,
         "totaal": totaal,
         "oordeel": oordeel(totaal),
         "segmenten": segmenten(trades),
-        "hypotheses": [toets(h, trades) for h in HYPOTHESEN],
+        "hypotheses": [toets(h, trades, schaduw) for h in HYPOTHESEN],
         "uitleg": ("Netto in accountvaluta; clusters per richting met een gat van "
                    f"{CLUSTER_GAT_S // 60} min; segmenten zijn metingen, geen filters."),
     }
