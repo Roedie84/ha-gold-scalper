@@ -33,6 +33,12 @@ REDACT = {
     "api_key", "apikey", "password", "identifier", "token",
     "secret", "client_secret", "access_token", "refresh_token",
     "login", "username", "account_id", "accountId",
+    # 2.8.0: cTrader (de sleutelnamen zelf zijn geen geheim, maar staan erbij
+    # zodat de test alles dekt wat "secret" of "token" heet).
+    "ctrader_client_id", "ctrader_client_secret", "ctrader_access_token",
+    "ctrader_refresh_token", "ctrader_trader_login", "ctrader_client_id_secret",
+    "ctrader_client_secret_secret", "ctrader_access_token_secret",
+    "ctrader_refresh_token_secret", "ctrader_ctid",
 }
 
 

@@ -1,5 +1,20 @@
 # Changelog — Gold Scalper
 
+## 2.8.0 - 14-10-2026
+
+### Pepperstone (cTrader Open API) naast IG
+- **Besluit Ruud:** Pepperstone Razor via cTrader, naast IG ("laat ze naast elkaar draaien, IG moet ook actief blijven"). Spread XAUUSD gemeten 13-10: ~0,10 USD/oz tegen ~0,76 bij IG.
+- **Nieuw: `broker/ctrader.py`** - JSON over WebSocket (`wss://demo.ctraderapi.com:5036`), één blijvende verbinding met hartslag, alleen `aiohttp`. Verkend op het demo-account (14-10): app- en accountaanmelding, XAUUSD (symbool 41, 1 oz = volume 100, stap 1 oz), saldo, trendbars, posities, koersen.
+  - Orders: marktorder met relatieve stop en doel; grootte naar beneden afgerond op hele ounces (nooit meer risico dan gevraagd), onder 1 oz geen order.
+  - Stop/doel aanpassen (`AmendPositionSLTP`, het andere niveau gaat mee), (deel)sluiten, posities met eigen ordernummer.
+  - Afstemming: sluitende deals in IG-vorm, zodat `match_transaction` en `learning/afstemming` ongewijzigd werken; `closed_deal` rechtstreeks op positienummer.
+  - Tokens: bij het instellen uit secrets.yaml (`ctrader_*`); een ververst token wordt in de entry bewaard.
+- **Naast elkaar:** een tweede Gold Scalper-integratie met eigen database (`gold_scalper_ctrader.db`): geen menging van trades, afstemming of onderzoek met IG. De veldproef warmt bij cTrader op met de trendbars van de broker zelf.
+- Instellen: Integratie toevoegen -> Gold Scalper -> "Pepperstone / cTrader"; alleen de SLEUTELNAMEN uit secrets.yaml.
+
+### Tests
+- `tests/test_v280_ctrader.py`.
+
 ## 2.7.3 - 14-10-2026
 
 ### Hard risicoplafond per order: 100 USD tot de stop (P2)

@@ -22,6 +22,8 @@ from homeassistant.helpers.selector import (
 from .broker.adapter import VenueError
 from .broker.ig_capital import CapitalVenue, IgVenue
 from .broker.oanda import OandaVenue
+from .broker.ctrader import CTraderVenue
+from .geheimen import async_lees_geheimen
 from .broker.public_data import PublicDataVenue
 from .broker.stooq import StooqVenue
 from .validation import reward_risk_warning
@@ -47,7 +49,10 @@ from .const import (
     TRADING_VENUES, VENUE_CAPITAL, VENUE_IG,
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
     DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUES,
-    VENUE_OANDA, VENUE_SIMULATOR, CONF_ENTRY_THRESHOLD, CONF_STRATEGIE, DEFAULT_STRATEGIE, STRATEGIEEN, CONF_SCALP_UNITS, DEFAULT_SCALP_UNITS, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
+    VENUE_OANDA, VENUE_SIMULATOR, VENUE_CTRADER,
+    CONF_CT_CLIENT_ID_SECRET, CONF_CT_CLIENT_SECRET_SECRET, CONF_CT_ACCESS_SECRET,
+    CONF_CT_REFRESH_SECRET, CONF_CT_ACCESS_TOKEN, CONF_CT_REFRESH_TOKEN,
+    CONF_CT_TRADER_LOGIN, CONF_CT_CTID, DEFAULT_CT_SYMBOL, CONF_CT_CLIENT_ID, CONF_CT_CLIENT_SECRET, CONF_ENTRY_THRESHOLD, CONF_STRATEGIE, DEFAULT_STRATEGIE, STRATEGIEEN, CONF_SCALP_UNITS, DEFAULT_SCALP_UNITS, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
     CONF_MAX_CONSECUTIVE_LOSSES, CONF_MAX_DAILY_LOSS_PCT, CONF_MAX_RESUMES_PER_DAY, CONF_MAX_SPREAD, CONF_MAX_SPREAD_ATR,
     CONF_MAX_TRADES_PER_DAY, CONF_MAX_UNITS, CONF_MIN_EDGE_MULTIPLE, CONF_MODE,
     CONF_STARTING_BALANCE, CONF_SYMBOL, CONF_TIMEFRAME, CONF_TOKEN,
@@ -104,6 +109,8 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_broker()
             if venue == VENUE_SIMULATOR:
                 return await self.async_step_simulator()
+            if venue == VENUE_CTRADER:
+                return await self.async_step_ctrader()
             return await self.async_step_oanda()
 
         return self.async_show_form(
@@ -519,6 +526,86 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
         })
         return self.async_show_form(step_id="oanda", data_schema=schema, errors=errors)
 
+    async def async_step_ctrader(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """2.8.0: Pepperstone via de cTrader Open API. Geheimen uit
+        secrets.yaml; hier alleen de sleutelnamen."""
+        errors: dict[str, str] = {}
+        detail = ""
+        if user_input is not None:
+            sleutels = [user_input[CONF_CT_CLIENT_ID_SECRET], user_input[CONF_CT_CLIENT_SECRET_SECRET],
+                        user_input[CONF_CT_ACCESS_SECRET], user_input[CONF_CT_REFRESH_SECRET]]
+            geheimen = await async_lees_geheimen(self.hass, sleutels)
+            ontbreekt = [k for k in sleutels[:3] if not geheimen.get(k)]
+            if ontbreekt:
+                errors["base"] = "secret_missing"
+                detail = "Niet gevonden in secrets.yaml: " + ", ".join(ontbreekt)
+            else:
+                venue = CTraderVenue(
+                    session=async_get_clientsession(self.hass),
+                    client_id=geheimen[sleutels[0]], client_secret=geheimen[sleutels[1]],
+                    access_token=geheimen[sleutels[2]], refresh_token=geheimen.get(sleutels[3]),
+                    trader_login=user_input.get(CONF_CT_TRADER_LOGIN) or None,
+                    environment=user_input[CONF_ENVIRONMENT],
+                    symbol_name=user_input[CONF_SYMBOL], trading_enabled=False,
+                )
+                try:
+                    await venue.account()
+                    candles = await venue.candles(user_input[CONF_SYMBOL], user_input[CONF_TIMEFRAME], 120)
+                    if len(candles) < 60:
+                        errors["base"] = "insufficient_history"
+                except VenueError as err:
+                    errors["base"] = "cannot_connect"
+                    detail = str(err)
+                    _LOGGER.warning("cTrader-validatie faalde: %s", err)
+                finally:
+                    await venue.sluit_verbinding()
+                if not errors:
+                    data = {
+                        **user_input, CONF_VENUE: VENUE_CTRADER,
+                        CONF_CT_CLIENT_ID: geheimen[sleutels[0]],
+                        CONF_CT_CLIENT_SECRET: geheimen[sleutels[1]],
+                        CONF_CT_ACCESS_TOKEN: geheimen[sleutels[2]],
+                        CONF_CT_REFRESH_TOKEN: geheimen.get(sleutels[3]),
+                        CONF_CT_CTID: venue.ctid,
+                    }
+                    if self.source == SOURCE_RECONFIGURE:
+                        return self.async_update_reload_and_abort(
+                            self._get_reconfigure_entry(), data_updates=data)
+                    await self.async_set_unique_id(
+                        f"ctrader_{venue.ctid}_{user_input[CONF_SYMBOL]}")
+                    self._abort_if_unique_id_configured()
+                    return self.async_create_entry(
+                        title=f"{user_input[CONF_SYMBOL]} (Pepperstone {user_input[CONF_ENVIRONMENT]})",
+                        data=data,
+                    )
+        schema = vol.Schema({
+            vol.Required(CONF_CT_CLIENT_ID_SECRET, default="ctrader_client_id"): str,
+            vol.Required(CONF_CT_CLIENT_SECRET_SECRET, default="ctrader_client_secret"): str,
+            vol.Required(CONF_CT_ACCESS_SECRET, default="ctrader_access_token"): str,
+            vol.Required(CONF_CT_REFRESH_SECRET, default="ctrader_refresh_token"): str,
+            vol.Optional(CONF_CT_TRADER_LOGIN, default=""): str,
+            vol.Required(CONF_ENVIRONMENT, default="demo"): SelectSelector(
+                SelectSelectorConfig(options=["demo", "live"], mode=SelectSelectorMode.DROPDOWN)
+            ),
+            vol.Required(CONF_SYMBOL, default=DEFAULT_CT_SYMBOL): str,
+            vol.Required(CONF_TIMEFRAME, default=DEFAULT_TIMEFRAME): SelectSelector(
+                SelectSelectorConfig(options=TIMEFRAMES, mode=SelectSelectorMode.DROPDOWN)
+            ),
+            vol.Required(CONF_MODE, default="demo"): SelectSelector(
+                SelectSelectorConfig(options=[m.value for m in TradingMode],
+                                     mode=SelectSelectorMode.DROPDOWN)
+            ),
+        })
+        return self.async_show_form(
+            step_id="ctrader", data_schema=schema, errors=errors,
+            description_placeholders={"note": (
+                "Vul hier de NAMEN van de sleutels in secrets.yaml in, niet de waarden. "
+                "Tokens maak je op openapi.ctrader.com (Sandbox, scope trading)."
+                + (f"\n\nFoutdetails: {detail}" if detail else ""))},
+        )
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -539,6 +626,8 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_broker()
             if venue == VENUE_SIMULATOR:
                 return await self.async_step_simulator()
+            if venue == VENUE_CTRADER:
+                return await self.async_step_ctrader()
             return await self.async_step_oanda()
 
         entry = self._get_reconfigure_entry()

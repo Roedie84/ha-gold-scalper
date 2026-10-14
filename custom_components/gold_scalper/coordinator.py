@@ -86,6 +86,8 @@ from .const import (
     CONF_TAKE_PROFIT_ATR, CONF_TAKE_PROFIT_USD, NOTIFY_NONE,
     CONF_ENFORCE_TRADING_HOURS,
     CONF_EPIC, CONF_IDENTIFIER, CONF_PASSWORD, DEFAULT_EPIC, VENUE_CAPITAL, VENUE_IG,
+    VENUE_CTRADER, CONF_CT_CLIENT_ID, CONF_CT_CLIENT_SECRET,
+    CONF_CT_ACCESS_TOKEN, CONF_CT_REFRESH_TOKEN, CONF_CT_TRADER_LOGIN, CONF_CT_CTID,
     CONF_REGIME_SWITCHING, DEFAULT_ASSUMED_SPREAD, VENUE_PUBLIC,
     VENUE_STOOQ,
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
@@ -301,6 +303,26 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 balance=self.starting_balance,
             )
             self.mode = TradingMode.PAPER
+        elif venue_name == VENUE_CTRADER:
+            # 2.8.0: Pepperstone via de cTrader Open API. De tokens staan in
+            # de entry (bij het instellen uit secrets.yaml gelezen); een
+            # ververst token wordt teruggeschreven.
+            from .broker.ctrader import CTraderVenue
+
+            self.venue = CTraderVenue(
+                session=async_get_clientsession(hass),
+                client_id=options.get(CONF_CT_CLIENT_ID) or "",
+                client_secret=options.get(CONF_CT_CLIENT_SECRET) or "",
+                access_token=options.get(CONF_CT_ACCESS_TOKEN) or "",
+                refresh_token=options.get(CONF_CT_REFRESH_TOKEN),
+                trader_login=options.get(CONF_CT_TRADER_LOGIN) or None,
+                ctid_account_id=options.get(CONF_CT_CTID),
+                environment=options.get(CONF_ENVIRONMENT, "demo"),
+                symbol_name=self.symbol,
+                trading_enabled=False,
+                max_units=options.get(CONF_MAX_UNITS, DEFAULT_MAX_UNITS),
+                tokens_bewaren=self._bewaar_ctrader_tokens,
+            )
         else:
             self.venue = OandaVenue(
                 session=async_get_clientsession(hass),
@@ -764,7 +786,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.saldosprong.herstel(self._state.saldosprong)
         self._herstel_geheugen()
 
-        path = self.hass.config.path(DATABASE_FILENAME)
+        # 2.8.0: een eigen database per broker naast IG. Eén gedeelde database
+        # zou de trades van twee brokers in dezelfde afstemming, hetzelfde
+        # onderzoek en dezelfde statistiek laten lopen.
+        bestand = DATABASE_FILENAME
+        if getattr(self.venue, "name", None) == VENUE_CTRADER:
+            bestand = "gold_scalper_ctrader.db"
+        path = self.hass.config.path(bestand)
         self.db = TradeDatabase(path)
         await self.hass.async_add_executor_job(self.db.connect)
         # Eenmalig en idempotent: dollarbedragen die met de verkeerde koers
@@ -1409,6 +1437,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Veldproefbar %s niet gearchiveerd: %s", tf, err)
 
+    def _bewaar_ctrader_tokens(self, access: str, refresh: str) -> None:
+        """2.8.0: een ververst cTrader-token in de entry bewaren, zodat een
+        herstart niet met het verlopen token begint."""
+        self.hass.config_entries.async_update_entry(
+            self.entry,
+            data={**self.entry.data, CONF_CT_ACCESS_TOKEN: access, CONF_CT_REFRESH_TOKEN: refresh},
+        )
+
     async def _vp_opwarmen(self) -> None:
         """2.4.0: veldproefbars opwarmen uit het archief, en waar dat te weinig
         heeft uit de koersgeschiedenis van Home Assistant (10-secondenkoersen)."""
@@ -1433,6 +1469,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("30m niet uit 15m op te bouwen: %s", err)
         tekort = [tf for tf, n in self.veldproef.aantal().items() if n < nodig]
+        # 2.8.0: een broker met trendbars (cTrader) vult elk tijdvak zelf.
+        if tekort and getattr(self.venue, "name", None) == VENUE_CTRADER:
+            for tf in tekort:
+                try:
+                    c = await self.venue.candles(self.symbol, tf, veldproef_mod.MAX_BARS)
+                    c = closed_only(c, datetime.now(timezone.utc).timestamp(), tf)
+                    self.veldproef.vul(tf, c)
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.debug("Veldproef %s niet bij cTrader op te halen: %s", tf, err)
+            tekort = [tf for tf, n in self.veldproef.aantal().items() if n < nodig]
         if tekort:
             await self._vp_uit_recorder(tekort)
         _LOGGER.info("Veldproefbars na opwarmen: %s", self.veldproef.aantal())
@@ -6153,6 +6199,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 return
             self._afgesloten = True
             self._turbo_stop()
+            # 2.8.0: een blijvende brokerverbinding (cTrader) netjes sluiten.
+            sluit = getattr(self.venue, "sluit_verbinding", None)
+            if sluit is not None:
+                try:
+                    await sluit()
+                except Exception:  # noqa: BLE001
+                    pass
             try:
                 await self._persist()
             except Exception:  # noqa: BLE001 - afsluiten gaat altijd door

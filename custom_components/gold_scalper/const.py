@@ -103,13 +103,29 @@ VENUE_OANDA: Final = "oanda"
 VENUE_STOOQ: Final = "stooq"
 VENUE_IG: Final = "ig"
 VENUE_CAPITAL: Final = "capital"
+#: 2.8.0: Pepperstone (cTrader Open API).
+VENUE_CTRADER: Final = "ctrader"
 VENUES: Final = [
     VENUE_PUBLIC, VENUE_STOOQ, VENUE_SIMULATOR,
-    VENUE_IG, VENUE_CAPITAL, VENUE_OANDA,
+    VENUE_IG, VENUE_CAPITAL, VENUE_OANDA, VENUE_CTRADER,
 ]
 
 #: Brokers die echt kunnen handelen; die krijgen live-modus aangeboden.
-TRADING_VENUES: Final = [VENUE_IG, VENUE_CAPITAL, VENUE_OANDA]
+TRADING_VENUES: Final = [VENUE_IG, VENUE_CAPITAL, VENUE_OANDA, VENUE_CTRADER]
+
+#: 2.8.0: cTrader. De geheimen zelf staan in secrets.yaml; de entry bewaart
+#: de SLEUTELNAMEN plus een kopie van de tokens (die ververst de koppeling).
+CONF_CT_CLIENT_ID_SECRET: Final = "ctrader_client_id_secret"
+CONF_CT_CLIENT_SECRET_SECRET: Final = "ctrader_client_secret_secret"
+CONF_CT_ACCESS_SECRET: Final = "ctrader_access_token_secret"
+CONF_CT_REFRESH_SECRET: Final = "ctrader_refresh_token_secret"
+CONF_CT_ACCESS_TOKEN: Final = "ctrader_access_token"
+CONF_CT_REFRESH_TOKEN: Final = "ctrader_refresh_token"
+CONF_CT_TRADER_LOGIN: Final = "ctrader_trader_login"
+CONF_CT_CLIENT_ID: Final = "ctrader_client_id"
+CONF_CT_CLIENT_SECRET: Final = "ctrader_client_secret"
+CONF_CT_CTID: Final = "ctrader_ctid"
+DEFAULT_CT_SYMBOL: Final = "XAUUSD"
 
 CONF_IDENTIFIER: Final = "identifier"
 CONF_PASSWORD: Final = "password"
@@ -224,7 +240,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.7.3"
+INTEGRATION_VERSION: Final = "2.8.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

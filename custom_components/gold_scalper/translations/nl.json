@@ -18,6 +18,21 @@
           "sim_seed": "Zaad"
         }
       },
+      "ctrader": {
+        "title": "Pepperstone (cTrader) verbinden",
+        "description": "{note}",
+        "data": {
+          "ctrader_client_id_secret": "Sleutelnaam client-id in secrets.yaml",
+          "ctrader_client_secret_secret": "Sleutelnaam client-secret in secrets.yaml",
+          "ctrader_access_token_secret": "Sleutelnaam toegangstoken in secrets.yaml",
+          "ctrader_refresh_token_secret": "Sleutelnaam verversingstoken in secrets.yaml",
+          "ctrader_trader_login": "Accountnummer (leeg = eerste account van het token)",
+          "environment": "Omgeving",
+          "symbol": "Instrument",
+          "timeframe": "Tijdsframe",
+          "mode": "Modus"
+        }
+      },
       "oanda": {
         "title": "OANDA verbinden",
         "description": "Haal je token op via het accountportaal: My Services, Manage API Access.",
@@ -71,6 +86,7 @@
     },
     "error": {
       "cannot_connect": "Kan de databron niet bereiken.",
+      "secret_missing": "Een of meer sleutels ontbreken in secrets.yaml. Details staan onder het formulier.",
       "invalid_token": "Het API-token wordt geweigerd.",
       "invalid_account": "Account-ID onbekend, of het hoort bij de andere omgeving (practice tegenover live).",
       "insufficient_history": "Te weinig historie voor een zinnige analyse; minimaal 60 candles nodig.",
@@ -171,7 +187,8 @@
         "simulator": "Simulator: verzonnen koersen (geen account)",
         "ig": "IG (account nodig, kan echt handelen)",
         "capital": "Capital.com (account nodig, kan echt handelen)",
-        "oanda": "OANDA (account nodig, EU-toegang onzeker)"
+        "oanda": "OANDA (account nodig, EU-toegang onzeker)",
+        "ctrader": "Pepperstone / cTrader (account nodig, kan echt handelen)"
       }
     },
     "strategie": {
