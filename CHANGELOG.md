@@ -1,5 +1,16 @@
 # Changelog — Gold Scalper
 
+## 2.7.3 - 14-10-2026
+
+### Hard risicoplafond per order: 100 USD tot de stop (P2)
+- **Gevonden:** 14-10 13:15 opende Daghandel een short van **500 oz** met de stop 21 USD weg: ~10.500 USD (~9.400 EUR) risico. De grootte volgde uit 3 % van het startsaldo van de run (1.000.000), begrensd op het maximum van 500 oz. Een veldproeftrade riskeert hooguit 100 USD; deze ene trade woog in de statistiek als ~100 trades. De risicolimieten van 2.7.0 grepen niet in omdat ze meeschalen met het risico per trade.
+- **Wijziging:** `risico_plafond()` (strategy/posities.py): elke order - daghandel, scalp, veldproef, bijkoop - riskeert hooguit `MAX_RISICO_PER_ORDER_USD` = 100 USD tot zijn stop (naar beneden afgerond op 0,1 oz, minstens 1 oz). Ook de grootte van schaduwtrades volgt dit plafond. De instelling "risico per trade" blijft bestaan maar kan dit plafond niet meer overschrijden.
+- Signalen, stops en uitstapregels ongewijzigd; geen nieuwe run.
+- De lopende positie van 500 oz blijft lopen onder zijn eigen regels.
+
+### Tests
+- `tests/test_v273.py`.
+
 ## 2.7.2 - 14-10-2026
 
 ### Afstemming: deelsluiting en rest van een positie verwisseld (P1)

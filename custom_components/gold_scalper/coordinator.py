@@ -126,8 +126,8 @@ from .strategy import combinatie as combinatie_mod
 from .strategy import daghandel as daghandel_mod
 from .strategy.aggregator import BAR_SECONDS
 from .strategy.posities import (
-    marge_en_vloer_ok, netting_uit_posities, richting_van, risicolimieten_ok,
-    spreiding_ok,
+    MAX_RISICO_PER_ORDER_USD, marge_en_vloer_ok, netting_uit_posities, richting_van,
+    risico_plafond, risicolimieten_ok, spreiding_ok,
     tel_per_richting,
 )
 from .strategy.tijdstopvarianten import VariantenBoek, VariantTrade
@@ -3520,6 +3520,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 )
                 units = sized.units
                 self.last_sizing = sized.as_dict()
+            # 2.7.3: hard plafond per order, voor elke strategie.
+            units, begrensd = risico_plafond(units, entry_price, signal.stop_loss)
+            if begrensd:
+                self.last_sizing = {
+                    **(self.last_sizing or {}), "units": units,
+                    "risk_amount": round(units * abs(entry_price - signal.stop_loss), 2),
+                    "capped_by": "max_risico_per_order",
+                    "reason": (f"{(self.last_sizing or {}).get('reason', '')} Begrensd op "
+                               f"{MAX_RISICO_PER_ORDER_USD:.0f} USD risico tot de stop: {units} oz.").strip(),
+                }
             _LOGGER.debug("Ordergrootte: %s", self.last_sizing.get("reason"))
             strategie = (getattr(signal, "components", None) or {}).get(
                 "strategie", self.primaire_strategie)
@@ -3733,7 +3743,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 self.sizing, basis, entry_price,
                 signal.stop_loss, signal.score, self.strategy_cfg.entry_threshold,
             )
-            return float(sized.units)
+            return float(risico_plafond(sized.units, entry_price, signal.stop_loss)[0])
         except Exception:  # noqa: BLE001 - een schatting mag niets breken
             return float(self.units)
 
@@ -5535,8 +5545,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             )
             if getattr(verplaatst, "success", False):
                 await self._sync_trade_stop(ticket, decision.new_stop)
+            # 2.7.3: ook een bijkoop valt onder het plafond per order.
+            bijkoop_units, _ = risico_plafond(
+                decision.units, quote.ask if long else quote.bid, decision.new_stop)
             result, notes = await self.executor.open_protected(
-                self.symbol, side, decision.units, quote.mid,
+                self.symbol, side, bijkoop_units, quote.mid,
                 stop_loss=decision.new_stop,
                 take_profit=getattr(position, "take_profit", None),
                 context=(bijkoop_signaal, quote, side, now),

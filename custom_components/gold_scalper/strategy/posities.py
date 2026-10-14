@@ -164,6 +164,34 @@ def positie_risico(positie, units_fallback: float | None = None,
 #: 2.7.0 (verbeterplan Ruud 14-10): risicolimieten over alle posities samen,
 #: als percentage van de referentie-equity (het startsaldo van de run).
 #: Gelijktijdige posities zijn geen onafhankelijke risico's.
+#: 2.7.3 (Ruud 14-10: "straks met echt geld is dit echt ongewenst"): geen
+#: enkele order riskeert meer dan dit bedrag (USD) tot zijn stop, ongeacht
+#: strategie of instellingen. Aanleiding: een daghandeltrade van 500 oz met
+#: een stop op 21 USD (risico ~10.500 USD) door 3 % van een startsaldo van
+#: 1.000.000. Gelijk aan het veldproefplafond, zodat elke trade even zwaar
+#: weegt in de statistiek.
+MAX_RISICO_PER_ORDER_USD = 100.0
+
+
+def risico_plafond(units: float, instap: float | None, stop: float | None,
+                   plafond: float = MAX_RISICO_PER_ORDER_USD) -> tuple[float, bool]:
+    """Grootte zodat het verlies tot de stop hooguit ``plafond`` USD is.
+
+    Geeft ``(units, begrensd)``. Nooit groter dan ``units``; afgerond naar
+    beneden op 0,1 oz, minstens 1 oz (kleinste zinvolle order). Zonder stop
+    of stopafstand: ongewijzigd (de veiligheidslaag weigert een order zonder
+    stop sowieso)."""
+    if stop is None or not instap or units is None:
+        return units, False
+    afstand = abs(float(instap) - float(stop))
+    if afstand <= 0:
+        return units, False
+    maximaal = max(1.0, math.floor(plafond / afstand * 10) / 10)
+    if units > maximaal:
+        return maximaal, True
+    return units, False
+
+
 MAX_TOTAAL_OPEN_RISICO_PCT = 0.5
 MAX_RICHTING_RISICO_PCT = 0.3
 #: Notional (units x koers) in de richting van de nieuwe positie, als veelvoud
