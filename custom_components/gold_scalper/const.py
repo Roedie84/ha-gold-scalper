@@ -240,7 +240,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.9.2"
+INTEGRATION_VERSION: Final = "2.9.3"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
@@ -304,6 +304,9 @@ DEFAULT_SCALP_REEKS_DOEL: Final = 1.0
 # van alleen op de cyclus van 10 s, met een orderbudget per minuut.
 CONF_SCALP_TURBO: Final = "scalp_turbo"
 CONF_SCALP_TURBO_ORDERS: Final = "scalp_turbo_orders_per_min"
+#: 2.9.3: scalp (incl. turbo) met de hand uitzetten, los van de groepsregel
+#: (n >= 200, t < -3). De schaduwtrades van H-GS-003 lopen gewoon door.
+CONF_SCALP_UIT: Final = "scalp_uit"
 DEFAULT_SCALP_TURBO: Final = True
 DEFAULT_SCALP_TURBO_ORDERS: Final = 20
 #: Hooguit één turboronde per zoveel seconden (de stream levert vaker).

@@ -58,6 +58,7 @@ from .broker.risk import RiskLimits, RiskManager, TradingState
 from .broker.saldosprong import SaldoSprongBewaker
 from .const import (
     CONF_SCALP_TURBO,
+    CONF_SCALP_UIT,
     CONF_SCALP_TURBO_ORDERS,
     DEFAULT_SCALP_TURBO,
     DEFAULT_SCALP_TURBO_ORDERS,
@@ -222,6 +223,19 @@ class _TicketOnly:
 
 
 
+def scalp_handmatig(netto: list[float]) -> dict:
+    """2.9.3: scalp met de hand uit; zelfde vorm als ``groep_uitgezet``."""
+    t = veldproef_mod.t_statistiek(netto) if len(netto) >= 2 else None
+    return {"n": len(netto), "netto": round(sum(netto), 2),
+            "t": round(t, 2) if t is not None else None, "handmatig": True}
+
+
+def _commissie_venue(venue) -> float:
+    """USD per lot per zijde van de venue; 0 als hij er geen opgeeft (2.9.3)."""
+    waarde = getattr(venue, "commissie_per_lot_per_zijde", 0.0)
+    return float(waarde) if isinstance(waarde, (int, float)) and waarde > 0 else 0.0
+
+
 def deel_units(gevraagd: float, bevestigd) -> float:
     """Hoeveel er bij een deelsluiting echt dicht ging (2.9.2).
 
@@ -380,7 +394,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 _as_int(options.get(CONF_TRADING_START_HOUR), 7),
                 _as_int(options.get(CONF_TRADING_END_HOUR), 20),
             ),
-            commission_per_lot_per_side=0.0,  # OANDA rekent in de spread
+            # IG/OANDA rekenen in de spread; cTrader (Pepperstone Razor) rekent
+            # commissie per lot per zijde (2.9.3).
+            commission_per_lot_per_side=_commissie_venue(self.venue),
             volume=self.units / CONTRACT_SIZE,
             # 1.9.0: tot zoveel posities per richting (besluit eigenaar).
             max_positions_per_richting=_per_richting(
@@ -605,6 +621,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._vp_uitgezet: dict[str, dict] = {}
         #: 2.6.1: scalp (incl. turbo) als groep uitgezet; None = aan.
         self._scalp_uitgezet: dict | None = None
+        #: 2.9.3: met de hand uitgezet (optie); geldt meteen, ook vóór de
+        #: eerste telling uit de database.
+        self.scalp_handmatig_uit = bool(options.get(CONF_SCALP_UIT, False))
+        if self.scalp_handmatig_uit:
+            self._scalp_uitgezet = {"n": 0, "netto": 0.0, "t": None, "handmatig": True}
         #: 2.7.1 (H-GS-003): schaduwtrades van uitgezette groepen.
         self.uitgezet_schaduw = uitgezet_mod.UitgezetBoek()
         self._vp_uitgezet_volgende = 0.0
@@ -1617,7 +1638,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("Scalpresultaten niet te lezen: %s", err)
             return
-        groep = veldproef_mod.groep_uitgezet(scalp.get(STRATEGIE_SCALP, []))
+        reeks = scalp.get(STRATEGIE_SCALP, [])
+        groep = veldproef_mod.groep_uitgezet(reeks)
+        if groep is None and self.scalp_handmatig_uit:
+            groep = scalp_handmatig(reeks)
         if groep and not self._scalp_uitgezet:
             _LOGGER.warning("Scalp (incl. turbo) uitgezet: n=%s, netto %s, t=%s",
                             groep["n"], groep["netto"], groep["t"])
@@ -2730,8 +2754,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     schaduw_reden = "onbevestigde_order"
                 elif strategie == STRATEGIE_SCALP and self._scalp_uitgezet and self.alles:
                     # 2.6.1: scalp bewezen verliezend als groep.
-                    r_reject = (f"scalp uitgezet (n={self._scalp_uitgezet['n']}, "
-                                f"t={self._scalp_uitgezet['t']})")
+                    r_reject = (f"scalp uitgezet{' (handmatig)' if self._scalp_uitgezet.get('handmatig') else ''} "
+                                f"(n={self._scalp_uitgezet['n']}, t={self._scalp_uitgezet['t']})")
                 elif not r_signal.should_trade:
                     r_reject = r_signal.reject_reason
                     if r_signal.reject_reason == "max_positions_zelfde_richting":
@@ -4975,7 +4999,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # administratie rekent in die laatste.
             trade.net_pnl = round(winst_account / koers, 4)
             trade.total_cost = round(
-                abs(trade.close_spread or 0.6) * units, 4
+                abs(trade.close_spread or 0.6) * units + self._commissie(units), 4
             )
             trade.gross_pnl = round(
                 (trade.net_pnl or 0) + (trade.total_cost or 0), 4
@@ -4986,7 +5010,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 (trade.close_mid - trade.open_mid) * richting * units, 4
             )
             trade.net_pnl = round(
-                (exit_price - trade.open_price) * richting * units, 4
+                (exit_price - trade.open_price) * richting * units - self._commissie(units), 4
             )
             trade.total_cost = round(
                 (trade.gross_pnl or 0) - (trade.net_pnl or 0), 4
@@ -5004,10 +5028,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         gemeten = meet_kosten(trade, exit_price, CONTRACT_SIZE)
         if gemeten is not None:
-            trade.total_cost = gemeten["total_cost"]
+            # 2.9.3: commissie hoort bij de kosten (zit al in het nettobedrag).
+            trade.total_cost = round(gemeten["total_cost"] + self._commissie(units), 4)
             trade.spread_cost = gemeten["spread_cost"]
             trade.slippage_cost = gemeten["slippage_cost"]
-            trade.gross_pnl = round((trade.net_pnl or 0) + gemeten["total_cost"], 4)
+            trade.gross_pnl = round((trade.net_pnl or 0) + trade.total_cost, 4)
             trade.cost_source = "measured"
 
         await self.hass.async_add_executor_job(self.db.update_trade, trade)
@@ -5730,6 +5755,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     # -- 2.5.0: turbo-scalp ------------------------------------------------- #
 
+    def _commissie(self, units: float | None) -> float:
+        """2.9.3: commissie rondreis (open + dicht) in USD voor ``units`` oz."""
+        per_lot = _commissie_venue(self.venue)
+        return round(2 * per_lot * abs(float(units or 0)) / CONTRACT_SIZE, 4)
+
     def _turbo_start(self) -> None:
         """Abonneer op de IG-koersstroom (dezelfde als het paneel)."""
         if not (self.mode.places_orders and self._strategie in (
@@ -5979,7 +6009,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             mfe=(self._excursions.get(str(ticket), {}).get("mfe", 0.0)) * units,
             mae=(self._excursions.get(str(ticket), {}).get("mae", 0.0)) * units,
             gross_pnl=round((quote.mid - trade.open_mid) * direction * units, 4),
-            net_pnl=round((exit_price - trade.open_price) * direction * units, 4),
+            net_pnl=round((exit_price - trade.open_price) * direction * units
+                          - self._commissie(units), 4),
         )
         part.total_cost = round((part.gross_pnl or 0) - (part.net_pnl or 0), 4)
         part.cost_source = "measured"
@@ -6150,8 +6181,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             (quote.mid - trade.open_mid) * direction * units, 4
         )
         # Netto op de werkelijke prijzen: daar zit de spread en de slippage in.
+        # 2.9.3: plus de commissie van de broker (cTrader; IG: 0).
         trade.net_pnl = round(
-            (exit_price - trade.open_price) * direction * units, 4
+            (exit_price - trade.open_price) * direction * units - self._commissie(units), 4
         )
         trade.total_cost = round(trade.gross_pnl - trade.net_pnl, 4)
         # Alleen een eigen sluitorder levert gemeten kosten. Een positie die de

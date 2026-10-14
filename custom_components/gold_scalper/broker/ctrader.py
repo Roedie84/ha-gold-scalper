@@ -82,6 +82,9 @@ ALGEMEEN_INTERVAL_S = 0.05
 REMMING_POGINGEN = 4
 REMMING_WACHT_S = 1.5
 
+#: USD per lot (100 oz) per zijde als het symbool niets bruikbaars meldt.
+COMMISSIE_STANDAARD = 3.50
+
 PRIJS_SCHAAL = 100_000.0
 VOLUME_PER_OZ = 100
 #: Na zoveel seconden zonder koers geldt de markt als dicht.
@@ -847,5 +850,27 @@ class CTraderVenue(ExecutionVenue):
             "reference": tx["reference"],
         }
 
+    @property
+    def commissie_per_lot_per_zijde(self) -> float:
+        """USD per lot (100 oz) per zijde (2.9.3).
+
+        Uit het symbool (commissionType 2 = USD per lot); de "precise"-velden
+        van cTrader zijn met 10^8 geschaald. Onbekend of onaannemelijk: de
+        gemeten 3,50 (Pepperstone Razor, 14-10: 3,50 USD per 50 oz rondreis).
+        """
+        s = self.symbool or {}
+        try:
+            soort = int(s.get("commissionType") or 0)
+            ruw = s.get("preciseTradingCommissionRate")
+            waarde = float(ruw) / 1e8 if ruw is not None else None
+        except (TypeError, ValueError):
+            soort, waarde = 0, None
+        if soort == 2 and waarde is not None and 0 < waarde < 50:
+            return waarde
+        return COMMISSIE_STANDAARD
+
     def describe(self) -> dict:
-        return {**super().describe(), "omgeving": self.environment, "symbool": self.symbol_name}
+        return {**super().describe(), "omgeving": self.environment, "symbool": self.symbol_name,
+                "commissie_per_lot_per_zijde": self.commissie_per_lot_per_zijde,
+                "commissie_bron": {k: (self.symbool or {}).get(k) for k in (
+                    "commissionType", "preciseTradingCommissionRate", "commission")}}

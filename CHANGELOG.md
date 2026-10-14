@@ -7,6 +7,14 @@
 - Verzoeken worden nu gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
 - Bij "rate limited" tot 4 pogingen met oplopende wachttijd (1,5 s, 3 s, ...); orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
 
+## 2.9.3 - 14-10-2026
+
+### Pepperstone na de eerste 99 trades (besluit Ruud: advies 1, 2, 3)
+Eerste 1,5 uur Pepperstone-demo (99 trades, netto -1.419 USD): scalp 58 trades, bruto -811, netto -1.222 (t -3,11) - verliest ook vóór kosten (-0,28 USD/oz), dus geen kostenprobleem maar geen edge. Veldproef 1m -825, 3m/5m +627 (n=20, nog toeval). Kosten ~0,15 USD/oz rondreis tegen ~0,8 bij IG.
+1. **Scalp met de hand uit** - nieuwe optie `scalp_uit` (Scalp (incl. turbo) uitzetten). Werkt als de groepsregel (n >= 200, t < -3), maar meteen; de schaduwtrades van H-GS-003 lopen door. Afwijzingsreden "scalp uitgezet (handmatig)". Aangezet voor Pepperstone.
+2. **Commissie in de eigen kosten** - cTrader rekent 3,50 USD per lot per zijde (gemeten: precies het verschil van 3,50 per 50 oz in de afstemming). `CTraderVenue.commissie_per_lot_per_zijde` (uit het symbool, anders 3,50); netto bij eigen sluiting en deelsluiting min commissie, kosten plus commissie, ook in de kosten/edge-toets (`commission_per_lot_per_side`). IG ongewijzigd (0).
+3. Veldproef loopt door.
+
 ## 2.9.2 - 14-10-2026
 
 ### Pepperstone: noodstop na deelsluiting

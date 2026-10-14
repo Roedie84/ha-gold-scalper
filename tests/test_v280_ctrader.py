@@ -347,3 +347,28 @@ def test_deelsluiting_boekt_wat_de_broker_sloot():
     assert deel_units(24.5, 0) == 24.5
     assert deel_units(24.5, 49.0) == 24.5   # nooit meer dan gevraagd
     assert ct.naar_volume(24.5) == 2400
+
+
+def test_commissie_en_scalp_handmatig_uit():
+    """2.9.3: commissie in de eigen kosten; scalp met de hand uit."""
+    from types import SimpleNamespace
+    from gold_scalper.coordinator import _commissie_venue, scalp_handmatig
+    v, _ = _venue()
+    assert v.commissie_per_lot_per_zijde == ct.COMMISSIE_STANDAARD
+    v.symbool = {"commissionType": 2, "preciseTradingCommissionRate": 350000000}
+    assert v.commissie_per_lot_per_zijde == 3.5
+    v.symbool = {"commissionType": 1, "preciseTradingCommissionRate": 999}
+    assert v.commissie_per_lot_per_zijde == ct.COMMISSIE_STANDAARD
+    assert _commissie_venue(v) == 3.5
+    assert _commissie_venue(SimpleNamespace()) == 0.0          # IG: geen commissie
+    from unittest.mock import MagicMock
+    assert _commissie_venue(MagicMock()) == 0.0
+    # 50 oz rondreis = 2 x 3,50 x 0,5 lot = 3,50 USD (gemeten verschil 14-10)
+    assert 2 * 3.5 * 50 / 100 == 3.5
+    g = scalp_handmatig([-10.0, -20.0, 5.0])
+    assert g["handmatig"] and g["n"] == 3 and g["netto"] == -25.0 and g["t"] < 0
+    assert scalp_handmatig([])["t"] is None
+    from pathlib import Path
+    co = (Path(__file__).resolve().parents[1] / "custom_components" / "gold_scalper"
+          / "coordinator.py").read_text(encoding="utf-8")
+    assert "self.scalp_handmatig_uit" in co and "CONF_SCALP_UIT" in co
