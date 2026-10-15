@@ -308,6 +308,21 @@ SENSORS: tuple[ScalperSensor, ...] = (
         },
     ),
     ScalperSensor(
+        # 2.11.0: schaduwmeting instap met bevestiging op 15m (paren direct /
+        # bevestigd, in R). Alleen meting; oordeel vanaf 30 paren.
+        key="bevestiging_15m", name="Bevestiging 15m (schaduw)", icon="mdi:check-decagram-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda d: (d.get("bevestiging_15m") or {}).get("paren"),
+        attrs_fn=lambda d: {
+            k: (d.get("bevestiging_15m") or {}).get(k)
+            for k in (
+                "oordeel", "bevestigd", "niet_bevestigd", "open",
+                "direct_r_per_trade", "bevestigd_r_per_trade",
+                "verschil_r_per_trade", "t_verschil", "let_op",
+            )
+        },
+    ),
+    ScalperSensor(
         # 1.9.5 (L-GS-008): elke echte trade nagespeeld met tijdstop 240, 480,
         # 720 s en zonder. Alleen meting. Waarde: aantal geëvalueerde
         # uurblokken; oordeel vanaf 20.

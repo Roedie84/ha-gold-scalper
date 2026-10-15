@@ -282,6 +282,30 @@ CREATE TABLE IF NOT EXISTS uitgezet_schaduw (
 );
 CREATE INDEX IF NOT EXISTS idx_uitgezet_schaduw ON uitgezet_schaduw(status, open_time);
 
+-- 2.11.0: schaduwmeting instap met bevestiging (15m). Per echt gehandeld
+-- 15m-signaal een paar (direct / bevestigd), alleen afgeronde paren.
+CREATE TABLE IF NOT EXISTS bevestiging_schaduw (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    strategie         TEXT,
+    richting          INTEGER,
+    signaal_tijd      TEXT,
+    stop              REAL,
+    doel              REAL,
+    r                 REAL,
+    status            TEXT,
+    direct_instap     REAL,
+    direct_sluit      TEXT,
+    direct_reden      TEXT,
+    direct_netto      REAL,
+    direct_r          REAL,
+    bevestigd_instap  REAL,
+    bevestigd_sluit   TEXT,
+    bevestigd_reden   TEXT,
+    bevestigd_netto   REAL,
+    bevestigd_r       REAL
+);
+CREATE INDEX IF NOT EXISTS idx_bevestiging_schaduw ON bevestiging_schaduw(signaal_tijd);
+
 -- 1.9.5: tijdstopvarianten (L-GS-008). Elke echte trade nagespeeld met een
 -- andere tijdstop (240/480/720 s en zonder). Alleen meting: eigen tabel,
 -- telt nergens mee in het echte resultaat, de bewijsfase of de live-poort.
@@ -1066,6 +1090,29 @@ class TradeDatabase:
             )
         self.conn.commit()
         return trade.id
+
+    BEVESTIGING_KOLOMMEN = (
+        "strategie", "richting", "signaal_tijd", "stop", "doel", "r", "status",
+        "direct_instap", "direct_sluit", "direct_reden", "direct_netto", "direct_r",
+        "bevestigd_instap", "bevestigd_sluit", "bevestigd_reden", "bevestigd_netto",
+        "bevestigd_r",
+    )
+
+    def bewaar_bevestiging(self, rij: dict) -> int:
+        """2.11.0: een afgerond paar van de bevestigingsmeting."""
+        kolommen = self.BEVESTIGING_KOLOMMEN
+        cur = self.conn.execute(
+            f"INSERT INTO bevestiging_schaduw ({', '.join(kolommen)}) "
+            f"VALUES ({', '.join('?' for _ in kolommen)})",
+            [rij.get(k) for k in kolommen],
+        )
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def bevestiging_paren(self, sinds_iso: str = "") -> list[dict]:
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM bevestiging_schaduw WHERE signaal_tijd >= ? "
+            "ORDER BY signaal_tijd, id", (sinds_iso,)).fetchall()]
 
     def uitgezet_gesloten(self, sinds_iso: str) -> list[dict]:
         return [dict(r) for r in self.conn.execute(

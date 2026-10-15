@@ -7,6 +7,15 @@
 - Verzoeken worden nu gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
 - Bij "rate limited" tot 4 pogingen met oplopende wachttijd (1,5 s, 3 s, ...); orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
 
+## 2.11.0 - 15-10-2026
+
+### Schaduwmeting: instap met bevestiging op 15m (besluit Ruud)
+- **Doorgerekend 15-10** (1m-koersen cTrader, echte veldproefposities sinds 14-10; IG n=80, Pepperstone n=263), in R per trade:
+  - Vroeg afbreken (in de eerste bar sluiten bij 0,5R tegen + 1m-slot tegen): IG -0,167 -> -0,174, Pepperstone -0,093 -> -0,091. Geen verbetering; niet gebouwd.
+  - Instap met bevestiging (eerste 1m-candle na het signaal moet in de richting sluiten, instap op de slotkoers, zelfde stop en doel; anders geen trade): IG -0,167 -> +0,005 (verschil t 2,0; 15m -0,26 -> +0,02, t 2,9; 30m slechter), Pepperstone -0,093 -> -0,070 (t 0,4; 15m -0,07 -> +0,17, n=14). Nergens duidelijk winstgevend, en met 4 regels x 5 tijdvakken x 2 brokers kan één goede cel toeval zijn. Daarom niet doorgevoerd maar gemeten op nieuwe data.
+- **Nieuw: `strategy/bevestiging.py`.** Per echt gehandeld 15m-veldproefsignaal een paar in de schaduw: *direct* (instap bij het signaal) en *bevestigd* (na de eerste afgesloten 1m-bar die ná het signaal begon, alleen als die in de richting sloot en de stop niet raakte; anders uitkomst 0). Zelfde simulator en uitersten (alleen van na de instap), dus een eerlijke paarvergelijking. Geen echte orders.
+- Afgeronde paren in tabel `bevestiging_schaduw`; sensor **Bevestiging 15m (schaduw)**: paren, bevestigd/niet bevestigd, R per trade direct en bevestigd, verschil en t. Oordeel vanaf 30 paren; "voorstel om door te voeren" alleen als het verschil t >= 2 heeft én bevestigd positief is.
+
 ## 2.10.0 - 15-10-2026
 
 ### Analyse beide brokers (15-10, besluit Ruud: A en B)

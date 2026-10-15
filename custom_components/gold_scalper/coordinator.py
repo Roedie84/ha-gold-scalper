@@ -143,6 +143,7 @@ from .learning.sessions import build_news_impact, build_sessions
 from .strategy.aggregator import BAR_SECONDS, QuoteAggregator, closed_only
 from .strategy import veldproef as veldproef_mod
 from .strategy import uitgezet_schaduw as uitgezet_mod
+from .strategy import bevestiging as bevestiging_mod
 from .strategy import turbo as turbo_mod
 from .strategy.pyramid import PyramidConfig, consider_addition
 from .strategy.scalp_reeks import ReeksConfig, stukken_nu
@@ -635,6 +636,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             self._scalp_uitgezet = {"n": 0, "netto": 0.0, "t": None, "handmatig": True}
         #: 2.7.1 (H-GS-003): schaduwtrades van uitgezette groepen.
         self.uitgezet_schaduw = uitgezet_mod.UitgezetBoek()
+        #: 2.11.0: schaduwmeting instap met bevestiging (15m), paarvergelijking.
+        self.bevestiging = bevestiging_mod.BevestigingBoek(
+            kosten=SchaduwKosten(slippage=uitgezet_mod.SLIPPAGE_PER_ZIJDE,
+                                 commissie_per_lot=_commissie_venue(self.venue)))
+        self._bevestiging_stats: dict = self.bevestiging.statistiek([])
+        self._bevestiging_geladen = False
         self._vp_uitgezet_volgende = 0.0
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
         # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
@@ -2569,6 +2576,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             await self._werk_schaduw_bij(quote, now)
             # 2.7.1: schaduwtrades van uitgezette groepen (H-GS-003).
             await self._werk_uitgezet_bij(quote, now)
+            # 2.11.0: bevestigingsmeting (15m), alleen schaduw.
+            await self._werk_bevestiging_bij(quote, now)
             # 1.9.5: tijdstopvarianten, idem. Alleen meting.
             await self._werk_varianten_bij(quote, now)
 
@@ -2853,6 +2862,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         uitgevoerd = await self._open_position(
                             r_signal, quote, now, gelijktijdig_open=aantal_open,
                         )
+                        # 2.11.0: 15m-signaal dat echt gehandeld wordt: ook als
+                        # paar (direct / met bevestiging) in de schaduw volgen.
+                        if uitgevoerd and bevestiging_mod.BevestigingBoek.hoort_erbij(strategie):
+                            try:
+                                self.bevestiging.aanmelden(
+                                    strategie=strategie, signal=r_signal,
+                                    bid=quote.bid, ask=quote.ask, nu=now)
+                            except Exception:  # noqa: BLE001 - meting raakt de handel niet
+                                _LOGGER.debug("Bevestigingsmeting niet gestart", exc_info=True)
 
                 # 1.9.0: geldig signaal, niet uitgevoerd: schaduwtrade.
                 # 2.4.0: geen schaduwtrades voor de veldproef (die handelt echt).
@@ -3059,6 +3077,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 2.7.0: onderzoeksrapport (samenvatting), risicolimieten.
             "onderzoek": onderzoek_mod.samenvatting(self.onderzoek) if self.onderzoek else None,
             "risico_limieten": self.risico_info,
+            # 2.11.0: schaduwmeting instap met bevestiging (15m).
+            "bevestiging_15m": {**self._bevestiging_stats,
+                                "open": len(self.bevestiging.open_paren)},
             "uitgezet_schaduw": {
                 "open": len(self.uitgezet_schaduw.open_trades),
                 "gesloten_sinds_start": len(self.uitgezet_schaduw.gesloten),
@@ -4041,6 +4062,35 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 await self.hass.async_add_executor_job(self.db.bewaar_uitgezet, trade)
         except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
             _LOGGER.debug("Schaduwtrade uitgezette groep niet vastgelegd: %s", err)
+
+    async def _werk_bevestiging_bij(self, quote: VenueQuote, now: datetime) -> None:
+        """2.11.0: paren direct/bevestigd een cyclus verder; afgeronde paren
+        naar de database en de statistiek."""
+        if self.db is None:
+            return
+        try:
+            if not self._bevestiging_geladen:
+                self._bevestiging_geladen = True
+                rijen = await self.hass.async_add_executor_job(self.db.bevestiging_paren, "")
+                self._bevestiging_stats = self.bevestiging.statistiek(rijen)
+            if not self.bevestiging.open_paren or self.koers_verouderd:
+                return
+            hoog, laag, vanaf = self._uitersten_voor_varianten(quote)
+            agg = self.veldproef.agg.get("1m")
+            bar = agg._closed[-1] if agg is not None and agg._closed else None
+            klaar = self.bevestiging.bijwerken(
+                bid=quote.bid, ask=quote.ask, hoog=hoog, laag=laag,
+                uitersten_vanaf=vanaf, nu=now, bar_1m=bar,
+                exits_voor=self._exits_voor, maat_voor=self._maat_uitgezet)
+            if klaar:
+                for paar in klaar:
+                    if paar.status != "vervallen":
+                        await self.hass.async_add_executor_job(
+                            self.db.bewaar_bevestiging, paar.als_rij())
+                rijen = await self.hass.async_add_executor_job(self.db.bevestiging_paren, "")
+                self._bevestiging_stats = self.bevestiging.statistiek(rijen)
+        except Exception as err:  # noqa: BLE001 - meting raakt de handel niet
+            _LOGGER.debug("Bevestigingsmeting niet bijgewerkt: %s", err)
 
     def _maat_uitgezet(self, t) -> float:
         if veldproef_mod.is_veldproef(t.strategie):
