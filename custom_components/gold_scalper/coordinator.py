@@ -31,7 +31,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .analysis.signals import Candles
 from .broker.adapter import (
-    ExecutionVenue, OrderResult, VenueError, VenueQuote, size_says_closed,
+    ExecutionVenue, OrderResult, VenueError, VenueQuote, size_says_closed, size_is_known,
 )
 from .broker.execution_safety import BrokerLimits, SafeExecutor
 from .broker.currency import Conversion, derive_rate_from_position
@@ -5577,6 +5577,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._sluitverzoeken = {
             t: m for t, m in self._sluitverzoeken.items() if t in live
         }
+        # 2.11.1: afrondingsverschil van een deelsluiting rechtzetten in de
+        # administratie (broker leidend) in plaats van een noodstop.
+        await self._herstel_afronding(positions, open_trades)
         audit = compare_positions(
             positions, open_trades,
             expected_currency=self.conversion.instrument,
@@ -5615,6 +5618,35 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 "audit", "Gold Scalper: administratie klopt niet",
                 audit.critical[0].message,
             )
+
+    async def _herstel_afronding(self, positions, open_trades) -> int:
+        """Neem de brokeromvang over bij een verschil van hooguit 0,01 (2.11.1).
+
+        Ontstond door een deelsluiting bij IG: 2,675 gevraagd, 2,67 gesloten,
+        2,675 geboekt. Elke controle gaf daarna een noodstop (15-10, twee
+        posities, broker 2,68 tegen database 2,67).
+        """
+        from .broker.reconcile_audit import afrondingsverschil
+
+        per_ticket = {str(getattr(p, "ticket", "")): p for p in positions}
+        hersteld = 0
+        for trade in open_trades:
+            positie = per_ticket.get(str(trade.broker_ticket or ""))
+            if positie is None or not size_is_known(getattr(positie, "units", None)):
+                continue
+            verwacht = trade.volume * CONTRACT_SIZE
+            if not afrondingsverschil(positie.units, verwacht):
+                continue
+            _LOGGER.warning(
+                "Omvang van %s rechtgezet naar de broker: %.4f -> %s "
+                "(afronding van een deelsluiting).",
+                trade.broker_ticket, verwacht, positie.units,
+            )
+            trade.volume = float(positie.units) / CONTRACT_SIZE
+            if self.db is not None:
+                await self.hass.async_add_executor_job(self.db.update_trade, trade)
+            hersteld += 1
+        return hersteld
 
     def _sluit_leeftijden(self) -> dict[str, float]:
         """Seconden sinds elk eigen sluitverzoek dat nog niet verwerkt is."""

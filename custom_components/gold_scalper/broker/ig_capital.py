@@ -1259,6 +1259,16 @@ class IgStyleVenue(ExecutionVenue):
                 "afgebroken in plaats van blind een aanvraag te sturen."
             )
 
+        # 2.11.1: afronden VOOR het versturen en dat afgeronde getal ook
+        # teruggeven. Eerder ging round(2.675, 2) = 2.67 naar IG, maar kwam
+        # 2.675 terug; de database boekte 2.675 dicht en de controle zag
+        # broker 2.68 tegen database 2.67 -> NOODSTOP (15-10).
+        size = round(float(size), 2)
+        if size <= 0:
+            raise VenueError(
+                f"Te kleine sluitomvang voor {ticket} na afronden op 0,01."
+            )
+
         # POST met de header ``_method: DELETE`` in plaats van een echte
         # DELETE. Dat is wat IG voorschrijft, en met reden: een DELETE met
         # inhoud wordt onderweg door proxies en tussenlagen gestript. Raakt de
@@ -1269,7 +1279,7 @@ class IgStyleVenue(ExecutionVenue):
             json={
                 "dealId": str(ticket),
                 "direction": direction,
-                "size": round(size, 2),
+                "size": size,
                 "orderType": "MARKET",
             },
             headers_extra={"_method": "DELETE"},
@@ -1925,8 +1935,11 @@ class IgVenue(IgStyleVenue):
             status = str((confirm or {}).get("dealStatus", "")).upper()
             if status == "ACCEPTED":
                 level = _als_getal(confirm.get("level"))
+                # 2.11.1: de omvang die IG bevestigt, als die er is
+                bevestigd = _als_getal(confirm.get("size"))
                 return OrderResult(
-                    success=True, ticket=ticket, units=size,
+                    success=True, ticket=ticket,
+                    units=bevestigd if bevestigd and bevestigd > 0 else size,
                     fill_price=level, client_ref=reference,
                 )
             if status == "REJECTED":

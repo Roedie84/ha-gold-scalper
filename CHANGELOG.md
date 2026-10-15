@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.11.1 - 15-10-2026
+
+### IG: geen noodstop meer door afronding bij een deelsluiting
+- Gemeld 15-10: "IG geeft nu telkens noodstops". Twee posities: "broker meldt 2.68, database 2.67".
+- Oorzaak: bij een deelsluiting ging `round(2.675, 2)` = 2,67 naar IG, maar de functie gaf 2,675 terug; de database boekte 2,675 dicht. Na elke handmatige hervatting kwam de noodstop terug.
+- `IgVenue.close` rondt nu af vóór het versturen en geeft dat getal terug (of de omvang die IG bevestigt).
+- Bestaande verschillen tot één volumestap (0,01) zet de controle recht naar de omvang van de broker (`_herstel_afronding`, waarschuwing in het logboek); een groter verschil blijft een noodstop.
+- Tests: `test_v2111_afronding.py` (5).
+
 ## 2.8.1 - 14-10-2026
 
 ### cTrader: binnen de verzoeklimieten blijven

@@ -38,6 +38,21 @@ _LOGGER = logging.getLogger(__name__)
 #: Verschil in omvang waaronder we niets zeggen; afrondingsruis.
 SIZE_TOLERANCE = 0.005
 
+#: 2.11.1: een verschil tot één volumestap (0,01) is afronding van een
+#: deelsluiting, geen echte afwijking. De administratie neemt dan de omvang
+#: van de broker over in plaats van een noodstop te geven.
+AFRONDING_MAX = 0.0101
+
+
+def afrondingsverschil(broker_units, database_units) -> bool:
+    """Waar als broker en database hooguit één volumestap verschillen."""
+    try:
+        verschil = abs(float(broker_units) - float(database_units))
+    except (TypeError, ValueError):
+        return False
+    return SIZE_TOLERANCE < verschil <= AFRONDING_MAX
+
+
 #: Verschil in prijsniveau waaronder we niets zeggen.
 PRICE_TOLERANCE = 0.01
 
