@@ -17,7 +17,7 @@ def _pos(ticket, side, units=50.0):
 
 
 def test_versie():
-    assert INTEGRATION_VERSION >= "2.5.2"
+    assert tuple(map(int, INTEGRATION_VERSION.split("."))) >= tuple(map(int, "2.5.2".split(".")))
 
 
 def test_tegengestelde_op_eigen_stop_is_geen_netting():

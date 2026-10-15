@@ -166,6 +166,29 @@ def sluitcode(reden: str | None) -> str:
     return "exit"
 
 
+def uitersten_voor(t, hoog: float | None, laag: float | None,
+                   vanaf: datetime | None) -> tuple[float | None, float | None]:
+    """2.10.0: alleen uitersten van bars die NA de instap begonnen.
+
+    Zonder deze toets kreeg een schaduwtrade de hoog/laag van de laatst
+    afgesloten candle mee - ook als die candle vóór de instap lag (bij de
+    veldproef is dat de signaalbar zelf). Stop en doel werden dan
+    "geraakt" door koersen van vóór de trade: rsi_rev 1m kwam in de schaduw
+    op +1,93 USD/oz bruto (t 7,8), in echte trades bij Pepperstone op
+    -0,04. ``vanaf`` = begin van de oudste bar waar de uitersten uit komen;
+    None betekent dat de aanroeper instaat voor uitersten van na de instap
+    (de coordinator geeft altijd een ``vanaf`` mee, of geen uitersten).
+    """
+    if hoog is None and laag is None:
+        return None, None
+    if vanaf is None:
+        return hoog, laag
+    geopend = _tijd(getattr(t, "open_time", None))
+    if geopend is None or geopend > vanaf:
+        return None, None
+    return hoog, laag
+
+
 def stap_trade(t, exits: ExitManager, kosten: SchaduwKosten, *, bid: float,
                ask: float, hoog: float | None, laag: float | None, atr: float,
                nu: datetime, rondreis_kosten: float) -> str:
@@ -306,7 +329,8 @@ class SchaduwBoek:
         sluit_trade(t, prijs, mid, nu, reden, self.kosten)
 
     def bijwerken(self, *, bid: float, ask: float, hoog: float | None,
-                  laag: float | None, atr: float, nu: datetime) -> list[SchaduwTrade]:
+                  laag: float | None, atr: float, nu: datetime,
+                  uitersten_vanaf: datetime | None = None) -> list[SchaduwTrade]:
         """Eén cyclus. Geeft de trades terug die veranderden (om weg te schrijven).
 
         ``hoog`` en ``laag`` zijn de uitersten (mid) van de bars sinds de
@@ -315,9 +339,10 @@ class SchaduwBoek:
         gewijzigd: list[SchaduwTrade] = []
         rondreis = (ask - bid) + 2 * self.kosten.slippage
         for t in list(self.open_trades):
+            h, lg = uitersten_voor(t, hoog, laag, uitersten_vanaf)
             uitkomst = stap_trade(
-                t, self.exits, self.kosten, bid=bid, ask=ask, hoog=hoog,
-                laag=laag, atr=atr, nu=nu, rondreis_kosten=rondreis,
+                t, self.exits, self.kosten, bid=bid, ask=ask, hoog=h,
+                laag=lg, atr=atr, nu=nu, rondreis_kosten=rondreis,
             )
             if uitkomst == "vervallen":
                 self.open_trades.remove(t)

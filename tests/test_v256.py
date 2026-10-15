@@ -13,7 +13,7 @@ from gold_scalper.strategy.scalping import ScalpConfig  # noqa: E402
 
 
 def test_versie():
-    assert INTEGRATION_VERSION >= "2.5.6"
+    assert tuple(map(int, INTEGRATION_VERSION.split("."))) >= tuple(map(int, "2.5.6".split(".")))
     assert V.VELDPROEF_VERSIE >= "veldproef-1.6.0"
 
 

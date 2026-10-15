@@ -7,6 +7,21 @@
 - Verzoeken worden nu gespreid: historie (trendbars, deals) hooguit één per 0,4 s (cTrader staat 5/s toe), overige één per 0,05 s.
 - Bij "rate limited" tot 4 pogingen met oplopende wachttijd (1,5 s, 3 s, ...); orders worden nooit opnieuw verstuurd. Aantal in `request_stats()` als `geremd`.
 
+## 2.10.0 - 15-10-2026
+
+### Analyse beide brokers (15-10, besluit Ruud: A en B)
+IG sinds 14-10 06:00 UTC: 101 trades, netto -2.023 (daghandel 1 trade van 500 oz -1.185, van vóór het risicoplafond; vp 15m -683, 30m -173). Pepperstone: 290 trades, netto -2.690 (scalp -1.394, uit; vp 1m -1.037 bruto -0,08 USD/oz; 3m +2 bruto +0,33; 5m -279; 15m +195 n=15). Geen opzet met aantoonbare edge na kosten.
+
+### A. Veldproef-tijdvakken met de hand uit
+- Nieuwe optie `vp_tijdvakken_uit` (meerkeuze 1m/3m/5m/15m/30m). Alle opzetten van zo'n tijdvak gelden als uitgezet ("handmatig"), meteen bij het starten; de schaduwtrades lopen door. Geen nieuwe run.
+- Voor Pepperstone: 1m uit (verliest ook vóór kosten, net als bij IG).
+
+### B. Schaduwsimulatie geijkt
+- **Gevonden:** schaduw en echt liepen ver uiteen op dezelfde signalen: rsi_rev 1m in de schaduw (IG) +24.691 USD, bruto +1,93 USD/oz, t 7,8 (n=527); echt bij Pepperstone -305, bruto -0,04 (n=31). Scalp: schaduw bruto -4,56 USD/oz, echt -0,31.
+- **Oorzaak:** de schaduw (en de cooldown-schaduw) kreeg elke cyclus de hoog/laag van de laatst afgesloten candle mee, ook als die vóór de instap lag - bij de veldproef is dat de signaalbar zelf. Stop en doel werden "geraakt" door koersen van vóór de trade. De tijdstopvarianten hadden die toets al (`uitersten_vanaf`, 1.9.5), de schaduwboeken niet.
+- **Nu:** `schaduw.uitersten_voor`: alleen uitersten van bars die ná de instap begonnen en alleen bij een nieuwe bar (`_uitersten_voor_varianten`), voor de schaduw van uitgezette groepen én de cooldown-schaduw.
+- **Gevolg:** schaduwrijen van vóór 15-10 05:00 UTC (`GELDIG_VANAF`) tellen niet mee in onderzoek en statistiek. H-GS-003 (uitsluiten 1m/3m/scalp terecht?) begint de bevestiging opnieuw op 15-10 05:00 UTC; de eerdere schaduwcijfers waren vertekend.
+
 ## 2.9.5 - 14-10-2026
 
 ### Pepperstone: handelsrooster van de broker

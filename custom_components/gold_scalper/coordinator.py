@@ -59,6 +59,7 @@ from .broker.saldosprong import SaldoSprongBewaker
 from .const import (
     CONF_SCALP_TURBO,
     CONF_SCALP_UIT,
+    CONF_VP_TIJDVAKKEN_UIT,
     CONF_SCALP_TURBO_ORDERS,
     DEFAULT_SCALP_TURBO,
     DEFAULT_SCALP_TURBO_ORDERS,
@@ -624,6 +625,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: 2.9.3: met de hand uitgezet (optie); geldt meteen, ook vóór de
         #: eerste telling uit de database.
         self.scalp_handmatig_uit = bool(options.get(CONF_SCALP_UIT, False))
+        #: 2.10.0: veldproef-tijdvakken met de hand uit; geldt meteen.
+        self.vp_tijdvakken_uit = tuple(
+            str(x) for x in (options.get(CONF_VP_TIJDVAKKEN_UIT) or ())
+            if str(x) in veldproef_mod.TIJDVAKKEN)
+        if self.vp_tijdvakken_uit:
+            self._vp_uitgezet = veldproef_mod.handmatig_uitgezet({}, self.vp_tijdvakken_uit)
         if self.scalp_handmatig_uit:
             self._scalp_uitgezet = {"n": 0, "netto": 0.0, "t": None, "handmatig": True}
         #: 2.7.1 (H-GS-003): schaduwtrades van uitgezette groepen.
@@ -1627,6 +1634,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.warning("Uitgezette veldproefopzetten niet te lezen: %s", err)
             return
         nieuw = veldproef_mod.uitgezette_opzetten(per_opzet)
+        for naam, info in veldproef_mod.handmatig_uitgezet(
+                per_opzet, self.vp_tijdvakken_uit).items():
+            nieuw.setdefault(naam, info)
         for naam in sorted(set(nieuw) - set(self._vp_uitgezet)):
             _LOGGER.warning("Veldproefopzet %s uitgezet: n=%s, netto %s, t=%s",
                             naam, nieuw[naam]["n"], nieuw[naam]["netto"], nieuw[naam]["t"])
@@ -3748,8 +3758,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 self.db.gesloten_als_dict, self.mode.value, sinds)
             schaduw = []
             try:
+                # 2.10.0: vertekende schaduwrijen van vóór de correctie niet.
+                schaduw_sinds = max(sinds, uitgezet_mod.GELDIG_VANAF)
                 schaduw = [uitgezet_mod.als_onderzoeksrij(r) for r in
-                           await self.hass.async_add_executor_job(self.db.uitgezet_gesloten, sinds)]
+                           await self.hass.async_add_executor_job(
+                               self.db.uitgezet_gesloten, schaduw_sinds)]
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Uitgezette schaduwtrades niet te lezen: %s", err)
             self.onderzoek = await self.hass.async_add_executor_job(
@@ -4002,11 +4015,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         atr = self.state.atr.value or 0.0
         if atr <= 0:
             return
-        pq = self._paper_quote(quote)
+        # 2.10.0: zie _werk_uitgezet_bij.
+        hoog, laag, vanaf = self._uitersten_voor_varianten(quote)
         voor = len(self.schaduw.gesloten) + self.schaduw.vervallen
         gewijzigd = self.schaduw.bijwerken(
-            bid=quote.bid, ask=quote.ask, hoog=pq.high, laag=pq.low,
-            atr=atr, nu=now,
+            bid=quote.bid, ask=quote.ask, hoog=hoog, laag=laag,
+            atr=atr, nu=now, uitersten_vanaf=vanaf,
         )
         for t in gewijzigd:
             await self.hass.async_add_executor_job(self.db.bewaar_schaduw, t)
@@ -4037,10 +4051,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if not self.uitgezet_schaduw.open_trades or self.db is None or self.koers_verouderd:
             return
         try:
-            pq = self._paper_quote(quote)
+            # 2.10.0: alleen uitersten van nieuwe bars, en alleen voor trades
+            # die vóór die bars opengingen (zoals de tijdstopvarianten).
+            hoog, laag, vanaf = self._uitersten_voor_varianten(quote)
             gewijzigd = self.uitgezet_schaduw.bijwerken(
-                bid=quote.bid, ask=quote.ask, hoog=pq.high, laag=pq.low, nu=now,
+                bid=quote.bid, ask=quote.ask, hoog=hoog, laag=laag, nu=now,
                 exits_voor=self._exits_voor, maat_voor=self._maat_uitgezet,
+                uitersten_vanaf=vanaf,
             )
             for t in gewijzigd:
                 await self.hass.async_add_executor_job(self.db.bewaar_uitgezet, t)
@@ -4072,7 +4089,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if t.status == "open":
                 self.schaduw.open_trades.append(t)
             elif t.status == "gesloten":
-                self.schaduw.gesloten.append(t)
+                # 2.10.0: gesloten vóór de correctie van de simulatie telt
+                # niet mee in de statistiek (vertekend, zie schaduw.uitersten_voor).
+                if (t.open_time or "") >= uitgezet_mod.GELDIG_VANAF:
+                    self.schaduw.gesloten.append(t)
             else:
                 self.schaduw.vervallen += 1
         self._schaduw_stats = self.schaduw.statistiek()

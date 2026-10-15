@@ -58,6 +58,6 @@ def test_winstslot_schaal():
 def test_versies():
     from gold_scalper.const import INTEGRATION_VERSION
     from gold_scalper.strategy import combinatie as C
-    assert INTEGRATION_VERSION >= "2.6.3"
+    assert tuple(map(int, INTEGRATION_VERSION.split("."))) >= tuple(map(int, "2.6.3".split(".")))
     assert V.VELDPROEF_VERSIE == "veldproef-2.1.0"
     assert C.COMBINATIE_VERSIE == "combinatie-1.9.0"

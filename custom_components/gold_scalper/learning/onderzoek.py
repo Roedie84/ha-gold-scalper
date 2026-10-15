@@ -312,7 +312,10 @@ HYPOTHESEN: tuple[Hypothese, ...] = (
         expected_market_regime="alle; geen filter",
         strategie_prefix="vp:", tijdvakken=("1m", "3m"), strategieen=("scalp",),
         discovery_tot="2026-10-13T17:48:00+00:00",
-        confirmation_vanaf="2026-10-14T06:00:00+00:00",
+        # 2.10.0: bevestiging opnieuw vanaf de correctie van de schaduw-
+        # simulatie (uitersten van vóór de instap); de rijen van 14-10 06:00
+        # tot 15-10 05:00 waren vertekend.
+        confirmation_vanaf="2026-10-15T05:00:00+00:00",
         verwachting="negatief",
         bron_bevestiging="schaduw_uitgezet",
         rejection_rule=(f"verworpen als na >= {MIN_CLUSTERS} clusters in de bevestigingsperiode "

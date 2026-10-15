@@ -13,7 +13,7 @@ from gold_scalper.strategy import veldproef as vp
 from gold_scalper.strategy.scalping import ScalpConfig
 
 PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalper"
-T0 = datetime(2026, 10, 14, 7, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 10, 15, 7, 0, tzinfo=timezone.utc)
 
 
 def _sig(d=1, stop=4100.0, tp=4106.0, bar="b1", geldig=True):

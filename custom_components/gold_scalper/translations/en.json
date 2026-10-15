@@ -148,7 +148,8 @@
           "scalp_reeks_doel_usd": "Scalp series: profit target per piece (USD/oz)",
           "scalp_turbo": "Turbo scalp: react to the live price (seconds)",
           "scalp_turbo_orders_per_min": "Turbo scalp: maximum orders per minute (IG limit)",
-          "scalp_uit": "Disable scalp (incl. turbo); shadow trades continue"
+          "scalp_uit": "Disable scalp (incl. turbo); shadow trades continue",
+          "vp_tijdvakken_uit": "Disable field-test timeframes; shadow trades continue"
         },
         "data_description": {
           "strategie": "Day trading: breakout of the 20-hour channel in the direction of the hourly trend, stop 4 x ATR, trailing stop, flat by 20:45 UTC. Scalping: the original strategy. Changing this starts a new run. Combination: both at once, each position with its own rules; scalp trades at a fixed size.",

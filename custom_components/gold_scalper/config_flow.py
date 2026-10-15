@@ -28,7 +28,7 @@ from .broker.public_data import PublicDataVenue
 from .broker.stooq import StooqVenue
 from .validation import reward_risk_warning
 from .const import (
-    CONF_SCALP_TURBO, CONF_SCALP_TURBO_ORDERS, DEFAULT_SCALP_TURBO, CONF_SCALP_UIT,
+    CONF_SCALP_TURBO, CONF_SCALP_TURBO_ORDERS, DEFAULT_SCALP_TURBO, CONF_SCALP_UIT, CONF_VP_TIJDVAKKEN_UIT,
     DEFAULT_SCALP_TURBO_ORDERS,
     CONF_SCALP_REEKS, CONF_SCALP_REEKS_STAP, CONF_SCALP_REEKS_MAX,
     CONF_SCALP_REEKS_DOEL, DEFAULT_SCALP_REEKS, DEFAULT_SCALP_REEKS_STAP,
@@ -866,6 +866,12 @@ class GoldScalperOptionsFlow(OptionsFlow):
             vol.Required(
                 CONF_SCALP_UIT, default=default(CONF_SCALP_UIT, False)
             ): BooleanSelector(),
+            # 2.10.0: veldproef-tijdvakken met de hand uit.
+            vol.Optional(
+                CONF_VP_TIJDVAKKEN_UIT, default=list(default(CONF_VP_TIJDVAKKEN_UIT, []) or [])
+            ): SelectSelector(SelectSelectorConfig(
+                options=["1m", "3m", "5m", "15m", "30m"], multiple=True,
+                mode=SelectSelectorMode.LIST)),
 
             vol.Required(
                 CONF_SCALE_WITH_CONFIDENCE,

@@ -26,13 +26,17 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
 
-from .schaduw import SchaduwKosten, SchaduwTrade, _iso, stap_trade
+from .schaduw import SchaduwKosten, SchaduwTrade, _iso, stap_trade, uitersten_voor
 
 #: Gemeten: (kosten/oz - spread) voor veldproef 1m (+0,016), 3m (+0,076) en
 #: scalp (-0,015) over 30 dagen demo; gemiddeld ~0,03 rondreis. Per zijde de
 #: helft, afgerond naar boven.
 SLIPPAGE_PER_ZIJDE = 0.02
 REDEN = "uitgezet"
+#: 2.10.0: vóór dit moment kregen schaduwtrades uitersten van vóór hun
+#: instap mee (zie ``schaduw.uitersten_voor``); die rijen zijn vertekend en
+#: tellen niet mee in het onderzoek (H-GS-003).
+GELDIG_VANAF = "2026-10-15T05:00:00+00:00"
 HERKOMST = "geschat"
 
 
@@ -84,7 +88,8 @@ class UitgezetBoek:
     def bijwerken(self, *, bid: float, ask: float, hoog: float | None,
                   laag: float | None, nu: datetime,
                   exits_voor: Callable[[str], object],
-                  maat_voor: Callable[[UitgezetTrade], float]) -> list[UitgezetTrade]:
+                  maat_voor: Callable[[UitgezetTrade], float],
+                  uitersten_vanaf: datetime | None = None) -> list[UitgezetTrade]:
         """Eén cyclus voor alle open trades; geeft de gewijzigde terug."""
         gewijzigd: list[UitgezetTrade] = []
         rondreis = (ask - bid) + 2 * self.kosten.slippage
@@ -92,9 +97,10 @@ class UitgezetBoek:
             maat = maat_voor(t)
             if not maat or maat <= 0:
                 continue
+            h, lg = uitersten_voor(t, hoog, laag, uitersten_vanaf)
             uitkomst = stap_trade(
-                t, exits_voor(naam), self.kosten, bid=bid, ask=ask, hoog=hoog,
-                laag=laag, atr=maat, nu=nu, rondreis_kosten=rondreis,
+                t, exits_voor(naam), self.kosten, bid=bid, ask=ask, hoog=h,
+                laag=lg, atr=maat, nu=nu, rondreis_kosten=rondreis,
             )
             if uitkomst == "vervallen":
                 del self.open_trades[naam]

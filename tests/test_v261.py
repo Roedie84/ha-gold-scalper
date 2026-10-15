@@ -51,6 +51,6 @@ def test_scalp_en_turbo_volgen_de_groep():
 def test_versies():
     from gold_scalper.const import INTEGRATION_VERSION
     from gold_scalper.strategy import combinatie as C
-    assert INTEGRATION_VERSION >= "2.6.1"
+    assert tuple(map(int, INTEGRATION_VERSION.split("."))) >= tuple(map(int, "2.6.1".split(".")))
     assert V.VELDPROEF_VERSIE >= "veldproef-1.9.0"
     assert C.COMBINATIE_VERSIE >= "combinatie-1.7.0"

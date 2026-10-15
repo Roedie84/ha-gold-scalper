@@ -55,7 +55,7 @@ def test_versies():
     from gold_scalper.const import INTEGRATION_VERSION
     from gold_scalper.strategy import combinatie as C
     from gold_scalper.strategy.scalping import STRATEGY_VERSION
-    assert INTEGRATION_VERSION >= "2.5.9"
+    assert tuple(map(int, INTEGRATION_VERSION.split("."))) >= tuple(map(int, "2.5.9".split(".")))
     assert V.VELDPROEF_VERSIE >= "veldproef-1.8.0"
     assert D.STRATEGIE_VERSIE == "daghandel-1.6.0"
     assert C.COMBINATIE_VERSIE >= "combinatie-1.6.0"

@@ -133,6 +133,21 @@ def uitgezette_opzetten(per_opzet: dict[str, list[float]]) -> dict[str, dict]:
     return uit
 
 
+def handmatig_uitgezet(per_opzet: dict[str, list[float]],
+                       tijdvakken) -> dict[str, dict]:
+    """2.10.0: alle opzetten van met de hand uitgezette tijdvakken."""
+    uit: dict[str, dict] = {}
+    gekozen = set(tijdvakken or ())
+    for naam in namen():
+        if ontleed(naam)[1] not in gekozen:
+            continue
+        netto = per_opzet.get(naam) or []
+        t = t_statistiek(netto) if len(netto) >= 2 else None
+        uit[naam] = {"n": len(netto), "netto": round(sum(netto), 2),
+                     "t": round(t, 2) if t is not None else None, "handmatig": True}
+    return uit
+
+
 def groep_uitgezet(netto: list[float]) -> dict | None:
     """2.6.1: n >= GROEP_MIN_N en t < GROEP_MAX_T -> de hele groep uit."""
     if len(netto) < GROEP_MIN_N:
