@@ -44,3 +44,12 @@ def test_paneel_heeft_indicatoren():
     js = PANEEL.read_text(encoding="utf-8")
     for naam in ("indEma", "indBb", "indDc", "indRsi", "indAtr", "_renderInd", "d.signalen", IND := "gold-scalper-indicatoren"):
         assert naam in js, naam
+
+
+def test_uitgezette_opzet_geen_marker():
+    rijen = [_rij("2026-10-16T08:00:00+00:00", "buy", 0, "opzet_uitgezet", strategie="vp:momentum:1m")]
+    assert signaal_markers(rijen) == []
+
+
+def test_paneel_stapelt_hooguit_drie():
+    assert "MAX_STAPEL = 3" in PANEEL.read_text(encoding="utf-8")

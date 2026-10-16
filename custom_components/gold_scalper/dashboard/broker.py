@@ -602,6 +602,10 @@ def signaal_markers(rijen: list[dict] | None) -> list[dict]:
         strategie = detail.get("strategie")
         if not strategie:
             continue
+        # 2.13.1: signalen van een uitgezette opzet zijn geen kandidaat;
+        # op 15m gaven ze kolommen van tientallen ruitjes per candle.
+        if str(r.get("reject_reason") or "").startswith("opzet_uitgezet"):
+            continue
         richting = "long" if r.get("state") == "buy" else "short" if r.get("state") == "sell" else None
         t = _epoch(r.get("ts"))
         if richting is None or t is None:

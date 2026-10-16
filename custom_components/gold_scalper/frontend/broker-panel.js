@@ -1047,6 +1047,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     }
     const sigs = c && this._sigPerCandle ? this._sigPerCandle[c.t] : null;
     if (sigs && sigs.length) {
+      if (sigs.length > 4) extra += `<span class="sig-w">${sigs.length} signalen, ${sigs.filter((s) => s.gehandeld).length} gehandeld:</span>`;
       extra += sigs.slice(0, 4).map((s) => `<span class="sig-w">${esc((s.strategie || "").replace(/^vp:/, ""))} ${s.richting === "long" ? "▲" : "▼"} ${s.gehandeld ? "gehandeld" : esc(s.reden || "overgeslagen")}</span>`).join("");
     }
     this._q("#gkop").innerHTML = `<span class="big">${fmt(k.mid)}</span>${vk}<div class="ohlc">${ohlc}${extra}</div>`;
@@ -1625,18 +1626,29 @@ ${tl}
         while (i < zicht.length - 1 && zicht[i + 1].t <= s.t) i++;
         (per[i] = per[i] || []).push(s);
       }
+      // 2.13.1: hooguit 3 ruitjes per kant per candle (gehandeld eerst),
+      // de rest als "+N"; alle signalen staan bij de cursor in de kopregel.
+      const MAX_STAPEL = 3;
       for (const [k, lijst] of Object.entries(per)) {
-        const i = Number(k), c = zicht[i];
+        const i = Number(k), c = zicht[i], xx = xs(i);
+        lijst.sort((a, b) => Number(b.gehandeld) - Number(a.gehandeld));
         sigPerCandle[c.t] = lijst;
-        let ol = 0, os = 0;
-        for (const s of lijst) {
-          const lg = s.richting === "long", xx = xs(i);
-          const yy = lg ? y(c.l) + 12 + ol * 8 : y(c.h) - 12 - os * 8;
-          if (lg) ol++; else os++;
+        for (const lg of [true, false]) {
+          const kant = lijst.filter((s) => (s.richting === "long") === lg);
+          if (!kant.length) continue;
           const kl = lg ? KLEUR.long : KLEUR.short;
-          g.beginPath(); g.moveTo(xx, yy - 3.5); g.lineTo(xx + 3.5, yy); g.lineTo(xx, yy + 3.5); g.lineTo(xx - 3.5, yy); g.closePath();
-          if (s.gehandeld) { g.fillStyle = kl; g.fill(); }
-          else { g.strokeStyle = kl; g.lineWidth = 1.2; g.stroke(); }
+          kant.slice(0, MAX_STAPEL).forEach((s, j) => {
+            const yy = Math.max(TOP + 4, Math.min(TOP + ph - 4, lg ? y(c.l) + 12 + j * 8 : y(c.h) - 12 - j * 8));
+            g.beginPath(); g.moveTo(xx, yy - 3.5); g.lineTo(xx + 3.5, yy); g.lineTo(xx, yy + 3.5); g.lineTo(xx - 3.5, yy); g.closePath();
+            if (s.gehandeld) { g.fillStyle = kl; g.fill(); }
+            else { g.strokeStyle = kl; g.lineWidth = 1.2; g.stroke(); }
+          });
+          if (kant.length > MAX_STAPEL) {
+            const yy = lg ? y(c.l) + 12 + MAX_STAPEL * 8 + 2 : y(c.h) - 12 - MAX_STAPEL * 8 - 2;
+            g.fillStyle = kl; g.font = font(9, 700); g.textAlign = "center";
+            g.textBaseline = lg ? "top" : "bottom";
+            g.fillText(`+${kant.length - MAX_STAPEL}`, xx, Math.max(TOP + 10, Math.min(TOP + ph - 2, yy)));
+          }
         }
       }
     }

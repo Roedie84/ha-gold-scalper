@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.13.1 - 16-10-2026
+
+### Grafiek: signalen niet meer als kolommen
+- Gemeld 16-10 11:01 (schermafdruk, 15m): per candle kolommen van tientallen ruitjes tot buiten de grafiek. Op 15m vallen alle setups en tijdvakken (1m/3m/5m) in één candle, en een uitgezette opzet logt elke cyclus.
+- Signalen met reden `opzet_uitgezet` tellen niet meer als marker.
+- Hooguit 3 ruitjes per kant per candle (gehandeld eerst), de rest als "+N"; binnen de grafiek gehouden. De kopregel bij de cursor noemt het totaal.
+- Tests: `test_v2130_grafiek_indicatoren.py` (+2).
+
 ## 2.13.0 - 16-10-2026
 
 ### Grafiek: signalen per setup en indicatoren
