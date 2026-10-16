@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.13.3 - 16-10-2026
+
+### Omkeren over alle setups en tijdvakken (besluit Ruud)
+- Gemeld 16-10 13:31: "Wel extra shorts openen, maar de longs niet sluiten." Besluit: "Omkeren: komt er een short-signaal, dan sluiten alle longs, met verlies of met vastgezette winst. Op alle timeframes."
+- Opent een setup (welke en op welk tijdvak ook) een positie, dan krijgen alle eerder geopende posities de andere kant op de omkeerregel van 2.5.5: in verlies of met te weinig winst sluiten, anders de winst vastzetten (stop vlak bij de koers). Sluitreden "omkeer door <setup>: …".
+- Posities die ná die instap opengingen, houden hun eigen regel (2.5.5 per setup).
+- Eerdere meting (15-10, vroeg afsluiten) gaf geen verbetering; het effect is te volgen in de sluitredenen.
+- Tests: `test_v2133_omkeer_alle.py` (6).
+
 ## 2.13.2 - 16-10-2026
 
 ### Pepperstone lag stil: dubbele deelsluiting en "database is locked"

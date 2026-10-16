@@ -483,6 +483,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.turbo_signaal = turbo_mod.TickUitbraak()
         #: 2.5.5: laatste signaalrichting per strategie (omkeer-exit).
         self._richting_per_strategie: dict[str, int] = {}
+        #: 2.13.3 (Ruud 16-10): de laatst geopende positie bepaalt de richting
+        #: voor ALLE setups en tijdvakken: oudere posities de andere kant op
+        #: worden gesloten (verlies) of hun winst wordt vastgezet.
+        self._omkeer_alle: dict | None = None
         self._turbo_sig_instap = 0.0
         self.turbo_stats: dict = {"ticks": 0, "rondes": 0, "orders": 0,
                                   "bijkopen": 0, "laatste_order": None}
@@ -2877,6 +2881,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         # signalenlog en de grafiek.
                         if not uitgevoerd and self._laatste_weigering:
                             r_reject = self._laatste_weigering
+                        if uitgevoerd and r_signal.direction:
+                            self._omkeer_alle = {
+                                "richting": 1 if r_signal.direction > 0 else -1,
+                                "sinds": now, "strategie": strategie,
+                            }
                         # 2.11.0: 15m-signaal dat echt gehandeld wordt: ook als
                         # paar (direct / met bevestiging) in de schaduw volgen.
                         if uitgevoerd and bevestiging_mod.BevestigingBoek.hoort_erbij(strategie):
@@ -3473,6 +3482,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # zelfgebouwde bars, en tot nu toe verloren.
             await self._on_bars_closed(fresh, "broker")
 
+    def _omkeer_richting(self, side: str, opened, eigen: int | None) -> int | None:
+        """2.13.3: tegenrichting van de laatst geopende positie (alle setups,
+        alle tijdvakken) voor posities die daarvóór opengingen; anders de
+        richting van de eigen strategie (2.5.5)."""
+        g = self._omkeer_alle
+        d = 1 if side == "buy" else -1
+        if g and g.get("richting") == -d:
+            sinds = g.get("sinds")
+            if opened is None or sinds is None or opened < sinds:
+                return g["richting"]
+        return eigen
+
     async def _manage_open_positions(self, quote: VenueQuote, now: datetime) -> None:
         """Break-even, gedeeltelijk sluiten, trailing en tijdstops."""
         atr = self.state.atr.value or 0.0
@@ -3536,8 +3557,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 omkeer = omkeer_actie(
                     position.side, position.open_price, quote.bid, quote.ask,
                     getattr(position, "stop_loss", None),
-                    self._richting_per_strategie.get(strategie),
+                    self._omkeer_richting(position.side, opened,
+                                          self._richting_per_strategie.get(strategie)),
                 )
+                if omkeer is not None and self._omkeer_alle and \
+                        self._omkeer_alle.get("strategie") != strategie:
+                    omkeer.reason = f"omkeer door {self._omkeer_alle.get('strategie')}: {omkeer.reason}"
                 if omkeer is not None and (
                         omkeer.kind == "close" or action.kind != "modify_stop"
                         or (omkeer.new_stop - (action.new_stop or 0))
