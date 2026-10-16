@@ -77,6 +77,36 @@ MAX_RISICO_PER_TRADE_USD = 100.0
 #: shorts binnen een minuut op dezelfde beweging en gingen samen naar de stop.
 MAX_POSITIES_MET_RISICO = 3
 
+#: 2.12.0 (Ruud 16-10: "IG en Pepperstone analyseren en verbeteren"): de
+#: kosten van een rondreis mogen hooguit 1/KOSTEN_STOP_FACTOR van het risico
+#: tot de stop zijn, en de stop is minstens KOSTEN_MIN_STOP_USD. Gemeten tot 16-10:
+#: trades met een stop van 2 USD of minder (grootte op het plafond van 50 oz)
+#: verloren bij beide brokers (IG n=18 t=-2,6; Pepperstone n=65 t=-2,3); bij
+#: IG kostte een rondreis 0,83 USD/oz - bij een stop van 3-5 USD een kwart
+#: van het risico (n=17, -0,39R per trade). Bij Pepperstone 0,18 USD/oz.
+KOSTEN_STOP_FACTOR = 8.0
+#: Niet MIN_STOP_USD (1,0): dat is de ondergrens bij het maken van de stop.
+KOSTEN_MIN_STOP_USD = 2.0
+#: Slippage per oz bovenop spread en commissie (gemeten gemiddelde 15-10:
+#: IG 0,16, Pepperstone 0,155).
+SLIP_PER_OZ = 0.15
+
+
+def min_stopafstand(kosten_per_oz: float | None) -> float:
+    """2.12.0: kleinste stopafstand (USD) die een veldproeftrade mag hebben."""
+    try:
+        kosten = max(0.0, float(kosten_per_oz or 0.0))
+    except (TypeError, ValueError):
+        kosten = 0.0
+    return max(KOSTEN_MIN_STOP_USD, KOSTEN_STOP_FACTOR * kosten)
+
+
+def stop_te_krap(instap: float, stop: float | None, kosten_per_oz: float | None) -> bool:
+    """2.12.0: is de stop te dicht bij de instap voor de kosten?"""
+    if stop is None or not instap:
+        return False
+    return abs(float(instap) - float(stop)) < min_stopafstand(kosten_per_oz)
+
 
 def grootte_op_risico(units: float, instap: float, stop: float | None) -> float:
     """2.6.2: grootte zodat het verlies tot de stop hooguit

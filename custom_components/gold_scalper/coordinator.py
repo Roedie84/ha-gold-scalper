@@ -641,6 +641,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             kosten=SchaduwKosten(slippage=uitgezet_mod.SLIPPAGE_PER_ZIJDE,
                                  commissie_per_lot=_commissie_venue(self.venue)))
         self._bevestiging_stats: dict = self.bevestiging.statistiek([])
+        #: 2.12.0: kostenfilter veldproef (overgeslagen signalen).
+        self._kostenfilter: dict = {"overgeslagen": 0, "per_opzet": {}, "laatste": None}
         self._bevestiging_geladen = False
         self._vp_uitgezet_volgende = 0.0
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
@@ -3078,6 +3080,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "onderzoek": onderzoek_mod.samenvatting(self.onderzoek) if self.onderzoek else None,
             "risico_limieten": self.risico_info,
             # 2.11.0: schaduwmeting instap met bevestiging (15m).
+            # 2.12.0: kostenfilter veldproef
+            "kostenfilter": {
+                **self._kostenfilter,
+                "factor": veldproef_mod.KOSTEN_STOP_FACTOR,
+                "min_stop_usd": veldproef_mod.KOSTEN_MIN_STOP_USD,
+            },
             "bevestiging_15m": {**self._bevestiging_stats,
                                 "open": len(self.bevestiging.open_paren)},
             "uitgezet_schaduw": {
@@ -3611,6 +3619,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return False
         side = "buy" if signal.direction == 1 else "sell"
         richting = 1 if side == "buy" else -1
+        # 2.12.0: kostenfilter voor de veldproef - geen trade als de kosten
+        # een te groot deel van het risico tot de stop zijn.
+        vp_naam = (getattr(signal, "components", None) or {}).get("strategie")
+        if veldproef_mod.is_veldproef(vp_naam):
+            instap = quote.ask if side == "buy" else quote.bid
+            kosten = self._kosten_per_oz(quote)
+            if veldproef_mod.stop_te_krap(instap, signal.stop_loss, kosten):
+                self._noteer_kostenfilter(vp_naam, instap, signal.stop_loss, kosten)
+                self._vp_bar_gebruikt(vp_naam, signal)
+                return False
         if gelijktijdig_open is None:
             gelijktijdig_open = len(await self._open_positions())
         # Voor de nettingcontrole: welke posities stonden er vlak vóór de
@@ -5881,6 +5899,30 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 uit = None
             return uit if isinstance(uit, (int, float)) else None
         return minutes_until_close(SPOT_GOLD, now)
+
+    def _kosten_per_oz(self, quote) -> float:
+        """2.12.0: geschatte rondreiskosten per oz: spread + commissie + slippage."""
+        spread = float(getattr(quote, "spread", None) or 0.0)
+        if not spread:
+            try:
+                spread = float(quote.ask) - float(quote.bid)
+            except (TypeError, ValueError, AttributeError):
+                spread = 0.0
+        return round(max(0.0, spread) + self._commissie(1.0)
+                     + veldproef_mod.SLIP_PER_OZ, 4)
+
+    def _noteer_kostenfilter(self, strategie: str, instap: float, stop, kosten: float) -> None:
+        """2.12.0: tel overgeslagen veldproefsignalen per opzet."""
+        stats = self._kostenfilter
+        stats["overgeslagen"] = stats.get("overgeslagen", 0) + 1
+        per = stats.setdefault("per_opzet", {})
+        per[strategie] = per.get(strategie, 0) + 1
+        afstand = abs(float(instap) - float(stop))
+        stats["laatste"] = (
+            f"{strategie}: stop {afstand:.2f} USD, minimaal "
+            f"{veldproef_mod.min_stopafstand(kosten):.2f} (kosten {kosten:.2f} USD/oz)"
+        )
+        _LOGGER.debug("Kostenfilter: %s", stats["laatste"])
 
     def _commissie(self, units: float | None) -> float:
         """2.9.3: commissie rondreis (open + dicht) in USD voor ``units`` oz."""

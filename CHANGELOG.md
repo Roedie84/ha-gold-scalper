@@ -1,5 +1,16 @@
 # Changelog — Gold Scalper
 
+## 2.12.0 - 16-10-2026
+
+### Veldproef: kostenfilter op de stopafstand
+- Gevraagd 16-10: "IG en Pepperstone analyseren en verbeteren".
+- Analyse (posities, deelsluitingen samengevoegd): bij geen van beide brokers een rand na kosten. IG laatste dag bruto +123, kosten 726 (0,83 USD/oz per rondreis); Pepperstone bruto +516, kosten 958 (0,18 USD/oz).
+- Trades met een stop van 2 USD of minder (grootte op het plafond van 50 oz) verloren bij beide (IG n=18 t=-2,6; Pepperstone n=65 t=-2,3). Bij IG was een stop van 3-5 USD -0,39R per trade (n=17): de kosten zijn daar een kwart van het risico.
+- Nu: een veldproefsignaal wordt overgeslagen als de stop dichter ligt dan max(2 USD, 8 x rondreiskosten per oz). Kosten = actuele spread + commissie + 0,15 slippage. IG: ongeveer 6,9 USD, Pepperstone 2 USD.
+- Teller in de coordinatordata (`kostenfilter`: overgeslagen, per opzet, laatste).
+- Let op bij eigen analyses: de hoofdrij van een positie met deelsluiting toont de RESTomvang; tel de `-deel`-rijen erbij voor de oorspronkelijke grootte.
+- Tests: `test_v2120_kostenfilter.py` (6).
+
 ## 2.11.1 - 15-10-2026
 
 ### IG: geen noodstop meer door afronding bij een deelsluiting
