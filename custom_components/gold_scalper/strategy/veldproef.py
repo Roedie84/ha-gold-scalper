@@ -66,6 +66,17 @@ UITZET_MAX_T = -2.0
 GROEP_MIN_N = 200
 GROEP_MAX_T = -3.0
 
+#: 2.14.0 (Ruud 16-10: "als de integratie er beter van wordt alles wat nodig
+#: is uitvoeren"): kostenregel. Een opzet stapt niet meer in als hij over
+#: minstens KOSTEN_UITZET_MIN_N posities bruto (de gevangen koersbeweging)
+#: minder dan KOSTEN_UITZET_DEKKING van zijn kosten terugverdient. Gemeten
+#: tot 16-10 bij Pepperstone: momentum en rsi_rev op 1m/3m/5m, 327 trades,
+#: bruto -611, kosten 2.105 - de beweging was nul, de kosten echt. De
+#: t-regel (n >= 100, t < -2) greep niet omdat lage kosten per trade in de
+#: spreiding van de uitkomst verdwijnen.
+KOSTEN_UITZET_MIN_N = 40
+KOSTEN_UITZET_DEKKING = 0.5
+
 #: 2.6.2 (Ruud 13-10: "verliezen per trade zijn te groot"): een veldproeftrade
 #: riskeert hooguit dit bedrag (USD) tot de stop. De grootte volgt uit de
 #: stopafstand (bij een stop van 9 USD/oz: 11 oz in plaats van 50), met de
@@ -160,6 +171,24 @@ def uitgezette_opzetten(per_opzet: dict[str, list[float]]) -> dict[str, dict]:
         for naam in namen():
             if naam.endswith(":" + tf):
                 uit[naam] = {**groep, "groep": tf}
+    return uit
+
+
+def kosten_uitgezet(per_opzet: dict[str, dict]) -> dict[str, dict]:
+    """2.14.0: opzetten waarvan de bruto beweging de kosten niet dekt.
+
+    ``per_opzet``: naam -> {"n", "bruto", "kosten", "netto"} (som per positie,
+    deelsluitingen bij hun positie opgeteld)."""
+    uit: dict[str, dict] = {}
+    for naam, r in per_opzet.items():
+        if not is_veldproef(naam):
+            continue
+        n, bruto, kosten = int(r.get("n") or 0), float(r.get("bruto") or 0.0), float(r.get("kosten") or 0.0)
+        if n < KOSTEN_UITZET_MIN_N or kosten <= 0:
+            continue
+        if bruto < KOSTEN_UITZET_DEKKING * kosten:
+            uit[naam] = {"n": n, "netto": round(float(r.get("netto") or 0.0), 2), "t": None,
+                         "bruto": round(bruto, 2), "kosten": round(kosten, 2), "regel": "kosten"}
     return uit
 
 
@@ -477,8 +506,13 @@ def evalueer(
         # schaduwtrade (strategy/uitgezet_schaduw) gevolgd kan worden; er komt
         # nooit een echte order van.
         info = uitgezet[naam] if isinstance(uitgezet, dict) else {}
-        tekst = (f"{naam}: uitgezet (n={info.get('n', '?')}, t={info.get('t', '?')}, "
-                 f"grens n >= {UITZET_MIN_N} en t < {UITZET_MAX_T:g})")
+        if info.get("regel") == "kosten":
+            tekst = (f"{naam}: uitgezet, bruto {info.get('bruto')} dekt de kosten "
+                     f"{info.get('kosten')} niet (n={info.get('n')}, grens bruto < "
+                     f"{KOSTEN_UITZET_DEKKING:g} x kosten bij n >= {KOSTEN_UITZET_MIN_N})")
+        else:
+            tekst = (f"{naam}: uitgezet (n={info.get('n', '?')}, t={info.get('t', '?')}, "
+                     f"grens n >= {UITZET_MIN_N} en t < {UITZET_MAX_T:g})")
         sig = evalueer(naam, bars, bid, ask, cfg, 0, seconds_since_last_entry,
                        laatste_bar, None)
         if sig.should_trade and sig.geldig:

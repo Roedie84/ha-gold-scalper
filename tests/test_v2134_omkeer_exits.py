@@ -33,6 +33,9 @@ def test_telling():
     assert s["noemer"] == 4
     assert s["omkeer"] == {"n": 2, "pct": 50.0, "netto": 5.0}
     assert s["omkeer_gesloten"]["n"] == 1 and s["omkeer_vastgezet"]["winst_n"] == 1
+    # 2.14.0: winst groen, verlies rood
+    assert s["omkeer_winst"] == {"n": 1, "pct": 25.0, "netto": 8.0}
+    assert s["omkeer_verlies"] == {"n": 1, "pct": 25.0, "netto": -3.0}
     # uitsplitsing, geen extra soort: gewone telling ongewijzigd
     assert s["stop_loss"]["n"] == 2 and s["eigen_exit"]["n"] == 1
 

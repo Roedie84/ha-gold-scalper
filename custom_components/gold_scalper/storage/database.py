@@ -1088,6 +1088,21 @@ class TradeDatabase:
             uit.setdefault(rij[0], []).append(float(rij[1]))
         return uit
 
+    def bruto_kosten_per_strategie(self, prefix: str) -> dict[str, dict]:
+        """2.14.0: per strategie het aantal posities en de som van bruto,
+        kosten en netto (over alle runs). Een deelsluiting telt bij zijn
+        positie."""
+        uit: dict[str, dict] = {}
+        for s, n, b, k, nt in self.conn.execute(
+            "SELECT strategie, COUNT(DISTINCT REPLACE(COALESCE(broker_ticket, id), '-deel', '')), "
+            "SUM(COALESCE(gross_pnl, 0)), SUM(COALESCE(total_cost, 0)), SUM(net_pnl) "
+            "FROM trades WHERE close_time IS NOT NULL AND net_pnl IS NOT NULL "
+            "AND strategie LIKE ? GROUP BY strategie",
+            (prefix + "%",),
+        ).fetchall():
+            uit[s] = {"n": n, "bruto": b or 0.0, "kosten": k or 0.0, "netto": nt or 0.0}
+        return uit
+
     def gesloten_als_dict(self, mode: str, sinds_iso: str) -> list[dict]:
         """2.7.0: gesloten trades als dict, voor het onderzoeksrapport."""
         kolommen = {r[1] for r in self.conn.execute("PRAGMA table_info(trades)").fetchall()}

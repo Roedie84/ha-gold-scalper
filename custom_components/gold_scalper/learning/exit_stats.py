@@ -141,6 +141,8 @@ def exit_stats(trades: Sequence) -> dict:
     # uitsplitsing daarvan, geen extra soort.
     omkeer = {"gesloten": [0, 0.0], "vastgezet": [0, 0.0]}
     omkeer_vastgezet_winst = 0
+    #: 2.14.0 (Ruud 16-10: "winstgevende omkeertrades groen"): winst/verlies.
+    omkeer_wv = {"winst": [0, 0.0], "verlies": [0, 0.0]}
     afgestemd = 0
     achteraf = 0
     for t in gesloten:
@@ -156,6 +158,9 @@ def exit_stats(trades: Sequence) -> dict:
             omkeer[ok][1] += getattr(t, "net_pnl", None) or 0.0
             if ok == "vastgezet" and (getattr(t, "net_pnl", None) or 0.0) > 0:
                 omkeer_vastgezet_winst += 1
+            wv = "winst" if (getattr(t, "net_pnl", None) or 0.0) > 0 else "verlies"
+            omkeer_wv[wv][0] += 1
+            omkeer_wv[wv][1] += getattr(t, "net_pnl", None) or 0.0
         if reden == "take_profit":
             telling["take_profit"] += 1
         elif reden == "stop_loss":
@@ -186,6 +191,10 @@ def exit_stats(trades: Sequence) -> dict:
             "pct": deel(omkeer["gesloten"][0] + omkeer["vastgezet"][0]),
             "netto": round(omkeer["gesloten"][1] + omkeer["vastgezet"][1], 2),
         },
+        "omkeer_winst": {"n": omkeer_wv["winst"][0], "pct": deel(omkeer_wv["winst"][0]),
+                         "netto": round(omkeer_wv["winst"][1], 2)},
+        "omkeer_verlies": {"n": omkeer_wv["verlies"][0], "pct": deel(omkeer_wv["verlies"][0]),
+                           "netto": round(omkeer_wv["verlies"][1], 2)},
         "omkeer_gesloten": {"n": omkeer["gesloten"][0], "pct": deel(omkeer["gesloten"][0]),
                             "netto": round(omkeer["gesloten"][1], 2)},
         "omkeer_vastgezet": {"n": omkeer["vastgezet"][0], "pct": deel(omkeer["vastgezet"][0]),

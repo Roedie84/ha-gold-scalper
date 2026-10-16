@@ -1655,6 +1655,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.warning("Uitgezette veldproefopzetten niet te lezen: %s", err)
             return
         nieuw = veldproef_mod.uitgezette_opzetten(per_opzet)
+        # 2.14.0: kostenregel (bruto dekt de kosten niet).
+        try:
+            for naam, info in veldproef_mod.kosten_uitgezet(await self.hass.async_add_executor_job(
+                    self.db.bruto_kosten_per_strategie, veldproef_mod.PREFIX)).items():
+                nieuw.setdefault(naam, info)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Kostenregel veldproef niet te bepalen: %s", err)
         for naam, info in veldproef_mod.handmatig_uitgezet(
                 per_opzet, self.vp_tijdvakken_uit).items():
             nieuw.setdefault(naam, info)
@@ -2946,7 +2953,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if self._vp_uitgezet:
                 # 2.6.1: een uitgezet tijdvak als één regel.
                 groepen = {v["groep"]: v for v in self._vp_uitgezet.values() if v.get("groep")}
-                losse = [f"{n[len(veldproef_mod.PREFIX):]} (n={v['n']}, t={v['t']})"
+                losse = [f"{n[len(veldproef_mod.PREFIX):]} (n={v['n']}, "
+                         + (f"bruto {v['bruto']:.0f} < kosten {v['kosten']:.0f})" if v.get("regel") == "kosten"
+                            else f"t={v['t']})")
                          for n, v in sorted(self._vp_uitgezet.items()) if not v.get("groep")
                          and n.split(":")[-1] not in groepen]
                 redenen["veldproef"] += " · uitgezet: " + ", ".join(

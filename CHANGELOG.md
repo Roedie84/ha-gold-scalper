@@ -1,5 +1,18 @@
 # Changelog — Gold Scalper
 
+## 2.14.0 - 16-10-2026
+
+### Kostenregel: opzetten die hun kosten niet terugverdienen gaan uit
+- Gevraagd 16-10 bij het oordeel "geen edge aantoonbaar" (Pepperstone, 753 trades, bruto -1.619, kosten 3.519): "Als de integratie er beter van wordt alles wat nodig is uitvoeren."
+- Analyse (Pepperstone, per positie): momentum en rsi_rev op 1m/3m/5m waren 327 posities met bruto -611 en kosten 2.105 - ruim de helft van alle kosten, zonder koersbeweging om ze te dragen. De t-regel (n >= 100, t < -2) greep niet: lage kosten per trade gaan op in de spreiding.
+- Nieuw: een veldproefopzet stapt niet meer in als hij over minstens 40 posities bruto minder dan de helft van zijn kosten terugverdient (`KOSTEN_UITZET_MIN_N`, `KOSTEN_UITZET_DEKKING`). Per broker, over alle runs, deelsluitingen bij hun positie. Schaduwtrades lopen door (2.7.1). Weigerreden: "bruto … dekt de kosten … niet".
+- Naar de huidige cijfers gaan uit: Pepperstone momentum 1m/3m/5m, rsi_rev 3m/5m; IG o.a. momentum:15m, pullback:15m, rsi_rev:30m (1m/3m/5m stonden daar al uit). Blijven aan: o.a. structuur_hl, donchian:3m, structuur_trend:3m, rsi_rev:15m.
+- Geen nieuwe strategieversie: de run (en het bewijsfase-oordeel) loopt door.
+- Tests: `test_v2140_kostenregel.py` (4).
+
+### Omkeer met winst groen
+- Gevraagd 16-10: "Winstgevende omkeertrades dienen ook groen te zijn in hoe trades eindigen." Het omkeerdeel is gesplitst: met winst groen, met verlies rood, beide met een gouden rand; netto per deel in de legenda.
+
 ## 2.13.4 - 16-10-2026
 
 ### Omgekeerde trades in "Hoe trades eindigden"
