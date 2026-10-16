@@ -180,6 +180,8 @@ def _meetkwaliteit(data: dict) -> str:
             f"doel {(e.get('take_profit') or {}).get('pct', 0)}% · "
             f"stop {(e.get('stop_loss') or {}).get('pct', 0)}%",
             f"van {e['noemer']} · onbekend {onbekend}%"
+            + (f" · omkeer {(e.get('omkeer') or {}).get('pct', 0)}%"
+               if (e.get("omkeer") or {}).get("n") else "")
             + (" · percentages zijn ondergrenzen" if onbekend else ""),
         ))
 

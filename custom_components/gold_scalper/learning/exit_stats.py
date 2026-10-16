@@ -105,6 +105,24 @@ def effective_reason(trade) -> str:
     return oorspronkelijk
 
 
+def is_omkeer(trade) -> str | None:
+    """2.13.4: eindigde de trade door een omkeer (signaal gedraaid)?
+
+    ``"gesloten"``: de omkeer sloot hem (verlies beperkt of kleine winst).
+    ``"vastgezet"``: de omkeer zette de stop vlak bij de koers en die stop
+    sloot hem. Anders None.
+    """
+    for veld in ("original_close_reason", "close_reason"):
+        r = str(getattr(trade, veld, None) or "").lower()
+        if "signaal gedraaid" in r or r.startswith("omkeer"):
+            return "gesloten"
+    if effective_reason(trade) == "stop_loss":
+        sr = str(getattr(trade, "stop_reden", None) or "").lower()
+        if "signaal gedraaid" in sr or sr.startswith("omkeer"):
+            return "vastgezet"
+    return None
+
+
 def exit_stats(trades: Sequence) -> dict:
     """Doeltreffers, stoptreffers, eigen exits en onbekend - met teller en noemer.
 
@@ -118,6 +136,11 @@ def exit_stats(trades: Sequence) -> dict:
     # 2.7.2 (Ruud 14-10: "een stop hoeft niet altijd rood te zijn"): een stop
     # die na break-even, winstslot of volgstop sluit, is vastgezette winst.
     stop_winst = 0
+    # 2.13.4 (Ruud 16-10): omgekeerde trades apart zichtbaar. Ze tellen ook
+    # mee in hun gewone soort (eigen exit of stop); deze tellers zijn een
+    # uitsplitsing daarvan, geen extra soort.
+    omkeer = {"gesloten": [0, 0.0], "vastgezet": [0, 0.0]}
+    omkeer_vastgezet_winst = 0
     afgestemd = 0
     achteraf = 0
     for t in gesloten:
@@ -127,6 +150,12 @@ def exit_stats(trades: Sequence) -> dict:
         # 1.10.0: reden achteraf uit de afstemming ingevuld.
         if getattr(t, "close_reason_source", None) == "afstemming":
             achteraf += 1
+        ok = is_omkeer(t)
+        if ok:
+            omkeer[ok][0] += 1
+            omkeer[ok][1] += getattr(t, "net_pnl", None) or 0.0
+            if ok == "vastgezet" and (getattr(t, "net_pnl", None) or 0.0) > 0:
+                omkeer_vastgezet_winst += 1
         if reden == "take_profit":
             telling["take_profit"] += 1
         elif reden == "stop_loss":
@@ -152,6 +181,17 @@ def exit_stats(trades: Sequence) -> dict:
         "stop_winst": {"n": stop_winst, "pct": deel(stop_winst)},
         "stop_verlies": {"n": telling["stop_loss"] - stop_winst,
                          "pct": deel(telling["stop_loss"] - stop_winst)},
+        "omkeer": {
+            "n": omkeer["gesloten"][0] + omkeer["vastgezet"][0],
+            "pct": deel(omkeer["gesloten"][0] + omkeer["vastgezet"][0]),
+            "netto": round(omkeer["gesloten"][1] + omkeer["vastgezet"][1], 2),
+        },
+        "omkeer_gesloten": {"n": omkeer["gesloten"][0], "pct": deel(omkeer["gesloten"][0]),
+                            "netto": round(omkeer["gesloten"][1], 2)},
+        "omkeer_vastgezet": {"n": omkeer["vastgezet"][0], "pct": deel(omkeer["vastgezet"][0]),
+                             "netto": round(omkeer["vastgezet"][1], 2),
+                             "winst_n": omkeer_vastgezet_winst,
+                             "winst_pct": deel(omkeer_vastgezet_winst)},
         "toelichting": (
             f"Van {noemer} gesloten trades is bij {telling['unknown']} de "
             "sluitreden niet te bewijzen. Het doeltreffer- en "

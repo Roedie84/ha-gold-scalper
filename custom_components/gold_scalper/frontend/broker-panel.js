@@ -1265,10 +1265,15 @@ ${tl}
       `<span class="e" style="left:${tPos(-s.t_drempel)}%">${MIN}2</span><span class="e" style="left:${tPos(0)}%">0</span><span class="e" style="left:${tPos(s.t_drempel)}%">+2</span>` +
       `<div class="nu" style="left:${tPos(s.t)}%"></div></div>` : "";
     const doel = s.doel_pct || 0, stop = s.stop_pct || 0, onb = s.onbekend_pct || 0;
-    const rest = Math.max(0, 100 - doel - stop - onb);
+    const rest = Math.max(0, 100 - doel - stop - onb - (s.omkeer_gesloten_pct || 0));
     // 2.7.2: stop met vastgezette winst apart van stop met verlies.
     const gesplitst = isNum(s.stop_winst_pct) && isNum(s.stop_verlies_pct);
-    const stopW = gesplitst ? s.stop_winst_pct : 0, stopV = gesplitst ? s.stop_verlies_pct : stop;
+    // 2.13.4: omgekeerde trades als eigen deel; uit overig (gesloten) en uit
+    // de stops (vastgezet) gehaald, zodat de balk op 100% blijft.
+    const omkG = s.omkeer_gesloten_pct || 0, omkV = s.omkeer_vastgezet_pct || 0, omkVW = s.omkeer_vastgezet_winst_pct || 0;
+    const omk = omkG + omkV;
+    const stopW = gesplitst ? Math.max(0, s.stop_winst_pct - omkVW) : 0;
+    const stopV = gesplitst ? Math.max(0, s.stop_verlies_pct - (omkV - omkVW)) : Math.max(0, stop - omkV);
     const lat = s.latency_n ? `${fmt(s.latency_p50, 0)} / ${fmt(s.latency_p99, 0)} ms` : "—";
     const af = s.afstemming;
     const checks = Object.entries(s.poort || {}).map(([k, v]) => `<span class="chip ${v ? "ok" : "neutraal"}">${v ? "✓" : "✗"} ${esc(k.replace(/_/g, " "))}</span>`).join("");
@@ -1286,8 +1291,8 @@ ${tl}
       `<div class="meter" style="--accent:var(--goud)"><b style="width:${cl.toFixed(1)}%"></b></div></div>` +
       `<div><div class="lbl" style="display:flex;justify-content:space-between"><span>t-statistiek (clusters)</span><span class="num ${toon(s.t)}" style="letter-spacing:0">${fmtS(s.t)}</span></div>${tschaal}</div>` +
       `<div><div class="lbl">Hoe trades eindigden${s.exits_noemer ? ` · ${s.exits_noemer}` : ""}</div><div class="verdeling" style="margin-top:7px">` +
-      `<b style="width:${doel}%;background:var(--groen)"></b><b style="width:${stopW}%;background:var(--groen);opacity:.5"></b><b style="width:${stopV}%;background:var(--rood)"></b><b style="width:${rest}%;background:rgba(160,200,220,.35)"></b><b style="width:${onb}%;background:rgba(255,255,255,.12)"></b></div>` +
-      `<div class="vlegenda"><span><i style="background:var(--groen)"></i>doel ${fmt(doel, 0)}%</span>${gesplitst ? `<span title="Stop na break-even, winstslot of volgstop: vastgezette winst"><i style="background:var(--groen);opacity:.5"></i>stop met winst ${fmt(stopW, 0)}%</span><span><i style="background:var(--rood)"></i>stop met verlies ${fmt(stopV, 0)}%</span>` : `<span><i style="background:var(--rood)"></i>stop ${fmt(stop, 0)}%</span>`}<span><i style="background:rgba(160,200,220,.35)"></i>overig ${fmt(rest, 0)}%</span><span><i style="background:rgba(255,255,255,.12)"></i>onbekend ${fmt(onb, 0)}%</span></div></div>` +
+      `<b style="width:${doel}%;background:var(--groen)"></b><b style="width:${stopW}%;background:var(--groen);opacity:.5"></b><b style="width:${stopV}%;background:var(--rood)"></b><b style="width:${omk}%;background:var(--goud)"></b><b style="width:${rest}%;background:rgba(160,200,220,.35)"></b><b style="width:${onb}%;background:rgba(255,255,255,.12)"></b></div>` +
+      `<div class="vlegenda"><span><i style="background:var(--groen)"></i>doel ${fmt(doel, 0)}%</span>${gesplitst ? `<span title="Stop na break-even, winstslot of volgstop: vastgezette winst"><i style="background:var(--groen);opacity:.5"></i>stop met winst ${fmt(stopW, 0)}%</span><span><i style="background:var(--rood)"></i>stop met verlies ${fmt(stopV, 0)}%</span>` : `<span><i style="background:var(--rood)"></i>stop ${fmt(stopV, 0)}%</span>`}${omk > 0 ? `<span title="Door een signaal de andere kant op: gesloten (${fmt(omkG, 0)}%) of op de vastgezette stop (${fmt(omkV, 0)}%). Netto ${fmtS(s.omkeer_netto)} over ${fmt(s.omkeer_n, 0)} trades."><i style="background:var(--goud)"></i>omkeer ${fmt(omk, 0)}% · ${fmtS(s.omkeer_netto)}</span>` : ""}<span><i style="background:rgba(160,200,220,.35)"></i>overig ${fmt(rest, 0)}%</span><span><i style="background:rgba(255,255,255,.12)"></i>onbekend ${fmt(onb, 0)}%</span></div></div>` +
       `<div class="rijen"><div><span>Afstemming met broker</span><b class="${af ? (af.in_orde ? "pos" : "neg") : ""}" title="${esc(af ? (af.tekst || "") + (af.moment ? " · laatste afstemming " + af.moment : "") + (af.hersteld ? " (bewaard van vóór de herstart)" : "") : "")}">${af ? (af.in_orde ? "in orde" : `${af.afwijkingen} afwijking(en)`) : "nog niet"}</b></div></div>` +
       (checks ? `<div><div class="lbl" style="margin-bottom:7px">Live-poort (alleen informatie)</div><div class="checks">${checks}</div></div>` : "");
   }

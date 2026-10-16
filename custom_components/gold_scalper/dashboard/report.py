@@ -901,6 +901,7 @@ def _exit_sectie(trades) -> str:
   {rij("stop geraakt", "stop_loss")}
   {rij("eigen exit", "eigen_exit")}
   {rij("onbekend", "unknown")}
+  {rij("waarvan omkeer", "omkeer") if s.get("omkeer", {}).get("n") else ""}
   </tbody></table>
   <p class="note">{_esc(s['toelichting'])} Afgestemd met de broker: {s['afgestemd']}.</p>
 </section>"""

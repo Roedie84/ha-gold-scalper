@@ -503,6 +503,9 @@ class Trade:
     #: Ticketnummer bij de broker. Tekst, niet numeriek: IG gebruikt sleutels
     #: als 'DIAAAAYCJETQ7A8'.
     broker_ticket: str | None = None
+    #: 2.13.4: reden van de laatste stopverschuiving (alleen lezen; wordt
+    #: geschreven door ``stop_gewijzigd``, nooit door insert/update_trade).
+    stop_reden: str | None = None
     id: int | None = None
 
     @property
@@ -843,6 +846,7 @@ class TradeDatabase:
         normaliseer_trade(trade)
         data = asdict(trade)
         data.pop("id", None)
+        data.pop("stop_reden", None)
         columns = ", ".join(data)
         placeholders = ", ".join("?" for _ in data)
         try:
@@ -866,6 +870,7 @@ class TradeDatabase:
         normaliseer_trade(trade)
         data = asdict(trade)
         data.pop("id")
+        data.pop("stop_reden", None)
         # De oorspronkelijke sluitreden wordt één keer gezet en daarna nooit
         # meer overschreven - ook niet door een object dat hem leeg heeft.
         # Eerst overschreef een correctie de sluitreden, en ging verloren of

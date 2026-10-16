@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.13.4 - 16-10-2026
+
+### Omgekeerde trades in "Hoe trades eindigden"
+- Gevraagd 16-10: "Omgekeerde trades ook meenemen in hoe trades eindigen."
+- Nieuw deel "omkeer" (goud) in de verdeling, met netto ernaast: trades die de omkeer sloot (verlies beperkt / kleine winst) én trades die sloten op de stop die de omkeer vastzette. Ze gaan af van "overig" en van de stops, zodat de balk op 100% blijft; tooltip splitst gesloten en vastgezet.
+- `exit_stats` geeft `omkeer`, `omkeer_gesloten`, `omkeer_vastgezet` als uitsplitsing (de bestaande tellingen blijven gelijk). Ook in overzicht en rapport.
+- `stop_reden` wordt nu met de trade ingelezen (alleen lezen; insert/update overschrijven hem niet).
+- Tests: `test_v2134_omkeer_exits.py` (3).
+
 ## 2.13.3 - 16-10-2026
 
 ### Omkeren over alle setups en tijdvakken (besluit Ruud)

@@ -803,6 +803,13 @@ def build_payload(
             "stop_verlies_pct": (exits.get("stop_verlies") or {}).get("pct"),
             "onbekend_pct": (exits.get("unknown") or {}).get("pct"),
             "exits_noemer": exits.get("noemer"),
+            # 2.13.4: omgekeerde trades (gesloten door de omkeer, of op de
+            # stop die de omkeer vastzette).
+            "omkeer_gesloten_pct": (exits.get("omkeer_gesloten") or {}).get("pct"),
+            "omkeer_vastgezet_pct": (exits.get("omkeer_vastgezet") or {}).get("pct"),
+            "omkeer_vastgezet_winst_pct": (exits.get("omkeer_vastgezet") or {}).get("winst_pct"),
+            "omkeer_n": (exits.get("omkeer") or {}).get("n"),
+            "omkeer_netto": _num((exits.get("omkeer") or {}).get("netto"), 2),
             "latency_p50": _num(lat.get("median"), 0),
             "latency_p99": _num(lat.get("p99") if lat.get("p99") is not None else lat.get("p90"), 0),
             "latency_staart": "p99" if lat.get("p99") is not None else ("p90" if lat.get("p90") is not None else None),
