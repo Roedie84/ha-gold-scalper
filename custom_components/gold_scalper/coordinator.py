@@ -643,6 +643,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._bevestiging_stats: dict = self.bevestiging.statistiek([])
         #: 2.12.0: kostenfilter veldproef (overgeslagen signalen).
         self._kostenfilter: dict = {"overgeslagen": 0, "per_opzet": {}, "laatste": None}
+        self._laatste_weigering: str | None = None
         self._bevestiging_geladen = False
         self._vp_uitgezet_volgende = 0.0
         # 1.7.6: 2000 metingen, en bewaard over een herstart heen (zie
@@ -2861,9 +2862,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         r_reject = "al een positie geopend in deze cyclus"
                         schaduw_reden = "per_cyclus"
                     else:
+                        self._laatste_weigering = None
                         uitgevoerd = await self._open_position(
                             r_signal, quote, now, gelijktijdig_open=aantal_open,
                         )
+                        # 2.13.0: waarom niet geopend (kostenfilter), voor het
+                        # signalenlog en de grafiek.
+                        if not uitgevoerd and self._laatste_weigering:
+                            r_reject = self._laatste_weigering
                         # 2.11.0: 15m-signaal dat echt gehandeld wordt: ook als
                         # paar (direct / met bevestiging) in de schaduw volgen.
                         if uitgevoerd and bevestiging_mod.BevestigingBoek.hoort_erbij(strategie):
@@ -3627,6 +3633,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             kosten = self._kosten_per_oz(quote)
             if veldproef_mod.stop_te_krap(instap, signal.stop_loss, kosten):
                 self._noteer_kostenfilter(vp_naam, instap, signal.stop_loss, kosten)
+                self._laatste_weigering = (
+                    f"kostenfilter: stop {abs(instap - signal.stop_loss):.2f}, minimaal "
+                    f"{veldproef_mod.min_stopafstand(kosten):.2f}")
                 self._vp_bar_gebruikt(vp_naam, signal)
                 return False
         if gelijktijdig_open is None:

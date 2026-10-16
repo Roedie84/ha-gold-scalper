@@ -21,6 +21,65 @@ const LIVE_MAX_LEEFTIJD_MS = 60000;
 const REPORT_URL = "/api/gold_scalper/report";
 const OVERVIEW_URL = "/api/gold_scalper/overview";
 const BROKER_OPSLAG = "gold-scalper-broker-entry";   // 2.9.0: gekozen broker (per browser)
+// 2.13.0: indicatoren in de grafiek (aan/uit, per browser)
+const IND_OPSLAG = "gold-scalper-indicatoren";
+const IND_KEUZES = [
+  { k: "sig", l: "Signalen", t: "Signaal per setup op de candle waar het viel; vol = gehandeld, open = overgeslagen (reden bij de cursor)" },
+  { k: "ema", l: "EMA", t: "EMA 20 en EMA 50" },
+  { k: "band", l: "BB/DC", t: "Bollinger-band (20, 2) en Donchian-kanaal (20) met uitbraken" },
+  { k: "osc", l: "RSI/ATR", t: "RSI(14) en ATR(14) in een paneel onder de candles" },
+];
+const leesInd = () => {
+  try { const v = JSON.parse(localStorage.getItem(IND_OPSLAG) || "null"); if (v && typeof v === "object") return v; } catch (_e) { /* geen opslag */ }
+  return { sig: true, ema: false, band: false, osc: false };
+};
+const bewaarInd = (v) => { try { localStorage.setItem(IND_OPSLAG, JSON.stringify(v)); } catch (_e) { /* geen opslag */ } };
+const IND_KLEUR = { ema20: "#f5c94a", ema50: "#7dd3fc", bb: "rgba(196, 181, 253, .75)", bbvul: "rgba(196, 181, 253, .06)",
+  dc: "rgba(148, 163, 184, .7)", rsi: "#c4b5fd", atr: "rgba(94, 234, 212, .28)", uit: "#f5c94a" };
+function indEma(v, n) {
+  const k = 2 / (n + 1), uit = []; let e = null;
+  v.forEach((x, i) => { e = e == null ? x : x * k + e * (1 - k); uit.push(i >= n - 1 ? e : null); });
+  return uit;
+}
+function indBb(v, n = 20, m = 2) {
+  const mid = [], op = [], neer = [];
+  for (let i = 0; i < v.length; i++) {
+    if (i < n - 1) { mid.push(null); op.push(null); neer.push(null); continue; }
+    const r = v.slice(i - n + 1, i + 1), g = r.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(r.reduce((a, b) => a + (b - g) * (b - g), 0) / n);
+    mid.push(g); op.push(g + m * sd); neer.push(g - m * sd);
+  }
+  return { mid, op, neer };
+}
+function indDc(cs, n = 20) {
+  // kanaal over de n VORIGE candles: een slot erboven is een uitbraak
+  const op = [], neer = [];
+  for (let i = 0; i < cs.length; i++) {
+    if (i < n) { op.push(null); neer.push(null); continue; }
+    const r = cs.slice(i - n, i);
+    op.push(Math.max(...r.map((c) => c.h))); neer.push(Math.min(...r.map((c) => c.l)));
+  }
+  return { op, neer };
+}
+function indRsi(v, n = 14) {
+  const uit = [null]; let w = 0, vl = 0;
+  for (let i = 1; i < v.length; i++) {
+    const d = v[i] - v[i - 1], up = Math.max(d, 0), dn = Math.max(-d, 0);
+    if (i <= n) { w += up / n; vl += dn / n; uit.push(i === n ? (vl === 0 ? 100 : 100 - 100 / (1 + w / vl)) : null); continue; }
+    w = (w * (n - 1) + up) / n; vl = (vl * (n - 1) + dn) / n;
+    uit.push(vl === 0 ? 100 : 100 - 100 / (1 + w / vl));
+  }
+  return uit;
+}
+function indAtr(cs, n = 14) {
+  const uit = []; let a = null;
+  cs.forEach((c, i) => {
+    const tr = i === 0 ? c.h - c.l : Math.max(c.h - c.l, Math.abs(c.h - cs[i - 1].c), Math.abs(c.l - cs[i - 1].c));
+    a = a == null ? tr : (a * (n - 1) + tr) / n;
+    uit.push(i >= n - 1 ? a : null);
+  });
+  return uit;
+}
 const leesKeuze = () => { try { return localStorage.getItem(BROKER_OPSLAG) || null; } catch (_e) { return null; } };
 const bewaarKeuze = (v) => { try { localStorage.setItem(BROKER_OPSLAG, v); } catch (_e) { /* geen opslag */ } };
 
@@ -201,6 +260,10 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 .wissel button { font: inherit; font-size: 12px; font-weight: 700; color: var(--tekst2); background: none; border: 0; padding: 5px 11px; border-radius: 999px; cursor: pointer; }
 .wissel button[aria-pressed="true"] { background: linear-gradient(135deg, #ffe08a, var(--goud2)); color: #1a1204; }
 .wissel button:focus-visible { outline: 2px solid var(--goud); outline-offset: 1px; }
+.wissel.ind { margin-right: 8px; }
+.wissel.ind button[aria-pressed="true"] { background: rgba(245, 201, 74, .16); color: var(--goud); }
+.ohlc .ind-w { color: var(--tekst2); }
+.ohlc .sig-w { color: var(--goud); }
 .brokerkeuze { flex: 0 0 auto; align-self: center; }
 .brokerkeuze small { font-weight: 500; opacity: .7; margin-left: 3px; }
 .canvasvak { position: relative; margin: 0 12px; height: 470px; flex: 1 1 auto; min-height: 470px; border-radius: 12px; overflow: hidden; background: rgba(4, 10, 15, .55); border: 1px solid var(--rand); touch-action: pan-y; }
@@ -455,6 +518,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._entry = leesKeuze();   // gekozen Gold Scalper-entry (broker)
     this._brokers = [];
     this._tfS = null;            // gekozen candletijd in seconden (null = basis)
+    this._ind = leesInd();       // 2.13.0: indicatoren aan/uit
     this._zoom = 8;          // pixels per bar
     this._offset = 0;        // bars vanaf rechts
     this._hover = null;
@@ -726,7 +790,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
   <section class="strip" id="strip"></section>
   <section class="raster">
     <div class="paneel p-grafiek">
-      <div class="ph">${IC.grafiek}<h2 id="g-titel">Koers</h2><div class="ph-r"><div class="wissel" id="tf"></div></div></div>
+      <div class="ph">${IC.grafiek}<h2 id="g-titel">Koers</h2><div class="ph-r"><div class="wissel ind" id="ind" role="group" aria-label="Indicatoren"></div><div class="wissel" id="tf"></div></div></div>
       <div class="gkop" id="gkop"></div>
       <div class="canvasvak" id="vak"><canvas id="cv" aria-label="Koersgrafiek met candles, open posities en recente trades" role="img"></canvas></div>
       <div class="glegenda">
@@ -735,6 +799,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
         <span><i class="str" style="border-color:${KLEUR.sl}"></i>stop-loss</span>
         <span><i class="str" style="border-color:${KLEUR.tp}"></i>take-profit</span>
         <span><em style="color:${KLEUR.long}">▲</em><em style="color:${KLEUR.short}">▼</em> instap · <em style="color:${KLEUR.tp}">●</em><em style="color:${KLEUR.sl}">●</em> uitstap (winst/verlies)</span>
+        <span><em style="color:${KLEUR.long}">◆</em><em style="color:${KLEUR.short}">◆</em> signaal (open ◇ = overgeslagen)</span>
+        <span id="ind-leg"></span>
         <span class="dim">scroll = zoom · slepen = schuiven · dubbelklik = terug</span>
       </div>
     </div>
@@ -758,6 +824,13 @@ class GoldScalperBrokerPanel extends HTMLElement {
       const b = e.target.closest("button");
       if (b && b.dataset.entry) this._kiesBroker(b.dataset.entry);
     });
+    this._q("#ind").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b || !b.dataset.k) return;
+      this._ind = { ...this._ind, [b.dataset.k]: !this._ind[b.dataset.k] };
+      bewaarInd(this._ind); this._renderInd(); this._teken();
+    });
+    this._renderInd();
     this._q("#tf").addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -938,6 +1011,19 @@ class GoldScalperBrokerPanel extends HTMLElement {
     const lab = (s) => (s < 3600 ? `${s / 60}m` : `${s / 3600}u`);
     return [60, 180, 300, 900, 1800, 3600, 14400].filter((s) => this._tfBron(s)).map((s) => ({ s, l: lab(s) }));
   }
+  _renderInd() {
+    const el = this._q("#ind");
+    if (!el) return;
+    const leg = this._q("#ind-leg");
+    if (leg) {
+      const i = this._ind || {};
+      leg.innerHTML = [
+        i.ema ? `<i style="border-color:${IND_KLEUR.ema20}"></i>EMA20 <i style="border-color:${IND_KLEUR.ema50}"></i>EMA50` : "",
+        i.band ? `<i style="border-color:${IND_KLEUR.bb}"></i>Bollinger <i class="str" style="border-color:${IND_KLEUR.dc}"></i>Donchian <em style="color:${IND_KLEUR.uit}">▲▼</em> uitbraak` : "",
+      ].filter(Boolean).join(" · ");
+    }
+    el.innerHTML = IND_KEUZES.map((o) => `<button type="button" data-k="${o.k}" title="${esc(o.t)}" aria-pressed="${!!this._ind[o.k]}">${o.l}</button>`).join("");
+  }
   _renderTf() {
     const nu = this._tfSec();
     this._q("#tf").innerHTML = this._tfOpties()
@@ -951,7 +1037,19 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._q("#g-titel").textContent = `${d.instrument.naam} · ${d.instrument.symbool}`;
     const c = hov || this._laatsteCandle;
     const ohlc = c ? `<span>${esc(this._dhm(c.t))}</span><span>O <b>${fmt(c.o)}</b></span><span>H <b>${fmt(c.h)}</b></span><span>L <b>${fmt(c.l)}</b></span><span>S <b class="${c.c >= c.o ? "pos" : "neg"}">${fmt(c.c)}</b></span>` : "";
-    this._q("#gkop").innerHTML = `<span class="big">${fmt(k.mid)}</span>${vk}<div class="ohlc">${ohlc}</div>`;
+    let extra = "";
+    const ni = this._indNu;
+    if (c && ni && ni.cs) {
+      const idx = ni.cs.findIndex((x) => x.t === c.t);
+      const w = (r, l, dec = 2) => (r && idx >= 0 && isNum(r[idx]) ? `<span class="ind-w">${l} <b>${fmt(r[idx], dec)}</b></span>` : "");
+      extra += w(ni.e20, "EMA20") + w(ni.e50, "EMA50") + w(ni.rsi, "RSI", 0) + w(ni.atr, "ATR");
+      if (ni.dc && idx >= 0 && isNum(ni.dc.op[idx])) extra += `<span class="ind-w">DC <b>${fmt(ni.dc.neer[idx])}–${fmt(ni.dc.op[idx])}</b></span>`;
+    }
+    const sigs = c && this._sigPerCandle ? this._sigPerCandle[c.t] : null;
+    if (sigs && sigs.length) {
+      extra += sigs.slice(0, 4).map((s) => `<span class="sig-w">${esc((s.strategie || "").replace(/^vp:/, ""))} ${s.richting === "long" ? "▲" : "▼"} ${s.gehandeld ? "gehandeld" : esc(s.reden || "overgeslagen")}</span>`).join("");
+    }
+    this._q("#gkop").innerHTML = `<span class="big">${fmt(k.mid)}</span>${vk}<div class="ohlc">${ohlc}${extra}</div>`;
   }
 
   _renderPositie(d) {
@@ -1341,7 +1439,11 @@ ${tl}
       return;
     }
     const AX = W < 520 ? 58 : 70, TB = 24, TOP = 10;
-    const pw = W - AX, ph = H - TB - TOP;
+    const pw = W - AX;
+    // 2.13.0: RSI/ATR-paneel onder de candles
+    const ind = this._ind || {};
+    const SUB = ind.osc ? Math.max(48, Math.round((H - TB - TOP) * 0.22)) : 0;
+    const ph = H - TB - TOP - (SUB ? SUB + 8 : 0);
     const zoom = W < 520 ? Math.max(3, this._zoom * 0.75) : this._zoom;
     const n = Math.max(10, Math.floor(pw / zoom) - 3);
     const maxOff = Math.max(0, cs.length - n);
@@ -1401,6 +1503,82 @@ ${tl}
       g.fillRect(xx - Math.floor(bw / 2), y1, bw, Math.max(1, y2 - y1));
     });
 
+    // 2.13.0: indicatoren (over alle candles berekend, alleen het zichtbare deel getekend)
+    const sluit = cs.map((c) => c.c);
+    const iv0 = start;
+    const lijn = (reeks, kleur, breed = 1.4, streep = null) => {
+      g.save(); g.beginPath(); g.rect(0, TOP, pw, ph); g.clip();
+      g.strokeStyle = kleur; g.lineWidth = breed; if (streep) g.setLineDash(streep);
+      g.beginPath(); let aan = false;
+      zicht.forEach((_c, i) => {
+        const v = reeks[iv0 + i];
+        if (v == null) { aan = false; return; }
+        const xx = xs(i), yy = y(v);
+        if (aan) g.lineTo(xx, yy); else { g.moveTo(xx, yy); aan = true; }
+      });
+      g.stroke(); g.setLineDash([]); g.restore();
+    };
+    const indNu = {};
+    if (ind.band) {
+      const bb = indBb(sluit), dc = indDc(cs);
+      g.save(); g.beginPath(); g.rect(0, TOP, pw, ph); g.clip();
+      g.fillStyle = IND_KLEUR.bbvul; g.beginPath(); let eerst = true; const terug = [];
+      zicht.forEach((_c, i) => {
+        const a = bb.op[iv0 + i], b = bb.neer[iv0 + i];
+        if (a == null || b == null) return;
+        if (eerst) { g.moveTo(xs(i), y(a)); eerst = false; } else g.lineTo(xs(i), y(a));
+        terug.push([xs(i), y(b)]);
+      });
+      for (let j = terug.length - 1; j >= 0; j--) g.lineTo(terug[j][0], terug[j][1]);
+      if (!eerst) { g.closePath(); g.fill(); }
+      g.restore();
+      lijn(bb.op, IND_KLEUR.bb, 1); lijn(bb.neer, IND_KLEUR.bb, 1); lijn(bb.mid, IND_KLEUR.bb, 1, [2, 3]);
+      lijn(dc.op, IND_KLEUR.dc, 1, [6, 4]); lijn(dc.neer, IND_KLEUR.dc, 1, [6, 4]);
+      // uitbraken: slot boven/onder het kanaal van de vorige 20 candles
+      g.font = font(9, 800); g.textAlign = "center";
+      zicht.forEach((c, i) => {
+        const op = dc.op[iv0 + i], ne = dc.neer[iv0 + i];
+        if (op != null && c.c > op) { g.fillStyle = IND_KLEUR.uit; g.textBaseline = "bottom"; g.fillText("▲", xs(i), y(c.h) - 2); }
+        else if (ne != null && c.c < ne) { g.fillStyle = IND_KLEUR.uit; g.textBaseline = "top"; g.fillText("▼", xs(i), y(c.l) + 2); }
+      });
+      indNu.bb = bb; indNu.dc = dc;
+    }
+    if (ind.ema) {
+      const e20 = indEma(sluit, 20), e50 = indEma(sluit, 50);
+      lijn(e50, IND_KLEUR.ema50, 1.5); lijn(e20, IND_KLEUR.ema20, 1.5);
+      indNu.e20 = e20; indNu.e50 = e50;
+    }
+    if (SUB) {
+      const rsi = indRsi(sluit), atr = indAtr(cs);
+      const sTop = TOP + ph + 8, sH = SUB;
+      g.strokeStyle = KLEUR.as; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(0, sTop - 4.5); g.lineTo(pw, sTop - 4.5); g.stroke();
+      const ry = (v) => sTop + (1 - v / 100) * sH;
+      g.strokeStyle = KLEUR.raster; g.setLineDash([3, 4]);
+      for (const v of [30, 70]) { g.beginPath(); g.moveTo(0, ry(v) + 0.5); g.lineTo(pw, ry(v) + 0.5); g.stroke(); }
+      g.setLineDash([]);
+      const zAtr = zicht.map((_c, i) => atr[iv0 + i]).filter((v) => v != null);
+      const aMax = zAtr.length ? Math.max(...zAtr) * 1.1 : 1;
+      g.fillStyle = IND_KLEUR.atr;
+      zicht.forEach((_c, i) => {
+        const v = atr[iv0 + i]; if (v == null) return;
+        const hh = (v / aMax) * sH * 0.9;
+        g.fillRect(Math.round(xs(i)) - Math.floor(bw / 2), sTop + sH - hh, bw, hh);
+      });
+      g.strokeStyle = IND_KLEUR.rsi; g.lineWidth = 1.4; g.beginPath(); let aan = false;
+      zicht.forEach((_c, i) => {
+        const v = rsi[iv0 + i]; if (v == null) { aan = false; return; }
+        if (aan) g.lineTo(xs(i), ry(v)); else { g.moveTo(xs(i), ry(v)); aan = true; }
+      });
+      g.stroke();
+      g.font = font(10, 700); g.textAlign = "left"; g.textBaseline = "middle";
+      const rl = rsi[cs.length - 1], al = atr[cs.length - 1];
+      g.fillStyle = IND_KLEUR.rsi; g.fillText(`RSI ${isNum(rl) ? fmt(rl, 0) : "—"}`, pw + 8, sTop + 8);
+      g.fillStyle = "#5eead4"; g.fillText(`ATR ${isNum(al) ? fmt(al, 2) : "—"}`, pw + 8, sTop + sH - 6);
+      g.fillStyle = KLEUR.tekst3; g.font = font(9, 600); g.fillText("70", 4, ry(70) - 6); g.fillText("30", 4, ry(30) - 6);
+      indNu.rsi = rsi; indNu.atr = atr;
+    }
+
     // markers van recente trades
     const t0 = zicht[0].t, tE = zicht[zicht.length - 1].t + tf;
     const xt = (t) => {
@@ -1436,6 +1614,34 @@ ${tl}
         g.beginPath(); g.arc(xt(m.s_t), y(m.uitstap), 3.6, 0, Math.PI * 2); g.fill(); g.stroke();
       }
     }
+
+    // 2.13.0: signalen per setup (vol = gehandeld, open = overgeslagen)
+    const sigPerCandle = {};
+    if (ind.sig) {
+      const per = {};
+      for (const s of d.signalen || []) {
+        if (!isNum(s.t) || s.t < t0 || s.t >= tE) continue;
+        let i = 0;
+        while (i < zicht.length - 1 && zicht[i + 1].t <= s.t) i++;
+        (per[i] = per[i] || []).push(s);
+      }
+      for (const [k, lijst] of Object.entries(per)) {
+        const i = Number(k), c = zicht[i];
+        sigPerCandle[c.t] = lijst;
+        let ol = 0, os = 0;
+        for (const s of lijst) {
+          const lg = s.richting === "long", xx = xs(i);
+          const yy = lg ? y(c.l) + 12 + ol * 8 : y(c.h) - 12 - os * 8;
+          if (lg) ol++; else os++;
+          const kl = lg ? KLEUR.long : KLEUR.short;
+          g.beginPath(); g.moveTo(xx, yy - 3.5); g.lineTo(xx + 3.5, yy); g.lineTo(xx, yy + 3.5); g.lineTo(xx - 3.5, yy); g.closePath();
+          if (s.gehandeld) { g.fillStyle = kl; g.fill(); }
+          else { g.strokeStyle = kl; g.lineWidth = 1.2; g.stroke(); }
+        }
+      }
+    }
+    this._sigPerCandle = sigPerCandle;
+    this._indNu = { ...indNu, start, cs };
 
     // prijstags op de as
     const tag = (v, kleur, tekst, vul = true) => {
@@ -1504,7 +1710,7 @@ ${tl}
       g.strokeStyle = KLEUR.kruis; g.setLineDash([4, 4]); g.lineWidth = 1;
       g.beginPath(); g.moveTo(xx, TOP); g.lineTo(xx, H - TB); g.moveTo(0, yy); g.lineTo(pw, yy); g.stroke(); g.setLineDash([]);
       const v = lo + (1 - (h.y - TOP) / ph) * (hi - lo);
-      tag(v, "#d6e0e6", fmt(v));
+      if (h.y <= TOP + ph) tag(v, "#d6e0e6", fmt(v));
       const tt = this._dhm(hov.t);
       g.font = font(11, 700);
       const tw = g.measureText(tt).width + 14;

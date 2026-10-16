@@ -19,9 +19,10 @@ oordeel staan in ``modes.py`` en ``storage/performance.py``.
 
 from __future__ import annotations
 
+import json
 import math
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,9 @@ MAX_CANDLES = 720
 MAX_EQUITY_POINTS = 400
 RECENT_TRADES = 20
 MARKER_TRADES = 150
+#: 2.13.0: signalen per setup in de grafiek - zo ver terug, en hooguit zoveel.
+SIGNAAL_UREN = 24
+MAX_SIGNALEN = 600
 #: Weergave: zoveel clusters is een redelijke ondergrens voor een t-toets.
 #: Geen poort; het oordeel komt uit storage/performance.py.
 CLUSTERS_RICHTGETAL = 30
@@ -219,6 +223,16 @@ def read_database(path: str | Path, run_id: int) -> dict:
             (run_id, stap, aantal),
         ).fetchall()
         reeks = _reeks(conn, run_id)
+        # 2.13.0: signalen met een richting (per setup) voor de grafiek.
+        vanaf = (datetime.now(timezone.utc) - timedelta(hours=SIGNAAL_UREN)).isoformat(timespec="seconds")
+        try:
+            signalen = conn.execute(
+                "SELECT ts, state, acted, reject_reason, detail_json FROM signals "
+                "WHERE run_id=? AND ts >= ? AND state != 'flat' ORDER BY ts DESC LIMIT ?",
+                (run_id, vanaf, MAX_SIGNALEN * 20),
+            ).fetchall()
+        except sqlite3.Error:
+            signalen = []
         # 2.5.9: genomen deelwinst per open positie (rij "<ticket>-deel").
         delen = {
             str(t)[: -len("-deel")]: (n or 0.0, a)
@@ -245,6 +259,7 @@ def read_database(path: str | Path, run_id: int) -> dict:
         "equity": [dict(r) for r in equity],
         "equity_rijen": aantal,
         "reeks": reeks,
+        "signalen": [dict(r) for r in signalen],
     }
 
 
@@ -571,6 +586,41 @@ def _reeks_payload(r: dict | None) -> dict | None:
     }
 
 
+def signaal_markers(rijen: list[dict] | None) -> list[dict]:
+    """2.13.0: één marker per setup per signaalbar, oudste eerst.
+
+    Een veldproefsignaal blijft zijn hele bar staan en wordt elke cyclus
+    gelogd; per (setup, bar, richting) telt het eerste moment, en gehandeld
+    als het in één van die rondes werd uitgevoerd.
+    """
+    uit: dict[tuple, dict] = {}
+    for r in rijen or []:
+        try:
+            detail = json.loads(r.get("detail_json") or "{}") or {}
+        except (TypeError, ValueError):
+            detail = {}
+        strategie = detail.get("strategie")
+        if not strategie:
+            continue
+        richting = "long" if r.get("state") == "buy" else "short" if r.get("state") == "sell" else None
+        t = _epoch(r.get("ts"))
+        if richting is None or t is None:
+            continue
+        sleutel = (strategie, detail.get("bar") or t // 60, richting)
+        m = uit.get(sleutel)
+        gehandeld = bool(r.get("acted"))
+        if m is None:
+            uit[sleutel] = {"t": t, "strategie": strategie, "richting": richting,
+                            "gehandeld": gehandeld, "reden": None if gehandeld else r.get("reject_reason")}
+        else:
+            m["t"] = min(m["t"], t)
+            if gehandeld:
+                m["gehandeld"] = True
+                m["reden"] = None
+    rij = sorted(uit.values(), key=lambda m: m["t"])
+    return rij[-MAX_SIGNALEN:]
+
+
 def build_payload(
     data: dict,
     *,
@@ -723,6 +773,8 @@ def build_payload(
         "trades": _trade_rows(db["gesloten"]),
         "markers": _markers(db["gesloten"], candles["t"][0] if candles else None, data)
         + _open_markers(db["open"], data),
+        # 2.13.0: signalen per setup voor de grafiek.
+        "signalen": signaal_markers(db.get("signalen")),
         # 2.1.0: strategiekeuze voor de grafieklegenda.
         "strategie": data.get("strategie_keuze") or data.get("primaire_strategie"),
         "stats": {

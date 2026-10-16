@@ -1,5 +1,16 @@
 # Changelog — Gold Scalper
 
+## 2.13.0 - 16-10-2026
+
+### Grafiek: signalen per setup en indicatoren
+- Gevraagd 16-10: "Kunnen indicatoren, uitbraken etc per tijd in de grafiek worden gezet?" Gekozen: alle vier.
+- Knoppen boven de grafiek (per browser onthouden): **Signalen** (ruit op de candle waar een setup een signaal gaf; vol = gehandeld, open = overgeslagen, met de setup en reden in de kopregel bij de cursor), **EMA** (20/50), **BB/DC** (Bollinger 20,2 en Donchian 20 over de vorige candles; ▲▼ bij een slot buiten het kanaal), **RSI/ATR** (RSI 14 als lijn met 30/70, ATR 14 als staafjes in een paneel onder de candles).
+- Indicatoren worden in het paneel uit de candles van het gekozen tijdvak berekend; de waarden bij de cursor staan in de kopregel.
+- Server: `signaal_markers()` - signalen met een richting van de lopende run (laatste 24 uur, hooguit 600), één per setup per bar.
+- Het kostenfilter (2.12.0) zet nu zijn reden in het signalenlog ("kostenfilter: stop x, minimaal y"); eerder telde zo'n signaal daar als gehandeld.
+- De dunne stippellijnen in de grafiek (al langer): verbinden instap en uitstap van een gesloten trade (groen winst, rood verlies).
+- Tests: `test_v2130_grafiek_indicatoren.py` (3).
+
 ## 2.12.0 - 16-10-2026
 
 ### Veldproef: kostenfilter op de stopafstand
