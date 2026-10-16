@@ -1,5 +1,15 @@
 # Changelog — Gold Scalper
 
+## 2.13.2 - 16-10-2026
+
+### Pepperstone lag stil: dubbele deelsluiting en "database is locked"
+- Gemeld 16-10 13:14: Pepperstone niet beschikbaar. De entry stond sinds 09:53 op setup_error: `UNIQUE constraint failed: trades.broker_ticket, trades.mode` in `_record_partial` (een tweede "<ticket>-deel"-rij), en om 13:16 bij een nieuwe poging `database is locked`.
+- Oorzaak 1: het deel telde pas als genomen na het boeken. Viel het boeken om, dan werd bij elke ronde en elke herstart opnieuw een deel bij de broker gesloten. Nu: direct na de sluiting bij de broker als genomen gemarkeerd; bij het opstarten aangevuld uit de database (open posities met een deel-rij).
+- Oorzaak 2: een tweede deelsluiting op dezelfde positie gaf een tweede deel-rij. Nu wordt het bij de bestaande deel-rij opgeteld.
+- Oorzaak 3: de mislukte INSERT liet een open transactie achter en een mislukte setup sloot de database niet; de volgende poging vond het bestand vergrendeld. Nu: rollback bij een mislukte INSERT, rollback bij sluiten, en de database dicht als de setup mislukt.
+- Een boekfout bij een deelsluiting legt het exitbeheer niet meer stil (gelogd, de afstemming zet de omvang recht).
+- Tests: `test_v2132_dubbele_deelsluiting.py` (4).
+
 ## 2.13.1 - 16-10-2026
 
 ### Grafiek: signalen niet meer als kolommen

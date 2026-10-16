@@ -849,6 +849,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         path = self.hass.config.path(bestand)
         self.db = TradeDatabase(path)
         await self.hass.async_add_executor_job(self.db.connect)
+        # 2.13.2: posities met een geboekte deelsluiting nooit opnieuw delen,
+        # ook als de bewaarde toestand dat niet meer weet.
+        try:
+            self._partial_taken |= await self.hass.async_add_executor_job(
+                self.db.deel_tickets_open)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Deelsluitingen niet uit de database te lezen", exc_info=True)
         # Eenmalig en idempotent: dollarbedragen die met de verkeerde koers
         # uit het brokerbedrag waren teruggerekend (tot 5.6.2).
         hersteld = await self.hass.async_add_executor_job(
@@ -3584,6 +3591,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     if self.mode.places_orders and units > 0:
                         deel = await self.venue.close(ticket, units)
                         self._positions_cache = None
+                        # 2.13.2: direct vastleggen dat het deel genomen is.
+                        # Viel het boeken hierna om, dan werd het elke ronde
+                        # (en na elke herstart) opnieuw gesloten - Pepperstone
+                        # 16-10: setup_error en elke herstart een halvering.
+                        self._partial_taken.add(ticket)
                         # Vastleggen: anders wordt de winst wél genomen maar
                         # verschijnt hij nergens in je resultaten, en telt hij
                         # niet mee in de bewijsfase.
@@ -3594,10 +3606,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                             # helft boeken liet database en broker uiteenlopen
                             # (NOODSTOP 14-10, 25,0 tegen 24,50).
                             gesloten = deel_units(units, getattr(deel, "units", None))
-                            await self._record_partial(
-                                ticket, gesloten, action.reason,
-                                datetime.now(timezone.utc),
-                            )
+                            try:
+                                await self._record_partial(
+                                    ticket, gesloten, action.reason,
+                                    datetime.now(timezone.utc),
+                                )
+                            except Exception:  # noqa: BLE001
+                                # 2.13.2: een boekfout mag het exitbeheer en
+                                # de setup niet stilleggen; de afstemming met
+                                # de broker zet de omvang daarna recht.
+                                _LOGGER.exception(
+                                    "Deelsluiting van %s gedaan bij de broker, "
+                                    "maar niet geboekt", ticket)
                         else:
                             _LOGGER.error(
                                 "Deelsluiting van %s niet bevestigd: %s. Niet "
@@ -6195,7 +6215,23 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         part.duration_seconds = int(
             (now - _as_datetime(trade.open_time, now)).total_seconds()
         )
-        await self.hass.async_add_executor_job(self.db.insert_trade, part)
+        # 2.13.2: bestaat er al een deel-rij (tweede deelsluiting, of een
+        # herhaling na een herstart), dan dat deel erbij optellen. Een tweede
+        # insert brak op UNIQUE(broker_ticket, mode) en legde de hele entry
+        # stil (Pepperstone 16-10 09:53 en 12:58).
+        bestaand = await self.hass.async_add_executor_job(self.db.deel_van, ticket)
+        if bestaand is None:
+            await self.hass.async_add_executor_job(self.db.insert_trade, part)
+        else:
+            bestaand.volume = (bestaand.volume or 0.0) + part.volume
+            for veld in ("gross_pnl", "net_pnl", "total_cost", "mfe", "mae"):
+                setattr(bestaand, veld, round((getattr(bestaand, veld) or 0.0)
+                                              + (getattr(part, veld) or 0.0), 4))
+            bestaand.close_time = part.close_time
+            bestaand.close_price = part.close_price
+            bestaand.close_mid = part.close_mid
+            bestaand.duration_seconds = part.duration_seconds
+            await self.hass.async_add_executor_job(self.db.update_trade, bestaand)
 
         # De oorspronkelijke rij krimpt tot wat er nog openstaat.
         trade.volume = max(0.0, trade.volume - closed_lots)

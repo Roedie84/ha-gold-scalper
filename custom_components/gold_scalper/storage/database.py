@@ -719,6 +719,10 @@ class TradeDatabase:
 
     def close(self) -> None:
         if self._conn:
+            try:
+                self._conn.rollback()
+            except sqlite3.Error:
+                pass
             self._conn.close()
             self._conn = None
 
@@ -841,10 +845,16 @@ class TradeDatabase:
         data.pop("id", None)
         columns = ", ".join(data)
         placeholders = ", ".join("?" for _ in data)
-        cur = self.conn.execute(
-            f"INSERT INTO trades ({columns}) VALUES ({placeholders})",
-            tuple(data.values()),
-        )
+        try:
+            cur = self.conn.execute(
+                f"INSERT INTO trades ({columns}) VALUES ({placeholders})",
+                tuple(data.values()),
+            )
+        except sqlite3.Error:
+            # 2.13.2: geen open transactie achterlaten (die hield de
+            # schrijfvergrendeling vast: "database is locked").
+            self.conn.rollback()
+            raise
         self.conn.commit()
         trade.id = int(cur.lastrowid)
         return trade.id
@@ -947,6 +957,23 @@ class TradeDatabase:
             (f"pyramide van {ticket}",),
         ).fetchall()
         return [self._row_to_trade(r) for r in rows]
+
+    def deel_van(self, ticket: str) -> Trade | None:
+        """2.13.2: de al geboekte deelsluiting van een positie (rij "<ticket>-deel")."""
+        row = self.conn.execute(
+            "SELECT * FROM trades WHERE broker_ticket = ? ORDER BY id DESC LIMIT 1",
+            (f"{ticket}-deel",),
+        ).fetchone()
+        return self._row_to_trade(row) if row else None
+
+    def deel_tickets_open(self) -> set[str]:
+        """2.13.2: open posities waarvan al een deel is gesloten."""
+        rows = self.conn.execute(
+            "SELECT d.broker_ticket FROM trades d JOIN trades t "
+            "ON t.broker_ticket || '-deel' = d.broker_ticket "
+            "WHERE t.close_time IS NULL AND d.broker_ticket LIKE '%-deel'"
+        ).fetchall()
+        return {str(r[0])[: -len("-deel")] for r in rows}
 
     def open_trades_by_tickets(self, tickets) -> list[Trade]:
         """Open trades met deze tickets, in welke run ook.

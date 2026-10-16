@@ -60,8 +60,20 @@ def _anonimiseer(waarde):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = GoldScalperCoordinator(hass, entry)
-    await coordinator.async_setup()
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_setup()
+        await coordinator.async_config_entry_first_refresh()
+    except Exception:
+        # 2.13.2: een mislukte setup liet de databaseverbinding open, met
+        # een half afgebroken schrijfactie; de volgende poging kreeg
+        # "database is locked" (Pepperstone 16-10 13:16).
+        db = getattr(coordinator, "db", None)
+        if db is not None:
+            try:
+                await hass.async_add_executor_job(db.close)
+            except Exception:  # noqa: BLE001
+                pass
+        raise
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
