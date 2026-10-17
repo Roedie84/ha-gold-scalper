@@ -90,6 +90,9 @@ TIMEOUT = ClientTimeout(total=15, connect=5)
 #: Zoveel seconden mag het openingsmoment van de broker afwijken van het eigen
 #: instapmoment. Bevestigen duurt hooguit seconden; tien minuten is ruim.
 OPENTIJD_TOLERANTIE_S = 600
+#: 2.14.1: ruimere omvangtolerantie (oz) bij exact dezelfde instap en opentijd.
+OMVANG_RUIM_OZ = 1.01
+OMVANG_RUIM_OPENTIJD_S = 5
 
 
 def _is_limietfout(payload) -> bool:
@@ -253,7 +256,16 @@ def match_transaction(
             omvang_afstand = 0.0
             if units is not None and omvang is not None:
                 omvang_afstand = abs(abs(omvang) - abs(units))
-                if omvang_afstand > 0.25:
+                # 2.14.1: een deelsluiting van vóór 2.11.1 stond als de
+                # onafgeronde helft in de administratie (24,5 oz) terwijl de
+                # broker op hele ounces sloot (24 en 25). Met dezelfde
+                # instapprijs en hetzelfde openingsmoment (binnen
+                # OMVANG_RUIM_OPENTIJD_S) is één ounce verschil nog dezelfde
+                # positie; het sluitmoment kiest dan tussen deel en rest.
+                ruim = (tijd_afstand is not None and tijd_afstand <= OMVANG_RUIM_OPENTIJD_S
+                        and open_price is not None and openings is not None
+                        and abs(openings - open_price) < 0.005)
+                if omvang_afstand > (OMVANG_RUIM_OZ if ruim else 0.25):
                     continue
 
             # Prijs en omvang samen wegen. De prijs zwaarder, want die is

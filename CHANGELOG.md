@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.14.1 - 17-10-2026
+
+### Afstemming Pepperstone: 10 "ontbrekende" trades van 14-10
+- Gevonden bij de HA-controle 17-10: de afstemming meldde steeds 10 afwijkingen ("staat na 2,1 dagen niet in het overzicht van de broker") voor trades van 14-10 18:57-19:12.
+- Oorzaak: deelsluitingen van vóór 2.11.1 staan in de administratie als onafgeronde helft (24,5 oz) terwijl de broker op hele ounces sloot (24 en 25). Het verschil van 0,5 oz viel buiten de omvangtolerantie (0,25 oz). Live bevestigd in de dealhistorie van cTrader.
+- Nu: bij exact dezelfde instapprijs en hetzelfde openingsmoment (binnen 5 s) mag de omvang tot 1 oz afwijken; het sluitmoment kiest tussen deel en rest.
+- Tests: `test_v2141_afstemming_omvang.py` (3).
+
 ## 2.14.0 - 16-10-2026
 
 ### Kostenregel: opzetten die hun kosten niet terugverdienen gaan uit
