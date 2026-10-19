@@ -16,13 +16,6 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .const import (
-    SERVICE_LAB_ASSESS,
-    SERVICE_LAB_CANCEL,
-    SERVICE_LAB_COMPARE,
-    SERVICE_LAB_CREATE_WALK_FORWARD,
-    SERVICE_LAB_REGISTER,
-    SERVICE_LAB_SNAPSHOT,
-    SERVICE_LAB_START,
     SERVICE_WRITE_DASHBOARD,
     SERVICE_RECONCILE,
     SERVICE_CAPTURE_RESPONSES,
@@ -98,10 +91,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Op de achtergrond: alleen lezen bij de broker, en het opstarten wacht
     # er niet op en kan er niet op stuklopen.
     _plan_afstemming_na_herstart(hass, entry, coordinator)
-
-    # Experiment Lab (fase 9A): na de handel, en omhuld. Een fout hier wordt
-    # gelogd en blokkeert niets. Eén Lab per Home Assistant, niet per entry.
-    await _async_lab(hass, "async_setup_lab")
     return True
 
 
@@ -116,20 +105,6 @@ def _plan_afstemming_na_herstart(hass: HomeAssistant, entry: ConfigEntry, coordi
             hass.async_create_task(taak)
     except Exception:  # noqa: BLE001 - mag het laden nooit breken
         _LOGGER.exception("Afstemming na de herstart niet gepland")
-
-
-async def _async_lab(hass: HomeAssistant, actie: str) -> None:
-    """Roep de Lab-koppeling aan, zonder dat die de handel kan tegenhouden.
-
-    Ook de import zit hierbinnen: een importfout in het Lab mag het laden van
-    Gold Scalper niet breken.
-    """
-    try:
-        from . import lab_panel
-
-        await getattr(lab_panel, actie)(hass)
-    except Exception:  # noqa: BLE001
-        _LOGGER.exception("Gold Scalper Lab: %s mislukte; de handel draait door", actie)
 
 
 def _register_services(hass: HomeAssistant) -> None:
@@ -301,7 +276,6 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_CLOSE_ALL, _zeg_wat_er_misging("close_all")(close_all))
     hass.services.async_register(DOMAIN, SERVICE_RESUME, _zeg_wat_er_misging("resume")(resume))
     hass.services.async_register(DOMAIN, SERVICE_GENERATE_REPORT, _zeg_wat_er_misging("generate_report")(generate_report))
-    _register_lab_services(hass)
     async def import_history(call: ServiceCall) -> ServiceResponse:
         """Vul het archief met historie van de broker.
 
@@ -771,10 +745,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await _stop_koersstroom(hass, entry.entry_id)
         await coordinator.async_shutdown_hook()
         await async_unregister_frontend(hass)
-        if not hass.data.get(DOMAIN):
-            # De laatste entry: het Lab-paneel gaat mee. Bij herladen zet de
-            # nieuwe setup het terug, zonder tweede herstel.
-            await _async_lab(hass, "async_unload_lab")
     return unloaded
 
 
@@ -790,39 +760,3 @@ async def _stop_koersstroom(hass: HomeAssistant, entry_id: str) -> None:
 
 async def _async_reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
-
-
-def _register_lab_services(hass: HomeAssistant) -> None:
-    """De Lab-acties (5.7). Antwoord altijd als response; nooit een order.
-
-    De afhandeling zit in ``lab_panel`` en wordt pas bij aanroep geladen: een
-    fout in het Lab mag het laden van Gold Scalper niet breken.
-    """
-    from .lab_actions import ACTION_FIELDS
-
-    def _schema(actie: str) -> vol.Schema:
-        return vol.Schema(
-            {vol.Optional("request_id"): str,
-             **{vol.Optional(veld): vol.Any(str, int, float, bool, list, dict, None)
-                for veld in ACTION_FIELDS[actie]}},
-            extra=vol.PREVENT_EXTRA,
-        )
-
-    def _handler(actie: str):
-        async def _lab_actie(call: ServiceCall) -> ServiceResponse:
-            from . import lab_panel
-
-            return await lab_panel.async_handle_action(
-                hass, actie, dict(call.data), call.context.user_id)
-        return _lab_actie
-
-    # Elke dienst op een eigen regel: zo controleert de statische test dat
-    # alles uit services.yaml echt geregistreerd is.
-    antwoord = SupportsResponse.ONLY
-    hass.services.async_register(DOMAIN, SERVICE_LAB_SNAPSHOT, _handler("snapshot"), schema=_schema("snapshot"), supports_response=antwoord)
-    hass.services.async_register(DOMAIN, SERVICE_LAB_CREATE_WALK_FORWARD, _handler("create_walk_forward"), schema=_schema("create_walk_forward"), supports_response=antwoord)
-    hass.services.async_register(DOMAIN, SERVICE_LAB_REGISTER, _handler("register"), schema=_schema("register"), supports_response=antwoord)
-    hass.services.async_register(DOMAIN, SERVICE_LAB_START, _handler("start"), schema=_schema("start"), supports_response=antwoord)
-    hass.services.async_register(DOMAIN, SERVICE_LAB_CANCEL, _handler("cancel"), schema=_schema("cancel"), supports_response=antwoord)
-    hass.services.async_register(DOMAIN, SERVICE_LAB_ASSESS, _handler("assess"), schema=_schema("assess"), supports_response=antwoord)
-    hass.services.async_register(DOMAIN, SERVICE_LAB_COMPARE, _handler("compare"), schema=_schema("compare"), supports_response=antwoord)

@@ -1,95 +1,16 @@
-"""1.1.0: brutotoets, telling van configuraties, groottemethode in de vingerafdruk.
+"""1.1.0: groottemethode in de vingerafdruk.
 
-EXPERIMENT_LAB_CAN_NEVER_ENABLE_LIVE_TRADING
+De Lab-delen van deze release (brutotoets, telling van configuraties) zijn
+met het Experiment Lab verwijderd in 2.16.0.
 """
 import os
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "custom_components"))
-from gold_scalper.const import STRATEGY_WINDOW_BARS  # noqa: E402
-from gold_scalper.experiment_lab import assessment as A  # noqa: E402
-from gold_scalper.experiment_lab.storage import LabDatabase  # noqa: E402
-from gold_scalper.experiment_lab.wf_runner import WalkForwardRunner  # noqa: E402
-from vaste_bars import vaste_bars  # noqa: E402
 
 PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalper"
 
-
-def _inp(paren):
-    return {"windows": [{"window_id": 1, "status": "COMPLETED",
-                         "test": {"trades": [{"gross": g, "net": n} for g, n in paren]}}]}
-
-
-# ------------------------------------------------------------- brutotoets --
-
-def test_rules_version_is_2():
-    assert A.ASSESSMENT_RULES_VERSION == 2
-
-
-def test_gross_positive_while_net_negative():
-    """Signaal vóór kosten, verlies erna: precies wat de opzet moet scheiden."""
-    paren = [(1.0 + (0.3 if i % 2 else -0.3), -0.2 + (0.3 if i % 2 else -0.3)) for i in range(200)]
-    c = A.c_gross(_inp(paren), 2.0)
-    assert c["component_code"] == "GROSS_EVIDENCE" and c["status"] == A.PASS
-    assert c["details"]["hypothesis"] == "H_GROSS_OOS_PER_TRADE"
-    assert c["details"]["mean_cost"] == pytest.approx(1.2)
-    assert c["blocking"] is False
-
-
-def test_gross_never_changes_the_classification():
-    bron = (PKG / "experiment_lab" / "assessment.py").read_text(encoding="utf-8")
-    beslissing = bron.split("def assess(")[1].split("plafond = ROBUST")[0]
-    assert "GROSS_EVIDENCE" not in beslissing.split("c_gross(")[1].split("\n", 1)[1]
-
-
-@pytest.mark.parametrize("paren,status", [
-    ([(-1.0 + (0.2 if i % 2 else -0.2), -1.5) for i in range(100)], A.FAIL),
-    ([(0.1 if i % 2 else -0.1, -0.8) for i in range(100)], A.WARNING),
-    ([(1.0, -0.5)], A.INSUFFICIENT_DATA),
-])
-def test_gross_outcomes(paren, status):
-    assert A.c_gross(_inp(paren), 2.0)["status"] == status
-
-
-# ---------------------------------------------- walk-forward van begin tot eind --
-
-@pytest.fixture(scope="module")
-def wf(tmp_path_factory):
-    import test_lab_walk_forward as T
-
-    pad = tmp_path_factory.mktemp("r110") / "lab.db"
-    c = vaste_bars(STRATEGY_WINDOW_BARS + 5 * 96)
-    db = LabDatabase(pad).open()
-    eid = T._wf(db, T._snapshot(db, c), c, kandidaten=[T.KANDIDATEN[1]], modus=T.W.SEQUENTIAL_OOS)
-    db.close()
-    h = WalkForwardRunner(pad).submit_walk_forward(eid)
-    assert h.wait(600) and h.final_status == "completed", h.error
-    db = LabDatabase(pad).open()
-    yield db, eid
-    db.close()
-
-
-def test_one_candidate_counts_as_one_configuration(wf):
-    db, eid = wf
-    familie = db.get(eid).hypothesis_family_id
-    assert db.family_summary(familie)["evaluated_configurations"] == 1
-
-
-def test_assessment_carries_gross_with_threshold_for_one_test(wf):
-    from gold_scalper.analysis.indicator_lab import drempel_t
-
-    db, eid = wf
-    a = db.assessment(db.create_assessment(eid, "test110"))
-    comp = a["components"]
-    assert "GROSS_EVIDENCE" in comp and "STATISTICAL_EVIDENCE" in comp
-    assert float(comp["MULTIPLE_TESTING"]["measured_value"]) == pytest.approx(drempel_t(1, 0.05))
-    assert a["assessment_rules_version"] == 2
-
-
-# ------------------------------------------------------------ vingerafdruk --
 
 def _materiaal():
     bron = (PKG / "coordinator.py").read_text(encoding="utf-8")

@@ -124,7 +124,6 @@ Zie `VENUES.md` en `BROKERS.md`.
 | `new_run` | bewust een nieuwe bewijsfase beginnen |
 | `generate_report` | keuringsrapport schrijven |
 | `close_all`, `resume`, `reset_day`, `prepare_shutdown` | bediening |
-| `lab_snapshot`, `lab_create_walk_forward`, `lab_register`, `lab_start`, `lab_cancel`, `lab_assess`, `lab_compare` | Experiment Lab: onderzoek op historische data, nooit live orders (zie `docs/experiment-lab-5.7.md`) |
 
 ---
 
@@ -176,7 +175,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **2.15.0** (zie `CHANGELOG.md`).
+Huidige versie: **2.16.0** (zie `CHANGELOG.md`).
 
 Sinds 2.0.0 is de standaardstrategie **daghandel** (trend op uurbasis, uiterlijk
 20:45 UTC dicht); scalpen blijft kiesbaar via de instelling *Strategie*, en sinds 2.1.0 ook

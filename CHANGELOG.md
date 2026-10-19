@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.16.0 - 19-10-2026
+
+### Experiment Lab verwijderd
+- Gevraagd 19-10 ("Wat doet het gold scalper lab nu nog?" en daarna "Graag"): het Lab werd niet meer gebruikt; het onderzoek gaat inmiddels via de veldproef, de schaduwtrades en `indicator_lab` op het barsarchief.
+- Weg: het Lab-paneel in de zijbalk, de diensten `lab_snapshot`, `lab_create_walk_forward`, `lab_register`, `lab_start`, `lab_cancel`, `lab_assess` en `lab_compare`, de modules `experiment_lab/`, `lab_panel`, `lab_actions`, `lab_bridge`, `lab_read_models`, `frontend/lab-panel.js`, `tools/lab_executor_benchmark.py` en de Lab-documentatie.
+- Blijft: `gold_scalper_lab.db` in de configuratiemap wordt niet aangeraakt (niets weggegooid). `indicator_lab` is iets anders en blijft.
+- De handel verandert niet: het Lab kon nooit orders plaatsen en werd pas na de handel geladen.
+- Tests: de Lab-tests zijn mee verwijderd; uit `test_release_110.py` blijven de vingerafdruktests.
+
 ## 2.15.0 - 19-10-2026
 
 ### Marktomstandigheden bij elke veldproefinstap vastgelegd

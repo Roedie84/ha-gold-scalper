@@ -196,11 +196,6 @@ STRATEGY_WINDOW_BARS: Final = WARMUP_CANDLES * 2
 
 ARCHIVE_FILENAME: Final = "gold_scalper_bars.db"
 DATABASE_FILENAME: Final = "gold_scalper.db"
-#: Het Experiment Lab: een eigen bestand naast de tradedatabase en het
-#: archief. Vaste plek in de configuratiemap, niet instelbaar: een pad dat de
-#: gebruiker kan kiezen, is een pad dat per ongeluk naar de tradedatabase kan
-#: wijzen.
-LAB_DATABASE_FILENAME: Final = "gold_scalper_lab.db"
 #: Bewust in www/: alles daarin serveert Home Assistant op /local/, wat de
 #: enige manier is om een eigen HTML-bestand in de UI te tonen zonder extra
 #: add-on of webserver.
@@ -224,14 +219,6 @@ SERVICE_RESET_DAY: Final = "reset_day"
 SERVICE_IMPORT_HISTORY: Final = "import_history"
 SERVICE_VALIDATE_BACKTEST: Final = "validate_backtest"
 SERVICE_EXPORT_DATA: Final = "export_data"
-# Experiment Lab (5.7). Alleen onderzoek: geen enkele raakt de handel.
-SERVICE_LAB_SNAPSHOT: Final = "lab_snapshot"
-SERVICE_LAB_CREATE_WALK_FORWARD: Final = "lab_create_walk_forward"
-SERVICE_LAB_REGISTER: Final = "lab_register"
-SERVICE_LAB_START: Final = "lab_start"
-SERVICE_LAB_CANCEL: Final = "lab_cancel"
-SERVICE_LAB_ASSESS: Final = "lab_assess"
-SERVICE_LAB_COMPARE: Final = "lab_compare"
 
 DISCLAIMER: Final = (
     "Technische indicatoranalyse, geen financieel advies. "
@@ -240,7 +227,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.15.0"
+INTEGRATION_VERSION: Final = "2.16.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
