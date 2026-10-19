@@ -1,5 +1,12 @@
 # Changelog — Gold Scalper
 
+## 2.14.2 - 19-10-2026
+
+### Dashboard: live koers herstelt zich zelf
+- Gemeld 19-10: het Pepperstone-dashboard bleef op "elke 5 s" staan. De server stroomde de koers wel live (via de websocket gecontroleerd: beide brokers `live`, ticks binnen), dus het abonnement van het paneel was vastgelopen, bijvoorbeeld na een herstart of herverbinding.
+- Nu: een waakhond in het paneel abonneert opnieuw als LIVE 60 s wegblijft of er 60 s geen tick meer komt; na "niet beschikbaar" (papier) wordt het na 5 minuten opnieuw geprobeerd.
+- Tests: `test_v2142_live_waakhond.py` (2).
+
 ## 2.14.1 - 17-10-2026
 
 ### Afstemming Pepperstone: 10 "ontbrekende" trades van 14-10

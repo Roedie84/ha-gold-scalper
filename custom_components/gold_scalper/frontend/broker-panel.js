@@ -18,6 +18,10 @@ const POLL_MS = 5000;
 const STREAM_TYPE = "gold_scalper/broker_stream";
 const HERABONNEER_MS = 30000;
 const LIVE_MAX_LEEFTIJD_MS = 60000;
+// 2.14.2: zonder LIVE zo lang opnieuw abonneren (vastgelopen abonnement na
+// een herstart of herverbinding); "niet beschikbaar" pas na 5 minuten.
+const LIVE_WAAKHOND_MS = 60000;
+const LIVE_NIET_OPNIEUW_MS = 300000;
 const REPORT_URL = "/api/gold_scalper/report";
 const OVERVIEW_URL = "/api/gold_scalper/overview";
 const BROKER_OPSLAG = "gold-scalper-broker-entry";   // 2.9.0: gekozen broker (per browser)
@@ -560,7 +564,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._actief = true;
     this._abonneer();
     this._timer = setInterval(() => { if (!document.hidden) this._laad(); }, POLL_MS);
-    this._klok = setInterval(() => this._tik(), 1000);
+    this._klok = setInterval(() => { this._tik(); this._bewaakLive(); }, 1000);
+    this._statusSinds = Date.now();
     if (!this._ro && window.ResizeObserver) {
       this._ro = new ResizeObserver(() => {
         this._teken();
@@ -628,8 +633,25 @@ class GoldScalperBrokerPanel extends HTMLElement {
       this._planLive();
     }
   }
+  // 2.14.2: waakhond. Blijft LIVE weg (of komen er geen ticks meer) terwijl
+  // de server wel stroomt, dan opnieuw abonneren in plaats van voorgoed op
+  // de 5-s-poll te blijven hangen.
+  _bewaakLive() {
+    if (!this._actief || this._subBezig || this._herTimer || document.hidden) return;
+    const nu = Date.now();
+    const sinds = nu - (this._statusSinds || nu);
+    const stil = this._liveStatus === "live"
+      ? !this._live || nu - this._live.ontvangen > LIVE_MAX_LEEFTIJD_MS
+      : sinds > (this._streamNiet ? LIVE_NIET_OPNIEUW_MS : LIVE_WAAKHOND_MS);
+    if (!stil) return;
+    this._afmelden();
+    this._streamNiet = false;
+    this._statusSinds = nu;
+    this._abonneer();
+  }
   _zetLive(status, reden) {
     const was = this._liveStatus;
+    if (was !== (status || "uit")) this._statusSinds = Date.now();
     this._liveStatus = status || "uit";
     this._liveReden = reden || null;
     if (this._liveStatus !== "live") { this._live = null; this._liveCandle = null; }
