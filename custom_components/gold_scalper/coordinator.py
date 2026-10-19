@@ -4055,6 +4055,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         hedgen uitzetten. Nooit een stille verrekening.
         """
         verrekend = list(getattr(result, "verrekend", None) or [])
+        # 2.14.3: zegt de broker zelf dat het account hedged is (cTrader
+        # accountType), dan kan een order niets verrekenen. Een tegengestelde
+        # positie die tegelijk verdwijnt, sloot op haar eigen stop of doel:
+        # op 19-10 01:30:06 de stop van 58459739, 4 ms voor de nieuwe short.
+        if not verrekend and getattr(self.venue, "account_hedged", None) is True:
+            return
         if tegengesteld and not verrekend:
             try:
                 na = await self._open_positions(refresh=True)

@@ -1,5 +1,12 @@
 # Changelog — Gold Scalper
 
+## 2.14.3 - 19-10-2026
+
+### Geen valse netting meer op een hedged account (Pepperstone)
+- 19-10 01:30 meldde de integratie netting en zette hedgen uit tot de herstart. Nagekeken bij cTrader: het account is HEDGED (`accountType` 0). In de dealhistorie sloot long 58459739 om 01:30:06.324 op zijn eigen stop (order 74631086, de stoporder van de opening); 4 ms later opende de nieuwe short 58460015 volledig (8 oz). De positievergelijking zag de long verdwijnen.
+- Nu: de cTrader-venue leest het accounttype bij het verbinden (`account_hedged`). Bij een hedged account wordt de positievergelijking overgeslagen; een verrekening die de broker zelf in de bevestiging meldt, telt nog steeds.
+- Tests: `test_v2143_hedged_geen_netting.py` (3).
+
 ## 2.14.2 - 19-10-2026
 
 ### Dashboard: live koers herstelt zich zelf

@@ -265,10 +265,23 @@ class CTraderVenue(ExecutionVenue):
         self._koers_event = asyncio.Event()
         #: 2.9.1: luisteraars op elke koers (live koers in het dashboard).
         self._koers_luisteraars: list[Callable[[float, float, float], None]] = []
+        #: 2.14.3: accounttype van de broker (0/HEDGED, 1/NETTED, 2/SPREAD_BETTING).
+        self.account_type = None
         self._stats = {"verzoeken": 0, "fouten": 0, "herverbindingen": 0,
                        "tokens_ververst": 0, "laatste_fout": None}
 
     # -- verbinding ---------------------------------------------------------- #
+
+    @property
+    def account_hedged(self) -> bool | None:
+        """True als de broker het account als hedged opgeeft (2.14.3).
+
+        Het veld ontbreekt in JSON bij de standaardwaarde 0 (HEDGED); None
+        zolang het account nog niet is opgevraagd.
+        """
+        if self.account_type is None:
+            return None
+        return self.account_type in (0, "HEDGED")
 
     @property
     def verbonden(self) -> bool:
@@ -316,6 +329,7 @@ class CTraderVenue(ExecutionVenue):
             antw = await self._verzoek(ASSET_LIST_REQ, {"ctidTraderAccountId": self.ctid},
                                        ASSET_LIST_RES)
             trader = await self._trader()
+            self.account_type = trader.get("accountType", 0)
             asset = trader.get("depositAssetId")
             self.valuta = next((a.get("name") for a in antw.get("asset") or []
                                 if a.get("assetId") == asset), None)
