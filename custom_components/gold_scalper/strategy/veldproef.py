@@ -328,6 +328,9 @@ class Kenmerken:
     atr: float = 0.0
     slot: float = 0.0
     uitleg: dict = field(default_factory=dict)
+    # 2.15.0: de marktomstandigheden op deze bar, alleen om vast te leggen
+    # bij de instap (entry_trend/adx/rsi/ema_dist/momentum). Beslist niets.
+    context: dict = field(default_factory=dict)
 
 
 def kenmerken(c: Candles) -> Kenmerken | None:
@@ -399,7 +402,35 @@ def kenmerken(c: Candles) -> Kenmerken | None:
         1 if ins and s[-1] > h[-2] and s[-1] > e50[-1]
         else -1 if ins and s[-1] < l[-2] and s[-1] < e50[-1] else 0
     )
+    k.context = _context(c, s, e50, a, mo)
     return k
+
+
+def _context(c: Candles, s: list[float], e50: list[float], a: float, mo: float) -> dict:
+    """2.15.0: omstandigheden op de laatste bar, voor de analyse achteraf.
+
+    trend      richting van de EMA50 over 10 bars (+1 op, -1 neer, 0 vlak)
+    ema_dist   afstand van de slotkoers tot de EMA50, in ATR
+    momentum   verandering over 12 bars, in ATR
+    rsi        RSI(14)
+    adx        ADX(14): trendsterkte
+    Beslist niets; een fout geeft een lege context.
+    """
+    try:
+        from ..analysis.trend import adx as _adx_reeks
+
+        helling = e50[-1] - e50[-11]
+        drempel = 0.05 * a
+        adx_waarde = _adx_reeks(c)[0][-1]
+        return {
+            "trend": 1 if helling > drempel else -1 if helling < -drempel else 0,
+            "ema_dist": round((s[-1] - e50[-1]) / a, 3) if a else None,
+            "momentum": round(mo / a, 3) if a else None,
+            "rsi": round(_rsi(s, 14)[-1], 1),
+            "adx": round(adx_waarde, 1) if adx_waarde is not None else None,
+        }
+    except Exception:  # noqa: BLE001 - meten mag de beslissing nooit raken
+        return {}
 
 
 # -- bars op alle tijdvakken -------------------------------------------------- #
@@ -489,6 +520,36 @@ def bars_uit_koersen(punten: list[tuple[float, float]], seconden: int) -> Candle
 
 # -- besluit ------------------------------------------------------------------ #
 
+#: 2.15.0: het tijdvak waarvan de trend als "hogere trend" wordt vastgelegd.
+HOGER_TIJDVAK = "30m"
+
+
+def instap_context(bars: "MeerTijdvakken", tf: str, k: Kenmerken) -> dict:
+    """2.15.0: wat bij een instap in de trade wordt vastgelegd (entry_*).
+
+    `trend` is de trend op het hogere tijdvak (30m; voor 30m zelf de eigen),
+    zodat achteraf te toetsen is of trades met de grote trend mee beter gaan.
+    De sleutels volgen wat `_record_broker_open` leest. Beslist niets.
+    """
+    eigen = getattr(k, "context", None) or {}
+    hoog = eigen
+    if tf != HOGER_TIJDVAK:
+        try:
+            kh = bars.kenmerken(HOGER_TIJDVAK)
+            hoog = (getattr(kh, "context", None) or {}) if kh is not None else {}
+        except Exception:  # noqa: BLE001
+            hoog = {}
+    uit = {
+        "trend": hoog.get("trend"),
+        "trend_eigen": eigen.get("trend"),
+        "adx": eigen.get("adx"),
+        "rsi_reversion": eigen.get("rsi"),
+        "ema_dist": eigen.get("ema_dist"),
+        "momentum": eigen.get("momentum"),
+    }
+    return {sleutel: waarde for sleutel, waarde in uit.items() if waarde is not None}
+
+
 def evalueer(
     naam: str, bars: MeerTijdvakken, bid: float, ask: float, cfg: ScalpConfig,
     open_position_count: int = 0, seconds_since_last_entry: float = 1e9,
@@ -531,7 +592,8 @@ def evalueer(
         return weiger("insufficient_data", f"{tf}: geen ATR")
     d = k.richting.get(familie, 0)
     onderdelen = {"tijdvak": tf, "familie": familie, "atr": round(k.atr, 3),
-                  "bar": k.ts, **{f"s_{f}": v for f, v in k.richting.items() if f == familie}}
+                  "bar": k.ts, **{f"s_{f}": v for f, v in k.richting.items() if f == familie},
+                  **instap_context(bars, tf, k)}
     if d == 0:
         return weiger("geen_signaal", f"{naam}: geen signaal op de bar van {tf}", 0, onderdelen)
     # Eén instap per bar: dezelfde bar levert geen tweede trade op.

@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.15.0 - 19-10-2026
+
+### Marktomstandigheden bij elke veldproefinstap vastgelegd
+- Gevraagd 19-10: "Kunnen we goldscalper nog verbeteren? Ik draai nog steeds verlies." Analyse van alle trades (IG 3.278, Pepperstone 1.131): bruto samen ongeveer nul (IG +275, Pepperstone -2.097); het verlies zijn de kosten (IG 67.210, waarvan 59.976 op 13-10 alleen). Sinds 16-10 staat Pepperstone bijna quitte (bruto +1.198 tegen kosten 1.712).
+- De voor de hand liggende volgende toets - werkt een opzet beter met de grote trend mee, bij een sterke trend (ADX), of na een uitschieter (RSI)? - kon niet: bij veldproeftrades bleven `entry_trend`, `entry_adx`, `entry_rsi`, `entry_ema_dist` en `entry_momentum` leeg. Alleen scalp vulde ze.
+- Nu: `kenmerken()` berekent per bar een context (EMA50-richting over 10 bars, afstand tot de EMA50 en 12-barsverandering in ATR, RSI(14), ADX(14)); `instap_context()` zet die in het signaal, met als `trend` de richting op 30m (de hogere trend). Wordt bij de order vastgelegd in de bestaande kolommen.
+- Beslist niets: zelfde signalen, stops, doelen en strategieversie (`veldproef-2.1.0`); de run loopt door. Een fout geeft een lege context.
+- Tests: `test_v2150_instapcontext.py` (4).
+
 ## 2.14.3 - 19-10-2026
 
 ### Geen valse netting meer op een hedged account (Pepperstone)
