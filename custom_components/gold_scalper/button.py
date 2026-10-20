@@ -30,6 +30,15 @@ async def async_setup_entry(
     ])
 
 
+def _leden(coordinator) -> list:
+    """2.18.0: de andere markten van een Bitvavo-mand; de knoppen gelden voor
+    de hele mand."""
+    mand = getattr(coordinator, "_mand", None)
+    if mand is None or getattr(mand, "hoofd", None) is not coordinator:
+        return []
+    return list(mand.leden.values())
+
+
 class CloseAllButton(GoldScalperEntity, ButtonEntity):
     _attr_name = "Alles sluiten"
     _attr_icon = "mdi:close-octagon"
@@ -40,6 +49,8 @@ class CloseAllButton(GoldScalperEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         await self.coordinator.async_close_all()
+        for lid in _leden(self.coordinator):
+            await lid.async_close_all()
 
 
 class PrepareShutdownButton(GoldScalperEntity, ButtonEntity):
@@ -52,6 +63,8 @@ class PrepareShutdownButton(GoldScalperEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         await self.coordinator.async_prepare_shutdown()
+        for lid in _leden(self.coordinator):
+            await lid.async_prepare_shutdown()
 
 
 class ResumeButton(GoldScalperEntity, ButtonEntity):
@@ -65,7 +78,10 @@ class ResumeButton(GoldScalperEntity, ButtonEntity):
     async def async_press(self) -> None:
         # De uitkomst niet weggooien: bij een geweigerde hervatting gebeurt er
         # anders zichtbaar niets, en dan blijf je drukken.
-        if not await self.coordinator.async_resume():
+        gelukt = await self.coordinator.async_resume()
+        for lid in _leden(self.coordinator):
+            gelukt = await lid.async_resume() and gelukt
+        if not gelukt:
             raise HomeAssistantError(
                 "Hervatten geweigerd: de daglimiet is vandaag al te vaak "
                 "opnieuw gezet. Verder hervatten zou van de limiet een "

@@ -29,6 +29,7 @@ from .const import (
     SERVICE_EXPORT_DATA,
 )
 from .coordinator import GoldScalperCoordinator
+from .mand import BitvavoMand, is_mand
 from .http import async_register_frontend, async_unregister_frontend
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,12 +81,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def _on_stop(event) -> None:
         await _stop_koersstroom(hass, entry.entry_id)
+        mand = hass.data.get(f"{DOMAIN}_mand", {}).get(entry.entry_id)
+        if mand is not None:
+            await mand.async_stop()
         await coordinator.async_shutdown_hook()
 
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _on_stop)
     )
     _register_services(hass)
+
+    # 2.18.0: Bitvavo-mand: de andere markten op de achtergrond erbij. De
+    # hoofdlus draait al; het opstarten van HA wacht niet op twintig warm-ups.
+    if is_mand(options):
+        mand = BitvavoMand(hass, entry, coordinator)
+        coordinator._mand = mand
+        coordinator.venue.mand_waarde = mand.waarde_elders
+        hass.data.setdefault(f"{DOMAIN}_mand", {})[entry.entry_id] = mand
+        maak = getattr(entry, "async_create_background_task", None)
+        if maak is not None:
+            maak(hass, mand.async_start(), "gold_scalper mand opstarten")
+        else:
+            hass.async_create_task(mand.async_start())
 
     # 1.10.0: één afstemming na het opstarten, ook als de markt dicht is.
     # Op de achtergrond: alleen lezen bij de broker, en het opstarten wacht
@@ -114,6 +131,12 @@ def _register_services(hass: HomeAssistant) -> None:
     def _coordinators() -> list[GoldScalperCoordinator]:
         return list(hass.data.get(DOMAIN, {}).values())
 
+    def _hoofden() -> list[GoldScalperCoordinator]:
+        """2.18.0: zonder de leden van een Bitvavo-mand: voor diensten die per
+        entry één keer horen te lopen (rapport, dashboard, backtest, import)."""
+        return [c for c in _coordinators()
+                if not getattr(getattr(c, "entry", None), "hoofd_entry_id", None)]
+
     async def prepare_shutdown(call: ServiceCall) -> None:
         for coordinator in _coordinators():
             result = await coordinator.async_prepare_shutdown()
@@ -135,7 +158,7 @@ def _register_services(hass: HomeAssistant) -> None:
     async def generate_report(call: ServiceCall) -> None:
         from .dashboard.report import write_report
 
-        for coordinator in _coordinators():
+        for coordinator in _hoofden():
             path = hass.config.path(call.data.get("path") or REPORT_FILENAME)
             from homeassistant.util import dt as dt_util
 
@@ -197,7 +220,7 @@ def _register_services(hass: HomeAssistant) -> None:
         """Draai de strategie over de opgebouwde historie."""
         from .analysis.backtest import run_backtest
 
-        for coordinator in _coordinators():
+        for coordinator in _hoofden():
             # Eerst het archief: dat groeit over herstarts heen en bevat
             # doorgaans veel meer dan wat er in het geheugen staat. Zonder
             # historie is een hypothese pas na weken te toetsen; met historie
@@ -295,7 +318,7 @@ def _register_services(hass: HomeAssistant) -> None:
         gevraagd = int(call.data.get("bars", 1000))
         antwoord: dict = {}
 
-        for coordinator in _coordinators():
+        for coordinator in _hoofden():
             if coordinator.archive is None:
                 raise HomeAssistantError("Het archief is niet geopend.")
             voor = await hass.async_add_executor_job(
@@ -394,7 +417,7 @@ def _register_services(hass: HomeAssistant) -> None:
         from .analysis.backtest import run_backtest
         from .analysis.validation import compare
 
-        for coordinator in _coordinators():
+        for coordinator in _hoofden():
             if coordinator.archive is None:
                 raise HomeAssistantError("Het archief is niet geopend.")
 
@@ -482,7 +505,7 @@ def _register_services(hass: HomeAssistant) -> None:
         soort = call.data.get("kind", "bars")
         offset = int(call.data.get("offset", 0))
         limit = int(call.data.get("limit", 2000))
-        for coordinator in _coordinators():
+        for coordinator in _hoofden():
             if soort == "available":
                 if coordinator.archive is None:
                     raise HomeAssistantError("Het archief is niet geopend.")
@@ -584,7 +607,7 @@ def _register_services(hass: HomeAssistant) -> None:
         """
         from .analysis.indicator_lab import run_lab
 
-        for coordinator in _coordinators():
+        for coordinator in _hoofden():
             if coordinator.archive is None:
                 raise HomeAssistantError("Het archief is niet geopend.")
             try:
@@ -650,7 +673,7 @@ def _register_services(hass: HomeAssistant) -> None:
         Rekeningnummers en namen worden eruit gehaald. Tokens en sleutels
         zitten in de headers, niet in deze antwoorden.
         """
-        for coordinator in _coordinators():
+        for coordinator in _hoofden():
             haal = getattr(coordinator.venue, "raw_responses", None)
             if haal is None:
                 raise HomeAssistantError("Deze broker kan dat niet.")
@@ -685,7 +708,7 @@ def _register_services(hass: HomeAssistant) -> None:
         from .dashboard.lovelace import build_dashboard
 
         register = er.async_get(hass)
-        for coordinator in _coordinators():
+        for coordinator in _hoofden():
             entry_id = coordinator.entry.entry_id
             voorvoegsel = f"{entry_id}_"
             ids = {
@@ -741,6 +764,9 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        mand = hass.data.get(f"{DOMAIN}_mand", {}).pop(entry.entry_id, None)
+        if mand is not None:
+            await mand.async_stop()
         coordinator: GoldScalperCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
         await _stop_koersstroom(hass, entry.entry_id)
         await coordinator.async_shutdown_hook()

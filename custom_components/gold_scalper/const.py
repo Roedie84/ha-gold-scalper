@@ -131,6 +131,25 @@ DEFAULT_BV_STARTSALDO: Final = 10000.0
 #: Spreadgrens bij crypto, als goud-equivalent (USD bij 4000): 8 = 0,2 %.
 DEFAULT_BV_MAX_SPREAD: Final = 8.0
 
+#: 2.18.0: de mand. Eén Bitvavo-entry handelt op de meest liquide markten in
+#: plaats van op één. ``een`` = alleen de gekozen markt (zoals 2.17.0).
+CONF_BV_MARKTEN: Final = "bitvavo_markten"
+BV_MARKTEN_MAND: Final = "mand"
+BV_MARKTEN_EEN: Final = "een"
+#: Hoeveel markten tegelijk in de mand (de gekozen markt telt mee).
+CONF_BV_AANTAL: Final = "bitvavo_aantal_markten"
+DEFAULT_BV_AANTAL: Final = 20
+#: Hooguit zoveel open posities over de hele mand samen.
+CONF_BV_MAX_POSITIES: Final = "bitvavo_max_posities"
+DEFAULT_BV_MAX_POSITIES: Final = 5
+#: Minimale handel in 24 uur (quote-valuta) om in de mand te mogen.
+CONF_BV_MIN_VOLUME: Final = "bitvavo_min_volume"
+DEFAULT_BV_MIN_VOLUME: Final = 250000.0
+#: Hoogste spread (procent van de koers) om in de mand te mogen.
+BV_MAND_MAX_SPREAD_PCT: Final = 0.2
+#: Zo vaak wordt de mand opnieuw samengesteld.
+BV_MAND_HERZIEN_MINUTEN: Final = 60
+
 #: 2.8.0: cTrader. De geheimen zelf staan in secrets.yaml; de entry bewaart
 #: de SLEUTELNAMEN plus een kopie van de tokens (die ververst de koppeling).
 CONF_CT_CLIENT_ID_SECRET: Final = "ctrader_client_id_secret"
@@ -245,7 +264,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.17.0"
+INTEGRATION_VERSION: Final = "2.18.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

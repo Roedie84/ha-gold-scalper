@@ -87,13 +87,17 @@
         "title": "Connect Bitvavo (crypto)",
         "description": "{note}",
         "data": {
-          "bitvavo_markt": "Market (e.g. BTC-EUR)",
+          "bitvavo_markt": "Market (basket: the fixed main market)",
           "timeframe": "Timeframe",
           "mode": "Mode",
           "bitvavo_key_secret": "Name of the API key in secrets.yaml",
           "bitvavo_geheim_secret": "Name of the API secret in secrets.yaml",
           "bitvavo_max_inzet": "Maximum amount per buy",
-          "starting_balance": "Paper starting balance"
+          "starting_balance": "Paper starting balance",
+          "bitvavo_markten": "Markets",
+          "bitvavo_aantal_markten": "Number of markets in the basket",
+          "bitvavo_max_posities": "Maximum open positions (whole basket)",
+          "bitvavo_min_volume": "Minimum 24h volume (EUR)"
         }
       }
     },
@@ -213,6 +217,12 @@
         "scalp": "Scalping (minutes, time stop)",
         "combinatie": "Combination (day trading + scalping, both live)",
         "alles": "Everything (day trading + scalping + field trial on 1m-30m, all live on demo)"
+      }
+    },
+    "bitvavo_markten": {
+      "options": {
+        "mand": "Basket: the most liquid markets",
+        "een": "Only the chosen market"
       }
     }
   },

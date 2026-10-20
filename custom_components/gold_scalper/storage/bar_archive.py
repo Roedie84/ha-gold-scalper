@@ -117,7 +117,9 @@ class BarArchive:
 
     def connect(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.path, check_same_thread=False)
+        # 2.18.0: ruimer wachten op een slot; met een Bitvavo-mand schrijven
+        # tientallen markten naar dit ene archief.
+        self._conn = sqlite3.connect(self.path, check_same_thread=False, timeout=30)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA)
         self._conn.commit()

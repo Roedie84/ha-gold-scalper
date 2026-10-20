@@ -805,6 +805,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: cyclus voordat de database dichtgaat.
         self._cyclus_slot = asyncio.Lock()
         self._afgesloten = False
+        #: 2.18.0: de Bitvavo-mand waar deze lus bij hoort (zie mand.py).
+        self._mand = None
         #: 1.7.5: kwam de accountvaluta bij het opstarten niet van de broker
         #: maar uit de laatst bekende waarde? Dan wordt de vingerafdruk van een
         #: run er nooit op aangepast.
@@ -2004,10 +2006,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return int(run["id"])
         return None
 
-    async def _refresh_gate(self) -> None:
-        """Herbereken of live handel vrijgegeven mag worden."""
-        if self.run_id is None:
-            return
+    async def _bereken_eigen_poort(self) -> bool:
+        """De poort op het bewijs van deze lus. False: geen bewijs, dicht."""
         bewijs_run = self.run_id
         if self._is_spot and self.mode.uses_real_money:
             # 2.17.0: Bitvavo heeft geen demo. Live gaat pas open als de
@@ -2021,8 +2021,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                                          "de bewijsfase doorlopen (modus paper)."],
                     "summary": "Live gesloten: geen papieren bewijsfase.",
                 }
-                self.venue.supports_trading = False
-                return
+                return False
         trades = await self.hass.async_add_executor_job(
             self.db.closed_trades, bewijs_run
         )
@@ -2034,6 +2033,19 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.gate = LiveGate().evaluate(
             stats, run or {}, daily, self.robustness, self._boekhouding_status(),
         ).as_dict()
+        return True
+
+    async def _refresh_gate(self) -> None:
+        """Herbereken of live handel vrijgegeven mag worden."""
+        if self.run_id is None:
+            return
+        mand = getattr(self, "_mand", None)
+        if self._is_spot and self.mode.uses_real_money and mand is not None:
+            # 2.18.0: de mand gaat samen open, op het bewijs van alle markten.
+            self.gate = await mand.poort()
+        elif not await self._bereken_eigen_poort():
+            self.venue.supports_trading = False
+            return
 
         # De venue mag alleen handelen als álles klopt: live modus, poort open,
         # en de gebruiker heeft de schakelaar bewust omgezet.
@@ -2059,6 +2071,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         await self._persist()
         await self._refresh_gate()
         await self.async_request_refresh()
+        mand = getattr(self, "_mand", None)
+        if mand is not None and mand.hoofd is self:
+            # 2.18.0: de schakelaar geldt voor de hele mand.
+            await mand.zet_aan(value)
 
     async def _persist(self) -> None:
         """Sla de toestand op die een herstart moet overleven."""
@@ -3312,6 +3328,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 for k, v in self._signalen.items() if v is not None
             } if self.combinatie else {},
             "gate": self.gate,
+            # 2.18.0: de Bitvavo-mand (alleen bij de hoofdlus).
+            "mand": (self._mand.overzicht()
+                     if getattr(self, "_mand", None) is not None and self._mand.hoofd is self
+                     else None),
             # 2.7.0: onderzoeksrapport (samenvatting), risicolimieten.
             "onderzoek": onderzoek_mod.samenvatting(self.onderzoek) if self.onderzoek else None,
             "risico_limieten": self.risico_info,
@@ -3901,6 +3921,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             self._vp_bar_gebruikt(
                 (getattr(signal, "components", None) or {}).get("strategie", ""), signal)
             return False
+        if getattr(self, "_mand", None) is not None:
+            # 2.18.0: hooguit zoveel posities over de hele mand samen.
+            mag, waarom = self._mand.mag_openen(self)
+            if not mag:
+                self._laatste_weigering = waarom
+                return False
         # 2.12.0: kostenfilter voor de veldproef - geen trade als de kosten
         # een te groot deel van het risico tot de stop zijn.
         vp_naam = (getattr(signal, "components", None) or {}).get("strategie")

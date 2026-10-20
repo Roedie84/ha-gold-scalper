@@ -413,12 +413,23 @@ def _uit_spec(spec: dict) -> ScalperSensor:
 #: Meetkwaliteit als entiteiten; de rekenregels staan in meetkwaliteit.py.
 MEETKWALITEIT: tuple[ScalperSensor, ...] = tuple(_uit_spec(x) for x in SPECS)
 
+#: 2.18.0: de Bitvavo-mand (alleen bij een mand-entry).
+MAND = ScalperSensor(
+    key="mand", name="Mand", icon="mdi:basket-outline",
+    value_fn=lambda d: (d.get("mand") or {}).get("markten"),
+    attrs_fn=lambda d: {k: v for k, v in (d.get("mand") or {}).items() if k != "markten"},
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
+    from .mand import is_mand
+
     coordinator: GoldScalperCoordinator = hass.data[DOMAIN][entry.entry_id]
+    extra = (MAND,) if is_mand({**entry.data, **entry.options}) else ()
     async_add_entities(
-        ScalperSensorEntity(coordinator, entry, d) for d in SENSORS + MEETKWALITEIT
+        ScalperSensorEntity(coordinator, entry, d) for d in SENSORS + MEETKWALITEIT + extra
     )
 
 

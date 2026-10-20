@@ -117,16 +117,62 @@ class RuntimeState:
         return asdict(self)
 
 
+def _gedeeld(hass: HomeAssistant, sleutel: str) -> dict:
+    """2.18.0: één Store en één inhoud per bestand, gedeeld door alle entries.
+
+    Elke entry hield een eigen kopie van het hele bestand, gelezen bij het
+    opstarten, en schreef bij elke wijziging die hele kopie terug. Met twee
+    entries (IG en Pepperstone) overschreef de ene zo de nieuwere toestand van
+    de andere met wat er bij het opstarten stond; met een Bitvavo-mand van
+    twintig markten zou dat bij elke cyclus gebeuren.
+    """
+    data = getattr(hass, "data", None)
+    if not isinstance(data, dict):
+        return {"store": Store(hass, STORAGE_VERSION, sleutel), "all": None}
+    pool = data.setdefault("gold_scalper_gedeelde_stores", {})
+    if sleutel not in pool:
+        pool[sleutel] = {"store": Store(hass, STORAGE_VERSION, sleutel), "all": None}
+    return pool[sleutel]
+
+
+async def _lees_gedeeld(gedeeld: dict) -> dict:
+    """Het bestand lezen in de gedeelde inhoud. Elke wijziging wordt meteen
+    geschreven, dus het bestand is de actuele stand; de inhoud wordt ter
+    plekke bijgewerkt zodat alle entries hetzelfde object blijven delen."""
+    inhoud = await gedeeld["store"].async_load() or {}
+    if gedeeld["all"] is None:
+        gedeeld["all"] = {}
+    gedeeld["all"].clear()
+    gedeeld["all"].update(inhoud)
+    return gedeeld["all"]
+
+
+async def _schrijf_gedeeld(gedeeld: dict) -> None:
+    # Een ondiepe kopie: HA schrijft het bestand mogelijk pas na een andere
+    # wijziging in hetzelfde dict.
+    await gedeeld["store"].async_save(dict(gedeeld["all"] or {}))
+
+
+async def _verwijder_gedeeld(gedeeld: dict, entry_id: str) -> None:
+    """De entry en zijn mandleden (``<entry_id>_<markt>``) uit het bestand
+    halen, zonder de andere entries te raken."""
+    alles = await _lees_gedeeld(gedeeld)
+    for sleutel in [k for k in alles if k == entry_id or k.startswith(f"{entry_id}_")]:
+        alles.pop(sleutel, None)
+    await _schrijf_gedeeld(gedeeld)
+
+
 class StateStore:
     """Leest en schrijft de toestand per config entry."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
-        self._store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        self._gedeeld = _gedeeld(hass, STORAGE_KEY)
+        self._store: Store = self._gedeeld["store"]
         self._entry_id = entry_id
         self._all: dict[str, Any] = {}
 
     async def async_load(self) -> RuntimeState:
-        self._all = await self._store.async_load() or {}
+        self._all = await _lees_gedeeld(self._gedeeld)
         raw = self._all.get(self._entry_id) or {}
         fields = {f for f in RuntimeState.__dataclass_fields__}
         state = RuntimeState(**{k: v for k, v in raw.items() if k in fields})
@@ -142,13 +188,15 @@ class StateStore:
         return state
 
     async def async_save(self, state: RuntimeState) -> None:
+        if self._gedeeld["all"] is None:
+            await _lees_gedeeld(self._gedeeld)
+        self._all = self._gedeeld["all"]
         self._all[self._entry_id] = state.as_dict()
-        await self._store.async_save(self._all)
+        await _schrijf_gedeeld(self._gedeeld)
 
     async def async_remove(self) -> None:
-        """Opruimen als de entry verwijderd wordt."""
-        self._all.pop(self._entry_id, None)
-        await self._store.async_save(self._all)
+        """Opruimen als de entry verwijderd wordt (nooit de andere entries)."""
+        await _verwijder_gedeeld(self._gedeeld, self._entry_id)
 
 
 RESULTS_KEY = "gold_scalper_results"
@@ -165,23 +213,31 @@ class ResultsStore:
     """
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
-        self._store: Store = Store(hass, STORAGE_VERSION, RESULTS_KEY)
+        self._gedeeld = _gedeeld(hass, RESULTS_KEY)
+        self._store: Store = self._gedeeld["store"]
         self._entry_id = entry_id
         self._all: dict[str, Any] = {}
 
     async def async_load(self) -> dict[str, Any]:
         try:
-            self._all = await self._store.async_load() or {}
+            self._all = await _lees_gedeeld(self._gedeeld)
         except Exception as err:  # noqa: BLE001 - meting mag het opstarten niet breken
             _LOGGER.warning("Bewaarde uitkomsten niet te lezen: %s", err)
-            self._all = {}
+            self._onleesbaar = True
+            return {}
         raw = self._all.get(self._entry_id)
         return dict(raw) if isinstance(raw, dict) else {}
 
     async def async_save(self, data: dict[str, Any]) -> None:
+        if getattr(self, "_onleesbaar", False):
+            # Niet schrijven over een bestand dat niet te lezen was: dat zou de
+            # uitkomsten van alle andere entries wissen.
+            return
+        if self._gedeeld["all"] is None:
+            await _lees_gedeeld(self._gedeeld)
+        self._all = self._gedeeld["all"]
         self._all[self._entry_id] = data
-        await self._store.async_save(self._all)
+        await _schrijf_gedeeld(self._gedeeld)
 
     async def async_remove(self) -> None:
-        self._all.pop(self._entry_id, None)
-        await self._store.async_save(self._all)
+        await _verwijder_gedeeld(self._gedeeld, self._entry_id)

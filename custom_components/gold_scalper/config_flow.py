@@ -51,6 +51,9 @@ from .const import (
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
     DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUES,
     VENUE_OANDA, VENUE_SIMULATOR, VENUE_CTRADER, VENUE_BITVAVO,
+    CONF_BV_MARKTEN, CONF_BV_AANTAL, CONF_BV_MAX_POSITIES, CONF_BV_MIN_VOLUME,
+    BV_MARKTEN_MAND, BV_MARKTEN_EEN, DEFAULT_BV_AANTAL, DEFAULT_BV_MAX_POSITIES,
+    DEFAULT_BV_MIN_VOLUME,
     CONF_BV_KEY_SECRET, CONF_BV_GEHEIM_SECRET, CONF_BV_KEY, CONF_BV_GEHEIM, CONF_BV_MARKT,
     CONF_BV_MAX_INZET, DEFAULT_BV_MAX_INZET, DEFAULT_BV_MARKT, DEFAULT_BV_STARTSALDO,
     DEFAULT_BV_MAX_SPREAD,
@@ -664,6 +667,12 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_BV_KEY: geheimen.get(sleutels[0]) if heeft else None,
                     CONF_BV_GEHEIM: geheimen.get(sleutels[1]) if heeft else None,
                     CONF_BV_MAX_INZET: float(user_input[CONF_BV_MAX_INZET]),
+                    # 2.18.0: de mand (de meest liquide markten) of één markt.
+                    CONF_BV_MARKTEN: user_input.get(CONF_BV_MARKTEN, BV_MARKTEN_MAND),
+                    CONF_BV_AANTAL: int(user_input.get(CONF_BV_AANTAL, DEFAULT_BV_AANTAL)),
+                    CONF_BV_MAX_POSITIES: int(user_input.get(CONF_BV_MAX_POSITIES,
+                                                             DEFAULT_BV_MAX_POSITIES)),
+                    CONF_BV_MIN_VOLUME: float(user_input.get(CONF_BV_MIN_VOLUME, DEFAULT_BV_MIN_VOLUME)),
                     CONF_STARTING_BALANCE: float(user_input[CONF_STARTING_BALANCE]),
                     # Startinstellingen voor crypto: grootte op risico, geen
                     # scalp (0,5 % kosten per rondreis), geen korte tijdvakken
@@ -678,8 +687,10 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
                         self._get_reconfigure_entry(), data_updates=data)
                 await self.async_set_unique_id(f"bitvavo_{markt}")
                 self._abort_if_unique_id_configured()
+                mand = data[CONF_BV_MARKTEN] == BV_MARKTEN_MAND
                 return self.async_create_entry(
-                    title=f"{markt} (Bitvavo {'live' if live else 'papier'})", data=data)
+                    title=(f"Bitvavo-mand {data[CONF_BV_AANTAL]} markten" if mand else markt)
+                    + f" ({'live' if live else 'papier'})", data=data)
 
         # De markten van Bitvavo als keuzelijst (alleen wat nu handelt).
         markten: list[str] = []
@@ -690,6 +701,15 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
         except VenueError as err:
             _LOGGER.debug("Bitvavo-marktlijst niet op te halen: %s", err)
         schema = vol.Schema({
+            vol.Required(CONF_BV_MARKTEN, default=BV_MARKTEN_MAND): SelectSelector(
+                SelectSelectorConfig(options=[BV_MARKTEN_MAND, BV_MARKTEN_EEN],
+                                     translation_key="bitvavo_markten",
+                                     mode=SelectSelectorMode.LIST)),
+            vol.Required(CONF_BV_AANTAL, default=DEFAULT_BV_AANTAL): _number(1, 60, 1, "markten"),
+            vol.Required(CONF_BV_MAX_POSITIES, default=DEFAULT_BV_MAX_POSITIES):
+                _number(1, 50, 1, "posities"),
+            vol.Required(CONF_BV_MIN_VOLUME, default=DEFAULT_BV_MIN_VOLUME):
+                _number(0, 100000000, 10000, "EUR"),
             vol.Required(CONF_BV_MARKT, default=DEFAULT_BV_MARKT): SelectSelector(
                 SelectSelectorConfig(options=markten or [DEFAULT_BV_MARKT], custom_value=True,
                                      mode=SelectSelectorMode.DROPDOWN, sort=True)),
@@ -708,6 +728,10 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="bitvavo", data_schema=schema, errors=errors,
             description_placeholders={"note": (
+                "Mand: de entry handelt op de meest liquide EUR-markten (op volume en "
+                "spread, elk uur herzien; de gekozen markt zit er altijd in), met hooguit "
+                "het ingestelde aantal posities over de hele mand en per koop hooguit de "
+                "maximale inzet. "
                 "Bitvavo heeft geen demo. 'paper' gebruikt de live koersen en het orderboek "
                 "van Bitvavo met de echte tarieven, zonder orders. 'live' plaatst echte "
                 "orders, maar pas nadat de laatste papieren run van deze markt de "

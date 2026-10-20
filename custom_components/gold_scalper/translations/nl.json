@@ -87,13 +87,17 @@
         "title": "Bitvavo verbinden (crypto)",
         "description": "{note}",
         "data": {
-          "bitvavo_markt": "Markt (bijv. BTC-EUR)",
+          "bitvavo_markt": "Markt (bij de mand: de vaste hoofdmarkt)",
           "timeframe": "Tijdsframe",
           "mode": "Modus",
           "bitvavo_key_secret": "Sleutelnaam API-sleutel in secrets.yaml",
           "bitvavo_geheim_secret": "Sleutelnaam API-geheim in secrets.yaml",
           "bitvavo_max_inzet": "Maximale inzet per koop",
-          "starting_balance": "Startsaldo op papier"
+          "starting_balance": "Startsaldo op papier",
+          "bitvavo_markten": "Markten",
+          "bitvavo_aantal_markten": "Aantal markten in de mand",
+          "bitvavo_max_posities": "Maximaal open posities (hele mand)",
+          "bitvavo_min_volume": "Minimale handel in 24 uur (EUR)"
         }
       }
     },
@@ -213,6 +217,12 @@
         "scalp": "Scalpen (minuten, tijdstop)",
         "combinatie": "Combinatie (daghandel + scalpen, beide echt)",
         "alles": "Alles (daghandel + scalpen + veldproef op 1m-30m, alles echt op demo)"
+      }
+    },
+    "bitvavo_markten": {
+      "options": {
+        "mand": "Mand: de meest liquide markten",
+        "een": "Alleen de gekozen markt"
       }
     }
   },

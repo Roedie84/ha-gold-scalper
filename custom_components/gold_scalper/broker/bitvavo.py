@@ -106,6 +106,12 @@ class BitvavoOnzeker(VenueError):
 #: Statussen van een order die niet meer kan uitvoeren.
 _WEG = ("canceled", "expired", "rejected", "cancelled")
 
+#: 2.18.0: saldi per API-sleutel, kort gedeeld tussen de markten van een mand
+#: (``/balance`` weegt 5 bij de verzoeklimiet; twintig markten vroegen het
+#: elk elke cyclus op).
+_SALDI: dict[str, tuple[float, dict]] = {}
+SALDI_GELDIG_S = 5.0
+
 STAND_PAPER = "paper"
 STAND_LIVE = "live"
 
@@ -282,6 +288,10 @@ class BitvavoVenue(ExecutionVenue):
         self._verzoeken = 0
         #: Kopen waarvan het antwoord uitbleef: ons kenmerk -> clientOrderId.
         self._onbevestigd: dict[str, str] = {}
+        #: 2.18.0: de waarde van wat de andere markten van de mand kochten
+        #: (callable, quote-valuta). Het vermogen is dan dat van de hele mand,
+        #: zodat de daglimiet niet schrikt van een koop op een andere markt.
+        self.mand_waarde = None
 
     # -- eigenschappen die de rest van Gold Scalper leest -------------------- #
 
@@ -456,8 +466,18 @@ class BitvavoVenue(ExecutionVenue):
 
     # -- rekening --------------------------------------------------------------- #
 
-    async def saldi(self) -> dict[str, tuple[float, float]]:
-        """symbool -> (vrij, in orders)."""
+    async def saldi(self, vers: bool = False) -> dict[str, tuple[float, float]]:
+        """symbool -> (vrij, in orders). ``vers``: niet uit de gedeelde cache
+        (vóór een order)."""
+        sleutel = f"{id(self._session)}:{hashlib.sha256(self._sleutel.encode()).hexdigest()[:16]}"
+        bewaard = _SALDI.get(sleutel)
+        if not vers and bewaard and time.monotonic() - bewaard[0] < SALDI_GELDIG_S:
+            return dict(bewaard[1])
+        uit = await self._haal_saldi()
+        _SALDI[sleutel] = (time.monotonic(), dict(uit))
+        return uit
+
+    async def _haal_saldi(self) -> dict[str, tuple[float, float]]:
         payload = await self._request("GET", "/balance", prive=True)
         uit = {}
         for r in payload if isinstance(payload, list) else []:
@@ -479,6 +499,11 @@ class BitvavoVenue(ExecutionVenue):
         # Alleen het geld van deze markt en wat de bot zelf kocht; eigen munten
         # van de gebruiker en andere munten tellen niet mee.
         waarde_munt = sum(float(r.get("units") or 0) for r in self._grootboek.values()) * bid
+        if callable(self.mand_waarde):
+            try:
+                waarde_munt += float(self.mand_waarde(self) or 0.0)
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Mandwaarde niet te bepalen", exc_info=True)
         return AccountSnapshot(
             balance=geld_vrij + geld_order,
             equity=geld_vrij + geld_order + waarde_munt,
@@ -606,7 +631,7 @@ class BitvavoVenue(ExecutionVenue):
         bedrag = float(hoeveel) * q.ask
         # Spot: niet meer kopen dan er vrij geld is (met ruimte voor het tarief).
         try:
-            vrij_geld = (await self.saldi()).get(self.quote_valuta, (0.0, 0.0))[0]
+            vrij_geld = (await self.saldi(vers=True)).get(self.quote_valuta, (0.0, 0.0))[0]
         except VenueError:
             vrij_geld = None
         if vrij_geld is not None and bedrag > vrij_geld * (1 - self.taker - 0.005):
@@ -817,7 +842,7 @@ class BitvavoVenue(ExecutionVenue):
 
         await self._bewaar()
         try:
-            vrij = (await self.saldi()).get(self.basis, (0.0, 0.0))[0]
+            vrij = (await self.saldi(vers=True)).get(self.basis, (0.0, 0.0))[0]
         except VenueError as err:
             await stop_terug()
             return OrderResult(success=False, ticket=ticket, error=f"Saldo niet op te halen: {err}")
@@ -977,6 +1002,69 @@ class BitvavoVenue(ExecutionVenue):
             "tarief_bron": self._tarief_bron, "max_inzet": self.max_inzet,
             "open_posities_grootboek": len(self._grootboek),
         }
+
+
+#: 2.18.0: munten die aan een munteenheid vastzitten. Daarop valt niets te
+#: verdienen behalve kosten; die komen nooit in de mand.
+STABIEL = frozenset({
+    "USDT", "USDC", "EURC", "EURS", "DAI", "PYUSD", "FDUSD", "TUSD", "USDP", "BUSD",
+    "EURT", "EURI", "USDE", "USDS", "RLUSD", "GUSD", "LUSD", "FRAX", "USD1",
+})
+
+
+def kies_markten(markten: list[dict], tickers: list[dict], quote: str, aantal: int,
+                 min_volume: float, max_spread_pct: float,
+                 verplicht: list[str] | None = None) -> list[dict]:
+    """2.18.0: de meest liquide markten voor de mand.
+
+    Alleen markten in ``quote`` (EUR) die nu handelen en een stoporder kennen,
+    geen stablecoins, met minstens ``min_volume`` handel in 24 uur en een
+    spread van hooguit ``max_spread_pct`` procent. Gesorteerd op volume, de
+    ``verplicht``-markten (de gekozen markt) altijd vooraan.
+    """
+    toegestaan = {}
+    for m in markten:
+        naam = str(m.get("market") or "").upper()
+        if not naam.endswith(f"-{quote.upper()}") or m.get("status") != "trading":
+            continue
+        soorten = m.get("orderTypes")
+        if soorten and "stopLoss" not in soorten:
+            continue
+        if naam.split("-")[0] in STABIEL:
+            continue
+        toegestaan[naam] = m
+    rijen = []
+    for t in tickers:
+        naam = str(t.get("market") or "").upper()
+        if naam not in toegestaan:
+            continue
+        try:
+            volume = float(t.get("volumeQuote") or 0)
+            bid, ask = float(t.get("bid") or 0), float(t.get("ask") or 0)
+        except (TypeError, ValueError):
+            continue
+        if bid <= 0 or ask <= 0 or ask < bid:
+            continue
+        spread = (ask - bid) / ((ask + bid) / 2) * 100
+        rijen.append({"market": naam, "volume": volume, "spread_pct": round(spread, 4)})
+    verplicht = [v.upper() for v in (verplicht or [])]
+    goed = [r for r in rijen if r["volume"] >= min_volume and r["spread_pct"] <= max_spread_pct
+            and r["market"] not in verplicht]
+    goed.sort(key=lambda r: r["volume"], reverse=True)
+    vooraan = [next((r for r in rijen if r["market"] == v), {"market": v, "volume": None, "spread_pct": None})
+               for v in verplicht]
+    return (vooraan + goed)[:max(len(vooraan), int(aantal))]
+
+
+async def mand_toppers(venue: "BitvavoVenue", aantal: int, min_volume: float,
+                       max_spread_pct: float, verplicht: list[str] | None = None) -> list[dict]:
+    """De mand ophalen: twee publieke verzoeken (alle markten, alle tickers)."""
+    markten = await venue.markten()
+    tickers = await venue._request("GET", "/ticker/24h")
+    if not isinstance(tickers, list):
+        raise VenueError("Bitvavo gaf geen 24-uurs tickers")
+    return kies_markten(markten, tickers, venue.quote_valuta, aantal, min_volume,
+                        max_spread_pct, verplicht)
 
 
 def _tick(markt: dict) -> float | None:

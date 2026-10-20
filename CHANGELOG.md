@@ -1,5 +1,19 @@
 # Changelog — Gold Scalper
 
+## 2.18.0 - 20-10-2026
+
+### Bitvavo-mand: handelen op de meest liquide markten
+- Gevraagd 20-10: "Ik wil dat de integratie op alle markten analyseert en zelf handelt, niet op alleen BTC". Gekozen: de meest liquide markten, met hooguit een aantal open posities en een inzet per koop.
+- Nieuw bij een Bitvavo-entry: *Markten* (`mand`, standaard, of `een` zoals in 2.17.0), het aantal markten (20), het maximum aantal open posities over de hele mand (5) en de minimale 24-uurshandel (250.000 EUR).
+- Samenstelling (`broker/bitvavo.py`: `kies_markten`, `mand_toppers`): twee publieke verzoeken (`/markets`, `/ticker/24h`), alleen EUR-markten die handelen en een stoporder kennen, geen stablecoins, spread hooguit 0,2 %, gesorteerd op volume; de gekozen markt altijd erbij. Elk uur opnieuw.
+- `mand.py`: elke markt draait als eigen handelslus (zelfde code als bij één markt, eigen database, run en grootboek). De gekozen markt heeft de entiteiten; de andere draaien zonder. Gedeeld: het maximum aantal posities (ook op papier, met een toegezegde plek tegen twee gelijktijdige instappen), de schakelaar, en de poort naar live op alle papieren trades van de mand samen. Een markt die uit de mand valt met een positie blijft draaien tot die dicht is en opent niets nieuws; markten met een positie komen na een herstart terug.
+- Sensor *Mand*: aantal markten, open posities, per markt koers, resultaat, volume, spread en de laatste weigering. In de brokerkeuze van het dashboard staat elke markt als *Bitvavo <markt>*.
+- Opgelost, ook voor IG en Pepperstone: de toestand (`gold_scalper_state`) en de uitkomsten (`gold_scalper_results`) waren per entry een eigen kopie van het hele bestand, gelezen bij het opstarten; elke entry schreef bij elke wijziging zijn kopie terug en zette daarmee de nieuwere toestand van de andere terug naar die van het opstarten (bijvoorbeeld een noodstop). Nu delen alle entries één inhoud.
+- Het barsarchief wacht ruimer op een slot (30 s): met de mand schrijven tientallen markten erin.
+- Veiligheid van de mand (uit de review): een noodstop bij één markt houdt de hele mand tegen; een koop zonder antwoord bezet een plek; het vermogen live is dat van de hele mand (geld plus alles wat de bot op alle markten kocht), zodat de daglimiet niet schrikt van een koop op een andere markt; een nieuwe markt telt mee en volgt de schakelaar al vóór zijn eerste cyclus; een markt wordt alleen gestopt als hij plat is, gecontroleerd binnen zijn eigen cyclusslot; markten met een positie worden nooit uit het bewaarde bestand vergeten; één herziening tegelijk; stoppen is veilig bij een herstart halverwege. De knoppen *Alles sluiten*, *Afwikkelen* en *Hervatten* gelden voor de hele mand; rapport, dashboard, backtest en import lopen één keer per entry, niet per markt. Geen uurbericht per markt. De poort blijft dicht als de afstemming bij één markt niet sluit. Saldi worden 5 s gedeeld tussen de markten (vóór een order altijd vers).
+- Een entry verwijderen wiste de toestand van alle andere entries (een nieuw, leeg object schreef het hele bestand terug); nu worden alleen die entry en zijn mandleden verwijderd, en een onleesbaar uitkomstenbestand wordt niet overschreven.
+- Tests: `test_v2180_mand.py` (19).
+
 ## 2.17.0 - 20-10-2026
 
 ### Bitvavo: handelen in crypto

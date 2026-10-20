@@ -161,7 +161,8 @@ def broker_keuzes(hass: HomeAssistant) -> list[dict]:
             or (getattr(entry, "options", None) or {}).get("mode")
         keuzes.append({
             "entry": entry.entry_id,
-            "naam": BROKER_NAMEN.get(venue, str(venue or getattr(entry, "title", "") or "?")),
+            "naam": (f"Bitvavo {getattr(c, 'symbol', '')}".strip() if venue == "bitvavo"
+                     else BROKER_NAMEN.get(venue, str(venue or getattr(entry, "title", "") or "?"))),
             "venue": venue,
             "modus": mode,
             "titel": getattr(entry, "title", None),
