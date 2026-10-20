@@ -480,6 +480,13 @@ function fmtS(v, d = 2) {
   return (v > 0 ? "+" : MIN) + s;
 }
 // 2.18.0: crypto: 91.234,50 maar ook 0,00001234 - decimalen naar grootte.
+// 2.18.4: met teken, decimalen naar grootte (punten bij crypto).
+function fmtSA(v) {
+  if (!isNum(v)) return "—";
+  const a = Math.abs(v);
+  const d = a === 0 || a >= 0.1 ? 2 : Math.min(10, 3 - Math.floor(Math.log10(a)) + 1);
+  return fmtS(v, d);
+}
 function fmtA(v) {
   if (!isNum(v)) return "—";
   const a = Math.abs(v);
@@ -1027,8 +1034,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
   _renderQuote(d) {
     const k = d.koers;
     this._q("#quote").innerHTML =
-      `<div class="qv"><div class="lbl">Bied</div><div class="px">${fmt(k.bied)}</div></div>` +
-      `<div class="qv"><div class="lbl">Laat</div><div class="px">${fmt(k.laat)}</div></div>`;
+      `<div class="qv"><div class="lbl">Bied</div><div class="px">${fmtA(k.bied)}</div></div>` +
+      `<div class="qv"><div class="lbl">Laat</div><div class="px">${fmtA(k.laat)}</div></div>`;
   }
 
   _renderMeldingen(d) {
@@ -1153,7 +1160,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
       if (sigs.length > 4) extra += `<span class="sig-w">${sigs.length} signalen, ${sigs.filter((s) => s.gehandeld).length} gehandeld:</span>`;
       extra += sigs.slice(0, 4).map((s) => `<span class="sig-w">${esc((s.strategie || "").replace(/^vp:/, ""))} ${s.richting === "long" ? "▲" : "▼"} ${s.gehandeld ? "gehandeld" : esc(s.reden || "overgeslagen")}</span>`).join("");
     }
-    this._q("#gkop").innerHTML = `<span class="big">${fmt(k.mid)}</span>${vk}<div class="ohlc">${ohlc}${extra}</div>`;
+    this._q("#gkop").innerHTML = `<span class="big">${fmtA(k.mid)}</span>${vk}<div class="ohlc">${ohlc}${extra}</div>`;
   }
 
   _renderPositie(d) {
@@ -1176,8 +1183,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
     if (isNum(p.sl) && isNum(p.tp) && isNum(p.koers) && p.tp !== p.sl) {
       const lo = Math.min(p.sl, p.tp), hi = Math.max(p.sl, p.tp);
       const pos = (x) => Math.max(0, Math.min(100, ((x - lo) / (hi - lo)) * 100));
-      const links = p.richting === "long" ? `SL ${fmt(p.sl)}` : `TP ${fmt(p.tp)}`;
-      const rechts = p.richting === "long" ? `TP ${fmt(p.tp)}` : `SL ${fmt(p.sl)}`;
+      const links = p.richting === "long" ? `SL ${fmtA(p.sl)}` : `TP ${fmtA(p.tp)}`;
+      const rechts = p.richting === "long" ? `TP ${fmtA(p.tp)}` : `SL ${fmtA(p.sl)}`;
       const lijn = p.richting === "long" ? "" : ' style="transform:scaleX(-1)"';
       slt = `<div class="slt"><div class="lijn"${lijn}></div><span class="e l">${links}</span><span class="e r">${rechts}</span>` +
         `<div class="mk" style="left:${pos(p.instap).toFixed(1)}%"></div><div class="nu" style="left:${pos(p.koers).toFixed(1)}%" title="huidige koers"></div></div>`;
@@ -1187,10 +1194,10 @@ class GoldScalperBrokerPanel extends HTMLElement {
       `<div class="pk-kop"><span class="zijde ${p.richting}">${p.richting.toUpperCase()}</span>${p.strategie ? `<span class="strat ${p.turbo ? "turbo" : stratKlasse(p.strategie)}">${stratLabel(p.strategie, p.turbo)}</span>` : ""}<b class="num">${fmt(p.units)} oz</b><span class="ticket">${esc(p.ticket)}</span></div>` +
       `<div><div class="pk-pnl ${toon(pnl)}">${fmtS(pnl)}<small>${esc(pv || "")}</small>${p.live ? '<span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}</div>` +
       (p.live && isNum(p.pnl_broker) ? `<div class="pk-sub">broker (per cyclus): ${fmtS(p.pnl_broker)} ${esc(vl || "")}</div>` : "") +
-      `<div class="pk-sub"><span class="${toon(p.punten)}">${fmtS(p.punten, 2)} pt</span> · instap ${fmt(p.instap)} → ${fmt(p.koers)}</div></div>` +
+      `<div class="pk-sub"><span class="${toon(p.punten)}">${fmtSA(p.punten)} pt</span> · instap ${fmtA(p.instap)} → ${fmtA(p.koers)}</div></div>` +
       slt +
-      `<div class="kv drie"><div><span class="lbl">Stop-loss</span><b class="neg">${fmt(p.sl)}</b><div class="s">${afstand(p.sl)}${isNum(p.sl_gewijzigd) ? ` · verplaatst ${this._hm(p.sl_gewijzigd)}${p.sl_wijzigingen > 1 ? ` (${p.sl_wijzigingen}×)` : ""}` : ""}</div></div>` +
-      `<div><span class="lbl">Take-profit</span><b class="pos">${fmt(p.tp)}</b><div class="s">${afstand(p.tp)}</div></div>` +
+      `<div class="kv drie"><div><span class="lbl">Stop-loss</span><b class="neg">${fmtA(p.sl)}</b><div class="s">${afstand(p.sl)}${isNum(p.sl_gewijzigd) ? ` · verplaatst ${this._hm(p.sl_gewijzigd)}${p.sl_wijzigingen > 1 ? ` (${p.sl_wijzigingen}×)` : ""}` : ""}</div></div>` +
+      `<div><span class="lbl">Take-profit</span><b class="pos">${fmtA(p.tp)}</b><div class="s">${afstand(p.tp)}</div></div>` +
       `<div><span class="lbl">Duur</span><b id="pk-duur">${duur(this._nu() - p.geopend)}</b><div class="s">sinds ${esc(this._hm(p.geopend))}</div></div></div>` +
       `<div class="aftel" id="pk-aftel"></div>`;
     this._renderAftel();
@@ -1239,7 +1246,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     let bereik = "";
     if (dag && isNum(dag.hoog) && isNum(dag.laag) && dag.hoog > dag.laag && isNum(k.mid)) {
       const pos = Math.max(0, Math.min(100, ((k.mid - dag.laag) / (dag.hoog - dag.laag)) * 100));
-      bereik = `<div><div class="lbl" style="display:flex;justify-content:space-between"><span>Dagbereik</span><span class="num" style="letter-spacing:0">${fmt(dag.laag)} – ${fmt(dag.hoog)}</span></div>` +
+      bereik = `<div><div class="lbl" style="display:flex;justify-content:space-between"><span>Dagbereik</span><span class="num" style="letter-spacing:0">${fmtA(dag.laag)} – ${fmtA(dag.hoog)}</span></div>` +
         `<div class="bereik"><div class="lijn"></div><div class="vul" style="left:0;width:${pos.toFixed(1)}%"></div><div class="nu" style="left:${pos.toFixed(1)}%"></div></div></div>`;
     }
     const leeft = isNum(k.leeftijd_s) ? `${fmt(k.leeftijd_s, 1)} s` : "—";
@@ -1247,8 +1254,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
       : st.koers_verouderd ? '<span class="chip let">koers verouderd</span>' : `<span class="chip"><span class="stip ok"></span>${esc(leeft)}</span>`;
     const sig = st.signaal;
     this._q("#markt").innerHTML =
-      `<div class="bl"><div class="bied"><div class="lbl">Bied</div><div class="px">${fmt(k.bied)}</div></div>` +
-      `<div class="laat"><div class="lbl">Laat</div><div class="px">${fmt(k.laat)}</div></div></div>` + bereik +
+      `<div class="bl"><div class="bied"><div class="lbl">Bied</div><div class="px">${fmtA(k.bied)}</div></div>` +
+      `<div class="laat"><div class="lbl">Laat</div><div class="px">${fmtA(k.laat)}</div></div></div>` + bereik +
       `<div class="rijen">` +
       `<div><span>Spread</span><b>${fmt(k.spread, 2)}</b></div>` +
       `<div><span>ATR (${esc(d.instrument.timeframe || "")})</span><b>${fmt(k.atr, 2)}</b></div>` +
@@ -1332,12 +1339,12 @@ class GoldScalperBrokerPanel extends HTMLElement {
         cel("Richting", `<span class="tag ${p.richting}">${p.richting.toUpperCase()}</span>`) +
         cel("Strategie", (p.strategie ? `<span class="strat ${p.turbo ? "turbo" : stratKlasse(p.strategie)}">${stratLabel(p.strategie, p.turbo)}</span>` : "—") +
           (p.bijkoop ? ' <span class="dim" title="Bijkoop (pyramide) van een andere positie">+ bijkoop</span>' : "")) +
-        cel("Units", fmtA(p.units), "r") + cel("Instap", fmt(p.instap), "r") +
-        cel("Koers", fmt(p.koers), "r") + cel("SL", fmt(p.sl) + (isNum(p.sl_gewijzigd) ? `<div class="dim" title="${esc(p.sl_reden || "")}">↕ ${this._hm(p.sl_gewijzigd)}${p.sl_wijzigingen > 1 ? ` (${p.sl_wijzigingen}×)` : ""}</div>` : ""), "r neg") + cel("TP", fmt(p.tp), "r pos") +
+        cel("Units", fmtA(p.units), "r") + cel("Instap", fmtA(p.instap), "r") +
+        cel("Koers", fmtA(p.koers), "r") + cel("SL", fmtA(p.sl) + (isNum(p.sl_gewijzigd) ? `<div class="dim" title="${esc(p.sl_reden || "")}">↕ ${this._hm(p.sl_gewijzigd)}${p.sl_wijzigingen > 1 ? ` (${p.sl_wijzigingen}×)` : ""}</div>` : ""), "r neg") + cel("TP", fmtA(p.tp), "r pos") +
         cel("P&amp;L", `<b>${fmtS(pnl)}</b> <span class="dim">${esc(pv || "")}</span>${p.live ? '<span class="ind" title="live, indicatief">live</span>' : ""}`, `r ${toon(pnl)}`) +
         cel("Gerealiseerd", ger === null ? "—" : `<b>${fmtS(ger)}</b> <span class="dim">${esc(bijSlV || "")}</span><div class="dim">deelwinst</div>`,
           `r ${ger === null ? "" : toon(ger)}`) +
-        cel("Punten", fmtS(p.punten), `r ${toon(p.punten)}`) +
+        cel("Punten", fmtSA(p.punten), `r ${toon(p.punten)}`) +
         cel("Bij SL", bijSl === null ? "—" : `<b>${fmtS(bijSl)}</b> <span class="dim">${esc(bijSlV || "")}</span>` +
           `<div class="dim">${bijSl >= 0 ? "vastgezet" : "risico"}</div>`,
           `r ${bijSl === null ? "" : toon(bijSl)}`) +
@@ -1458,7 +1465,7 @@ ${tl}
       const run = t.eerdere_run ? ` <span class="dim" title="Trade uit run ${esc(String(t.run))}; telt niet mee in de statistiek van de lopende run">· run ${esc(String(t.run))}</span>` : "";
       return `<tr>${cel("Gesloten", esc(this._dhm(t.sluit_t)) + run, "breed")}` +
         cel("Richting", `<span class="tag ${t.richting}">${t.richting.toUpperCase()}</span>`) +
-        cel("Units", fmt(t.units), "r") + cel("Instap", fmt(t.instap), "r") + cel("Uitstap", fmt(t.uitstap), "r") +
+        cel("Units", fmtA(t.units), "r") + cel("Instap", fmtA(t.instap), "r") + cel("Uitstap", fmtA(t.uitstap), "r") +
         cel("P&amp;L", `<b>${fmtS(t.pnl)}</b>${pa}`, `r ${toon(t.pnl)}`) +
         cel("Reden", esc(t.reden) + (t.reden === "Stop" && isNum(t.pnl) && t.pnl > 0 ? ' <span class="dim">· winst vastgezet</span>' : "") + (t.reden_bron === "afstemming" ? ' <span class="dim" title="achteraf ingevuld uit de afstemming met de broker">*</span>' : ""), "", "", t.reden_lang) +
         cel("Kosten", `${fmt(t.kosten)} <span class="tag ${b}">${b}</span>`, "r breed") +
@@ -1842,7 +1849,7 @@ ${tl}
       if (l.t === "entry") {
         const pnl = isNum(p.pnl_account) ? p.pnl_account : p.pnl;
         const v = isNum(p.pnl_account) ? (d.account.valuta || "") : iv;
-        tekst = `${p.strategie === "daghandel" ? "D " : p.strategie === "scalp" ? "S " : ""}${p.richting.toUpperCase()} ${fmt(p.units)} @ ${fmt(p.instap)}   ${fmtS(pnl)} ${v}`;
+        tekst = `${p.strategie === "daghandel" ? "D " : p.strategie === "scalp" ? "S " : ""}${p.richting.toUpperCase()} ${fmtA(p.units)} @ ${fmtA(p.instap)}   ${fmtS(pnl)} ${v}`;
       } else if (l.t === "sl") tekst = `SL ${fmt(l.v)}  (${fmtS((p.richting === "long" ? l.v - p.instap : p.instap - l.v) * p.units)} ${iv})`;
       else tekst = `TP ${fmt(l.v)}  (${fmtS((p.richting === "long" ? l.v - p.instap : p.instap - l.v) * p.units)} ${iv})`;
       // labels niet over elkaar
@@ -1862,7 +1869,7 @@ ${tl}
       const k = laatste.c >= laatste.o ? KLEUR.op : KLEUR.neer;
       g.strokeStyle = k; g.globalAlpha = 0.7; g.setLineDash([2, 3]); g.lineWidth = 1;
       g.beginPath(); g.moveTo(0, yy); g.lineTo(pw, yy); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
-      tag(mid, k, fmt(mid));
+      tag(mid, k, fmtA(mid));
     }
 
     // crosshair

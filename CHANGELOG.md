@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.18.4 - 20-10-2026
+
+### Mand: posities op risico, niet op de kleinste order
+- Gemeld 20-10 13:21 (screenshot): "Nog steeds mini posities?" Een positie op PUMP-EUR van 1.271 units, ruim 5 euro, ondanks een inzet tot 2.000 euro.
+- Oorzaak: bij *alles* krijgen veldproefopzetten de vaste scalpgrootte (1 oz, verkleind tot 100 USD risico). Bij crypto werd 1 "oz" de kleinste order van de exchange. Nu krijgt spot (Bitvavo) de gewone grootte op risico (risico per trade van het saldo, standaard 0,5 %), begrensd door de inzet per koop; schaduwtrades rekenen net zo. Goud verandert niet.
+- In het paneel stonden instap, koers, stop en doel bij goedkope munten als 0,00: alle koersen hebben nu decimalen naar grootte (goud blijft op twee). Punten idem.
+- Een papieren positie stond als *Daghandel*: op papier is het ticket het trade-ID en dat werd niet gekoppeld aan de database. Nu wel, dus de echte opzet (bijvoorbeeld vp:momentum:15m).
+- Tests: `test_v2184_grootte.py` (3).
+
 ## 2.18.3 - 20-10-2026
 
 ### Mand: geen instap tijdens het opstarten

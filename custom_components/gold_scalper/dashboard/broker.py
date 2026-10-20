@@ -381,6 +381,11 @@ def _dagverandering(c: dict | None, prijs, tz) -> dict | None:
 def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote,
                    delen: dict | None = None) -> list[dict]:
     per_ticket = {str(r.get("broker_ticket")): r for r in db_open if r.get("broker_ticket")}
+    # 2.18.4: op papier is het ticket het trade-ID (geen brokerticket); zonder
+    # dit stond elke papieren positie als de primaire strategie (Daghandel).
+    for r in db_open:
+        if r.get("id") is not None:
+            per_ticket.setdefault(str(r["id"]), r)
     bid = _num(getattr(quote, "bid", None))
     ask = _num(getattr(quote, "ask", None))
     uit = []

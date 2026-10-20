@@ -4189,7 +4189,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         return units
 
     def _scalp_vast(self, signal) -> bool:
-        """2.1.0: bij de combinatie krijgen scalptrades een vaste grootte."""
+        """2.1.0: bij de combinatie krijgen scalptrades een vaste grootte.
+
+        2.18.4: niet bij spot (Bitvavo). De vaste grootte is 1 oz (de
+        scalpgrootte), bij crypto werd dat de kleinste order van de exchange
+        (live gezien 20-10: 1.271 PUMP, ruim 5 euro). Daar geldt de gewone
+        grootte op risico, begrensd door de inzet per koop."""
+        if self._is_spot:
+            return False
         naam = (getattr(signal, "components", None) or {}).get("strategie")
         return self.combinatie and (
             naam == STRATEGIE_SCALP or veldproef_mod.is_veldproef(naam)
@@ -4218,6 +4225,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 self.sizing, basis, entry_price,
                 signal.stop_loss, signal.score, self.strategy_cfg.entry_threshold,
             )
+            max_inzet = getattr(self.venue, "max_inzet", None) if self._is_spot else None
+            if max_inzet and entry_price > 0:
+                # 2.18.4: schaduwtrades net zo groot als een echte instap.
+                return min(float(risico_plafond(sized.units, entry_price, signal.stop_loss)[0]),
+                           schaal_mod.omlaag(float(max_inzet) / entry_price, 0.1))
             return float(risico_plafond(sized.units, entry_price, signal.stop_loss)[0])
         except Exception:  # noqa: BLE001 - een schatting mag niets breken
             return float(self.units)
