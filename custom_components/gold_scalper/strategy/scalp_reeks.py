@@ -17,6 +17,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from . import schaal as _schaal
+
 
 @dataclass(slots=True)
 class ReeksConfig:
@@ -45,7 +47,8 @@ def stukken_nu(
     richting = 1.0 if side == "buy" else -1.0
     ref = last_price if last_price is not None else entry_price
     beweging = (current_price - ref) * richting
-    if beweging < cfg.stap_usd - 1e-9:
+    stap = _schaal.usd(cfg.stap_usd)   # 2.17.0: schaalt mee met het instrument
+    if beweging < stap - 1e-9:
         return 0
-    stappen = int(math.floor(beweging / cfg.stap_usd + 1e-9))
+    stappen = int(math.floor(beweging / stap + 1e-9))
     return max(0, min(stappen, cfg.per_cyclus, cfg.max_stukken - done))

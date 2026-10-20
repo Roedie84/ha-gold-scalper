@@ -16,6 +16,7 @@ Alles draait binnen HA. Er is geen tweede proces, geen bridge, geen Windows.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import functools
 import hashlib
 import json
@@ -89,6 +90,8 @@ from .const import (
     CONF_ENFORCE_TRADING_HOURS,
     CONF_EPIC, CONF_IDENTIFIER, CONF_PASSWORD, DEFAULT_EPIC, VENUE_CAPITAL, VENUE_IG,
     VENUE_CTRADER, CONF_CT_CLIENT_ID, CONF_CT_CLIENT_SECRET,
+    VENUE_BITVAVO, CONF_BV_KEY, CONF_BV_GEHEIM, CONF_BV_MARKT, CONF_BV_MAX_INZET,
+    DEFAULT_BV_MAX_INZET,
     CONF_CT_ACCESS_TOKEN, CONF_CT_REFRESH_TOKEN, CONF_CT_TRADER_LOGIN, CONF_CT_CTID,
     CONF_REGIME_SWITCHING, DEFAULT_ASSUMED_SPREAD, VENUE_PUBLIC,
     VENUE_STOOQ,
@@ -142,6 +145,7 @@ from .learning.robustness import evaluate_robustness
 from .learning.sessions import build_news_impact, build_sessions
 from .strategy.aggregator import BAR_SECONDS, QuoteAggregator, closed_only
 from .strategy import veldproef as veldproef_mod
+from .strategy import schaal as schaal_mod
 from .strategy import uitgezet_schaduw as uitgezet_mod
 from .strategy import bevestiging as bevestiging_mod
 from .strategy import turbo as turbo_mod
@@ -253,6 +257,21 @@ def deel_units(gevraagd: float, bevestigd) -> float:
     return b
 
 
+def _met_schaal(func):
+    """2.17.0: zet de prijs-/eenheidsschaal van deze coordinator voor de duur
+    van de aanroep en zet daarna de vorige terug. Zonder dat erft een
+    volgende coordinator in dezelfde taak (de diensten lopen over alle
+    entries) de schaal van deze."""
+    @functools.wraps(func)
+    async def omhulsel(self, *args, **kwargs):
+        token = schaal_mod.zet(self._schaal_nu())
+        try:
+            return await func(self, *args, **kwargs)
+        finally:
+            schaal_mod.terug(token)
+    return omhulsel
+
+
 class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     """Houdt de handelslus, de administratie en alle bewaking bij elkaar."""
 
@@ -268,6 +287,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if requested == TradingMode.BACKTEST.value:
             requested = TradingMode.PAPER.value
         self.requested_mode = TradingMode(requested)
+        # 2.17.0: Bitvavo heeft geen demo-account; demo betekent daar papier.
+        if (options.get(CONF_VENUE) == VENUE_BITVAVO
+                and self.requested_mode is TradingMode.DEMO):
+            self.requested_mode = TradingMode.PAPER
         self.mode = self.requested_mode
         self.mode_override_reason: str | None = None
         self.units: float = options.get(CONF_UNITS, DEFAULT_UNITS)
@@ -355,6 +378,23 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 max_units=options.get(CONF_MAX_UNITS, DEFAULT_MAX_UNITS),
                 tokens_bewaren=self._bewaar_ctrader_tokens,
             )
+        elif venue_name == VENUE_BITVAVO:
+            # 2.17.0: Bitvavo (crypto spot). Papier: live koersen, uitvoering
+            # gesimuleerd met de echte tarieven. Live: echte orders, pas na de
+            # bewijsfase (zie _refresh_gate).
+            from .broker.bitvavo import STAND_LIVE, STAND_PAPER, BitvavoVenue
+
+            self.symbol = options.get(CONF_BV_MARKT) or self.symbol
+            self.venue = BitvavoVenue(
+                session=async_get_clientsession(hass),
+                market=self.symbol,
+                api_key=options.get(CONF_BV_KEY) or None,
+                api_secret=options.get(CONF_BV_GEHEIM) or None,
+                stand=STAND_LIVE if self.mode.uses_real_money else STAND_PAPER,
+                trading_enabled=False,
+                max_inzet=options.get(CONF_BV_MAX_INZET, DEFAULT_BV_MAX_INZET),
+                bewaren=self._bewaar_bitvavo_posities,
+            )
         else:
             self.venue = OandaVenue(
                 session=async_get_clientsession(hass),
@@ -399,6 +439,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # IG/OANDA rekenen in de spread; cTrader (Pepperstone Razor) rekent
             # commissie per lot per zijde (2.9.3).
             commission_per_lot_per_side=_commissie_venue(self.venue),
+            # 2.17.0: crypto: geen aangenomen slippage in USD/oz; de spread en
+            # het tarief staan apart.
+            expected_slippage=0.0 if self._is_spot else 0.02,
             volume=self.units / CONTRACT_SIZE,
             # 1.9.0: tot zoveel posities per richting (besluit eigenaar).
             max_positions_per_richting=_per_richting(
@@ -455,6 +498,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             scale_with_confidence=options.get(CONF_SCALE_WITH_CONFIDENCE, False),
             max_units=options.get(CONF_MAX_UNITS, DEFAULT_MAX_UNITS),
         )
+        if self._is_spot:
+            # 2.17.0: bij crypto zegt een aantal munten niets (5 BTC of 5 SHIB);
+            # de grens is de inzet per koop (venue) en het risico tot de stop.
+            self.sizing.max_units = 1e12
+            self.risk.limits.max_volume = 1e12
+            self.executor.limits.max_volume = 1e12
         self.pyramid = PyramidConfig(
             enabled=options.get(CONF_PYRAMID_ENABLED, False),
             trigger_atr=options.get(CONF_PYRAMID_TRIGGER_ATR, 1.0),
@@ -591,7 +640,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: Omrekening tussen instrument- en accountvaluta. Wordt bij elke
         #: accountopvraging bijgewerkt; zolang de koers onbekend is, wordt er
         #: niet omgerekend maar gemeld dat het niet kan.
-        self.conversion = Conversion(instrument="USD")
+        # 2.17.0: crypto noteert in de valuta van de markt (BTC-EUR: EUR) en
+        # het saldo staat in diezelfde valuta: dan is er niets om te rekenen.
+        _valuta = getattr(self.venue, "instrument_currency", None)
+        self.conversion = (Conversion(instrument=_valuta, account=_valuta)
+                           if self._is_spot and _valuta else Conversion(instrument="USD"))
         self.last_sizing: dict = {}
 
         service = options.get(CONF_NOTIFY_SERVICE, NOTIFY_NONE)
@@ -773,8 +826,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     # -- opstarten ---------------------------------------------------------- #
 
+    @_met_schaal
     async def async_setup(self) -> None:
         """Toestand herstellen, database openen, historie ophalen, afstemmen."""
+        # 2.17.0: Bitvavo: grootboek terug en marktgegevens ophalen; daarna de
+        # schaal voor alles wat bij het opstarten rekent.
+        await self._laad_bitvavo_posities()
+        self._zet_schaal()
         instelling = self.candle_setting
         _LOGGER.info(
             "Candlebron: %s (build_from_quotes=%s, uit %s)",
@@ -850,6 +908,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         bestand = DATABASE_FILENAME
         if getattr(self.venue, "name", None) == VENUE_CTRADER:
             bestand = "gold_scalper_ctrader.db"
+        elif getattr(self.venue, "name", None) == VENUE_BITVAVO:
+            # 2.17.0: per markt een eigen database (eigen runs en statistiek).
+            bestand = f"gold_scalper_bitvavo_{self.symbol.lower().replace('-', '_')}.db"
         path = self.hass.config.path(bestand)
         self.db = TradeDatabase(path)
         await self.hass.async_add_executor_job(self.db.connect)
@@ -984,14 +1045,28 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # Slippage volgt de aangenomen spread: staat die op nul, dan is de
             # hele kostenkant uitgeschakeld en moet dat consistent zijn.
             spread = getattr(self.venue, "assumed_spread", 0.0)
-            self.paper = PaperBroker(
-                self.db, self.run_id, self.symbol, self.starting_balance,
-                BrokerCosts(
+            if self._is_spot:
+                # 2.17.0: Bitvavo op papier: de echte spread uit het orderboek,
+                # het echte tarief per zijde, geen hefboom en geen swap.
+                kosten = BrokerCosts(
+                    commission_per_lot_per_side=0.0,
+                    commission_rate=float(getattr(self.venue, "tarief_per_zijde", 0.0025)),
+                    base_slippage=0.0,
+                    volatility_slippage_factor=0.02,
+                    size_slippage_per_lot=0.0,
+                    swap_long_per_lot=0.0,
+                    swap_short_per_lot=0.0,
+                    leverage=1.0,
+                )
+            else:
+                kosten = BrokerCosts(
                     commission_per_lot_per_side=0.0,
                     base_slippage=0.0 if spread <= 0 else 0.02,
                     volatility_slippage_factor=0.0 if spread <= 0 else 0.05,
                     size_slippage_per_lot=0.0,
-                ),
+                )
+            self.paper = PaperBroker(
+                self.db, self.run_id, self.symbol, self.starting_balance, kosten,
             )
 
         # 1.7.5: wat uit de run zelf volgt terugzetten (papersaldo, laatste
@@ -1510,6 +1585,90 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             data={**self.entry.data, CONF_CT_ACCESS_TOKEN: access, CONF_CT_REFRESH_TOKEN: refresh},
         )
 
+    @property
+    def _is_spot(self) -> bool:
+        """2.17.0: een spot-venue (Bitvavo): alleen kopen, geen hefboom."""
+        return bool(getattr(getattr(self, "venue", None), "alleen_long", False))
+
+    def _schaal_nu(self, quote=None):
+        """2.17.0: de prijs- en eenheidsschaal van deze coordinator.
+
+        Goud: neutraal (alle vaste afstanden zoals ze waren). Crypto: de vaste
+        koersafstanden schalen met de koers mee, de eenheden komen van de
+        exchange en het tarief is een percentage. Zie strategy/schaal.py.
+        """
+        if not self._is_spot:
+            return schaal_mod.GOUD
+        koers = getattr(quote, "mid", None) or getattr(getattr(self, "_last_quote", None), "mid", None)
+        grenzen = None
+        f = getattr(self.venue, "broker_limits", None)
+        if callable(f):
+            try:
+                grenzen = f()
+            except Exception:  # noqa: BLE001
+                grenzen = None
+        if grenzen is not None and getattr(self.venue, "_markt", None) and getattr(self, "executor", None):
+            # De grenzen van de exchange, ook als de marktgegevens pas na het
+            # opstarten binnenkwamen.
+            self.executor.limits = grenzen
+        return schaal_mod.voor_markt(
+            koers or schaal_mod.REF_PRIJS,
+            getattr(grenzen, "volume_step", None),
+            getattr(grenzen, "min_volume", None),
+            float(getattr(self.venue, "tarief_per_zijde", 0.0) or 0.0),
+            spot=True,
+        )
+
+    def _zet_schaal(self, quote=None) -> None:
+        """2.17.0: de schaal voor de rest van deze cyclus (zie ``_async_refresh``)."""
+        schaal_mod.zet(self._schaal_nu(quote))
+
+    async def _async_refresh(self, *args, **kwargs):
+        """2.17.0: elke verversing met de eigen schaal, en daarna de vorige terug."""
+        token = schaal_mod.zet(self._schaal_nu())
+        try:
+            return await super()._async_refresh(*args, **kwargs)
+        finally:
+            schaal_mod.terug(token)
+
+    async def _bewaar_bitvavo_posities(self, inhoud) -> None:
+        """2.17.0: het grootboek van de Bitvavo-venue bewaren (overleeft een herstart)."""
+        store = getattr(self, "_bv_store", None)
+        if store is None:
+            from homeassistant.helpers.storage import Store
+
+            store = self._bv_store = Store(self.hass, 1, f"{DOMAIN}_bitvavo_{self.entry.entry_id}")
+        if isinstance(inhoud, list):
+            inhoud = {"posities": inhoud}
+        await store.async_save(inhoud)
+
+    async def _laad_bitvavo_posities(self) -> None:
+        if getattr(self.venue, "name", None) != VENUE_BITVAVO:
+            return
+        from homeassistant.helpers.storage import Store
+
+        self._bv_store = Store(self.hass, 1, f"{DOMAIN}_bitvavo_{self.entry.entry_id}")
+        try:
+            data = await self._bv_store.async_load() or {}
+        except Exception:  # noqa: BLE001 - een onleesbaar bestand is een leeg grootboek
+            _LOGGER.exception("Bitvavo-grootboek onleesbaar; leeg begonnen")
+            data = {}
+        for regel in data.get("posities") or []:
+            if regel.get("ticket"):
+                self.venue._grootboek[str(regel["ticket"])] = dict(regel)
+        for sleutel, regel in (data.get("gesloten") or {}).items():
+            self.venue._gesloten[str(sleutel)] = dict(regel)
+        try:
+            await self.venue.markt()
+            # Volumestap en minimum van de exchange voor de veiligheidslaag.
+            self.executor.limits = self.venue.broker_limits()
+            # Een koers vóór de afstemming bij het opstarten: die rekent al met
+            # de schaal van deze markt.
+            self._last_quote = await self.venue.quote(self.symbol)
+            self._zet_schaal(self._last_quote)
+        except VenueError as err:
+            _LOGGER.warning("Bitvavo-marktgegevens niet op te halen: %s", err)
+
     async def _vp_opwarmen(self) -> None:
         """2.4.0: veldproefbars opwarmen uit het archief, en waar dat te weinig
         heeft uit de koersgeschiedenis van Home Assistant (10-secondenkoersen)."""
@@ -1535,9 +1694,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 _LOGGER.debug("30m niet uit 15m op te bouwen: %s", err)
         tekort = [tf for tf, n in self.veldproef.aantal().items() if n < nodig]
         # 2.8.0: een broker met trendbars (cTrader) vult elk tijdvak zelf.
-        if tekort and getattr(self.venue, "name", None) == VENUE_CTRADER:
+        if tekort and getattr(self.venue, "name", None) in (VENUE_CTRADER, VENUE_BITVAVO):
             for tf in tekort:
                 try:
+                    if tf == "3m" and getattr(self.venue, "name", None) == VENUE_BITVAVO:
+                        # 2.17.0: Bitvavo kent geen 3m; uit 1m opbouwen.
+                        c1 = await self.venue.candles(self.symbol, "1m", 3 * veldproef_mod.MAX_BARS)
+                        c1 = closed_only(c1, datetime.now(timezone.utc).timestamp(), "1m")
+                        self.veldproef.vul(tf, veldproef_mod.hersample(c1, 180))
+                        continue
                     c = await self.venue.candles(self.symbol, tf, veldproef_mod.MAX_BARS)
                     c = closed_only(c, datetime.now(timezone.utc).timestamp(), tf)
                     self.veldproef.vul(tf, c)
@@ -1825,17 +1990,46 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if not result.consistent:
             self.risk.halt(result.message)
 
+    def _laatste_papieren_run(self) -> int | None:
+        """2.17.0: de meest recente papieren run in deze database, met dezelfde
+        strategie en dezelfde markt. Een bewijs van een andere opzet telt niet."""
+        versie = self.strategie_versie
+        for run in self.db.list_runs(limit=50):
+            if str(run.get("mode")) != TradingMode.PAPER.value:
+                continue
+            if str(run.get("strategy_version")) != str(versie):
+                continue
+            if str(run.get("symbol") or "").upper() != str(self.symbol or "").upper():
+                continue
+            return int(run["id"])
+        return None
+
     async def _refresh_gate(self) -> None:
         """Herbereken of live handel vrijgegeven mag worden."""
         if self.run_id is None:
             return
+        bewijs_run = self.run_id
+        if self._is_spot and self.mode.uses_real_money:
+            # 2.17.0: Bitvavo heeft geen demo. Live gaat pas open als de
+            # laatste papieren run van deze markt de bewijsfase haalde; zolang
+            # niet, gaat er geen enkele order uit.
+            bewijs_run = await self.hass.async_add_executor_job(self._laatste_papieren_run)
+            if bewijs_run is None:
+                self.gate = {
+                    "unlocked": False, "checks": {},
+                    "blocking_reasons": ["Nog geen papieren run voor deze markt: eerst op papier "
+                                         "de bewijsfase doorlopen (modus paper)."],
+                    "summary": "Live gesloten: geen papieren bewijsfase.",
+                }
+                self.venue.supports_trading = False
+                return
         trades = await self.hass.async_add_executor_job(
-            self.db.closed_trades, self.run_id
+            self.db.closed_trades, bewijs_run
         )
         stats = await self.hass.async_add_executor_job(
-            performance.compute_for_run, self.db, self.run_id, trades
+            performance.compute_for_run, self.db, bewijs_run, trades
         )
-        run = await self.hass.async_add_executor_job(self.db.get_run, self.run_id)
+        run = await self.hass.async_add_executor_job(self.db.get_run, bewijs_run)
         daily = performance.daily_breakdown(trades)
         self.gate = LiveGate().evaluate(
             stats, run or {}, daily, self.robustness, self._boekhouding_status(),
@@ -1859,6 +2053,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     def enabled(self) -> bool:
         return self._enabled
 
+    @_met_schaal
     async def async_set_enabled(self, value: bool) -> None:
         self._enabled = value
         await self._persist()
@@ -1962,6 +2157,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:  # noqa: BLE001 - meting mag de lus niet slopen
             _LOGGER.debug("Uitkomsten niet bewaard: %s", err)
 
+    @_met_schaal
     async def async_bewaar_resultaten(self) -> None:
         """Na een backtest, validatie of indicatorlab: meteen bewaren."""
         await self._bewaar_resultaten(direct=True)
@@ -2165,17 +2361,20 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             raise ValueError(f"onbekende richting {side!r}")
         return signal, quote, side, parse_utc(data["moment"])
 
+    @_met_schaal
     async def async_prepare_shutdown(self) -> dict:
         """Wikkel af zodat HA veilig herstart kan worden."""
         result = await self.lifecycle.drain(self._open_positions, self._close_position)
         await self.async_request_refresh()
         return result.as_dict()
 
+    @_met_schaal
     async def async_close_all(self) -> None:
         for position in await self._open_positions():
             await self._close_position(position, "handmatig")
         await self.async_request_refresh()
 
+    @_met_schaal
     async def async_new_run(self, note: str | None = None) -> int:
         """Begin bewust een nieuwe bewijsfase.
 
@@ -2222,6 +2421,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         await self.async_request_refresh()
         return self.run_id
 
+    @_met_schaal
     async def async_reset_day(self) -> str:
         """Begin de handelsdag opnieuw, zonder op middernacht te wachten."""
         balance = self.starting_balance
@@ -2243,6 +2443,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         await self.async_request_refresh()
         return bericht
 
+    @_met_schaal
     async def async_resume(self) -> bool:
         """Hervat na een noodstop. Bewust handmatig.
 
@@ -2512,6 +2713,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     return vastgehouden
                 raise UpdateFailed(f"Geen koers beschikbaar: {err}") from err
         self._last_quote = quote
+        self._zet_schaal(quote)
         budget.mark("quote")
 
         now = datetime.now(timezone.utc)
@@ -2764,7 +2966,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             )
             r_signal = None
             if self._candles is not None and len(self._candles) >= 60:
+                # 2.17.0: met de context mee, anders rekent de strategie in de
+                # werkthread met de neutrale (goud)schaal.
                 r_signal = await self.hass.async_add_executor_job(
+                    contextvars.copy_context().run,
                     self._beslisser(now, strategie), self._candles, quote.bid, quote.ask,
                     self.strategy_cfg, now.hour, eigen_open,
                     now.timestamp() - laatste_instap, 0, eigen_richting,
@@ -3508,7 +3713,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         atr = self.state.atr.value or 0.0
         if atr <= 0:
             return
-        cost = quote.spread + 0.04  # spread plus geschatte slippage beide zijden
+        # spread plus geschatte slippage beide zijden (2.17.0: geschaald, plus
+        # procentuele kosten bij crypto)
+        cost = (quote.spread + schaal_mod.usd(0.04)
+                + schaal_mod.commissie_rondreis_per_unit(quote.mid))
 
         for position in await self._open_positions():
             ticket = str(getattr(position, "ticket", None) or getattr(position, "id", ""))
@@ -3679,6 +3887,20 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return False
         side = "buy" if signal.direction == 1 else "sell"
         richting = 1 if side == "buy" else -1
+        # 2.17.0: spot (Bitvavo) kan niet short. Het signaal blijft bestaan
+        # (het voedt de omkeer-exit van een lopende long), maar er gaat geen
+        # order uit - ook niet op papier, anders meet de bewijsfase iets wat
+        # live nooit kan.
+        spot = bool(getattr(getattr(self, "venue", None), "alleen_long", False))
+        if spot and self.mode.uses_real_money and not (self.gate or {}).get("unlocked"):
+            # 2.17.0: live staat aan maar de poort is dicht: geen order, geen fout.
+            self._laatste_weigering = "live: poort nog dicht (eerst de papieren bewijsfase)"
+            return False
+        if side == "sell" and spot:
+            self._laatste_weigering = "spot: geen short mogelijk"
+            self._vp_bar_gebruikt(
+                (getattr(signal, "components", None) or {}).get("strategie", ""), signal)
+            return False
         # 2.12.0: kostenfilter voor de veldproef - geen trade als de kosten
         # een te groot deel van het risico tot de stop zijn.
         vp_naam = (getattr(signal, "components", None) or {}).get("strategie")
@@ -3736,6 +3958,21 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     "reason": (f"{(self.last_sizing or {}).get('reason', '')} Begrensd op "
                                f"{MAX_RISICO_PER_ORDER_USD:.0f} USD risico tot de stop: {units} oz.").strip(),
                 }
+            # 2.17.0: Bitvavo: hooguit de ingestelde inzet per koop, op papier
+            # net zo als live.
+            max_inzet = getattr(self.venue, "max_inzet", None)
+            if spot and max_inzet and entry_price > 0:
+                hooguit = schaal_mod.omlaag(float(max_inzet) / entry_price, 0.1)
+                if units > hooguit:
+                    units = hooguit
+                    self.last_sizing = {
+                        **(self.last_sizing or {}), "units": units, "capped_by": "max_inzet",
+                        "reason": (f"{(self.last_sizing or {}).get('reason', '')} Begrensd op de "
+                                   f"maximale inzet van {float(max_inzet):.2f} per koop.").strip(),
+                    }
+            if units <= 0:
+                self._laatste_weigering = "ordergrootte 0 na begrenzing"
+                return False
             _LOGGER.debug("Ordergrootte: %s", self.last_sizing.get("reason"))
             strategie = (getattr(signal, "components", None) or {}).get(
                 "strategie", self.primaire_strategie)
@@ -4375,6 +4612,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
             _LOGGER.debug("Tijdstopvarianten niet geladen: %s", err)
 
+    @_met_schaal
     async def async_afstemming_na_herstart(self) -> dict | None:
         """1.10.0: één keer afstemmen na het opstarten, ook bij een gesloten markt.
 
@@ -4414,6 +4652,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         except Exception as err:  # noqa: BLE001 - alleen weergave
             _LOGGER.debug("Afstemming niet doorgegeven aan de sensoren: %s", err)
 
+    @_met_schaal
     async def async_reconcile(self, dagen: float = 3.0) -> dict:
         """Leg de gesloten trades van de laatste dagen naast de broker.
 
@@ -5071,7 +5310,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         long = trade.side == "buy"
         richting = 1.0 if long else -1.0
         units = trade.volume * CONTRACT_SIZE
-        half = (trade.close_spread or 0.6) / 2.0
+        half = (trade.close_spread or schaal_mod.usd(0.6)) / 2.0
 
         trade.close_price = exit_price
         trade.close_mid = exit_price + (half if long else -half)
@@ -5159,7 +5398,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # administratie rekent in die laatste.
             trade.net_pnl = round(winst_account / koers, 4)
             trade.total_cost = round(
-                abs(trade.close_spread or 0.6) * units + self._commissie(units), 4
+                abs(trade.close_spread or schaal_mod.usd(0.6)) * units + self._commissie(units), 4
             )
             trade.gross_pnl = round(
                 (trade.net_pnl or 0) + (trade.total_cost or 0), 4
@@ -5785,7 +6024,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         long = getattr(position, "side", "buy") == "buy"
         price = quote.bid if long else quote.ask
-        costs = self.strategy_cfg.expected_slippage * 2 + quote.spread
+        costs = (self.strategy_cfg.expected_slippage * 2 + quote.spread
+                 + schaal_mod.commissie_rondreis_per_unit(quote.mid))
 
         decision = consider_addition(
             self.pyramid,
@@ -5907,7 +6147,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         for _ in range(n):
             now = datetime.now(timezone.utc)
             instap = quote.ask if long else quote.bid
-            doel = round(instap + richting * self.reeks.doel_usd, 2)
+            doel = schaal_mod.rond_prijs(instap + richting * schaal_mod.usd(self.reeks.doel_usd), 2)
             signaal = ScalpSignal(
                 direction=richting, score=0.0, confidence=0.0,
                 should_trade=True, reject_reason=None,
@@ -5977,8 +6217,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 spread = float(quote.ask) - float(quote.bid)
             except (TypeError, ValueError, AttributeError):
                 spread = 0.0
-        return round(max(0.0, spread) + self._commissie(1.0)
-                     + veldproef_mod.SLIP_PER_OZ, 4)
+        totaal = (max(0.0, spread) + self._commissie(1.0)
+                  + schaal_mod.usd(veldproef_mod.SLIP_PER_OZ))
+        return schaal_mod.rond_prijs(totaal, 4)
 
     def _noteer_kostenfilter(self, strategie: str, instap: float, stop, kosten: float) -> None:
         """2.12.0: tel overgeslagen veldproefsignalen per opzet."""
@@ -5996,7 +6237,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     def _commissie(self, units: float | None) -> float:
         """2.9.3: commissie rondreis (open + dicht) in USD voor ``units`` oz."""
         per_lot = _commissie_venue(self.venue)
-        return round(2 * per_lot * abs(float(units or 0)) / CONTRACT_SIZE, 4)
+        vast = 2 * per_lot * abs(float(units or 0)) / CONTRACT_SIZE
+        # 2.17.0: procentuele kosten (Bitvavo) tegen de laatste koers.
+        laatste = getattr(self, "_last_quote", None)
+        koers = getattr(laatste, "mid", None) if laatste else None
+        # Rechtstreeks uit de venue, niet uit de schaal: een boeking hoort het
+        # tarief van zijn eigen broker te gebruiken.
+        tarief = float(getattr(getattr(self, "venue", None), "tarief_per_zijde", 0.0) or 0.0) \
+            if getattr(getattr(self, "venue", None), "alleen_long", False) else 0.0
+        procent = 2.0 * tarief * float(koers or 0.0) * abs(float(units or 0))
+        return round(vast + procent, 4)
 
     def _turbo_start(self) -> None:
         """Abonneer op de IG-koersstroom (dezelfde als het paneel)."""
@@ -6128,6 +6378,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             laatste = (self._laatste_instap.get(STRATEGIE_SCALP, 0.0)
                        if self.combinatie else self._last_entry_ts)
             sig = await self.hass.async_add_executor_job(
+                contextvars.copy_context().run,
                 self._beslisser(now, STRATEGIE_SCALP), self._candles, bid, ask,
                 self.strategy_cfg, now.hour, len(eigen) + len(pending),
                 now.timestamp() - laatste, 0, tel_per_richting(eigen, pending),
@@ -6478,6 +6729,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     # -- afsluiten ---------------------------------------------------------- #
 
+    @_met_schaal
     async def async_shutdown_hook(self) -> None:
         """Bij het HA-stop-event en bij het ontladen: administratie veiligstellen.
 

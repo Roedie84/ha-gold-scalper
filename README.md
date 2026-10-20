@@ -105,6 +105,18 @@ Daarna Home Assistant herstarten en de integratie toevoegen via
 | Yahoo Finance | ja | nee |
 | Stooq | dagelijks | nee |
 | Simulator | synthetisch | gesimuleerd |
+| Pepperstone (cTrader) | ja | ja (demo) |
+| Bitvavo (crypto, 2.17.0) | ja, elke markt | papier, en live na de bewijsfase; alleen kopen (spot) |
+
+**Bitvavo** (2.17.0): kies bij *Integratie toevoegen* de databron Bitvavo en
+een markt (BTC-EUR, ETH-EUR, ...). Elke markt is een eigen entry met een eigen
+database. Bitvavo heeft geen demo: `paper` gebruikt de live koersen en het
+orderboek met de echte tarieven (0,25 % per zijde tot het werkelijke tarief van
+je rekening bekend is) zonder orders; `live` plaatst echte orders, maar pas als
+de laatste papieren run van die markt de bewijsfase haalde. Na elke koop staat
+er een stop bij Bitvavo; de bot verkoopt nooit meer dan hij zelf kocht.
+Sleutels in `secrets.yaml` (standaardnamen `bitvavo_api_key` en
+`bitvavo_api_secret`), met alleen lees- en handelsrechten, nooit opnemen.
 
 Zie `VENUES.md` en `BROKERS.md`.
 
@@ -175,7 +187,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **2.16.0** (zie `CHANGELOG.md`).
+Huidige versie: **2.17.0** (zie `CHANGELOG.md`).
 
 Sinds 2.0.0 is de standaardstrategie **daghandel** (trend op uurbasis, uiterlijk
 20:45 UTC dicht); scalpen blijft kiesbaar via de instelling *Strategie*, en sinds 2.1.0 ook

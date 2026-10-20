@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from . import schaal as _schaal
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -150,12 +151,13 @@ def position_size(
         units = cfg.max_units
         capped_by = "max_units"
         steps.append(f"begrensd op {cfg.max_units} oz")
-    if units < cfg.min_units:
-        units = cfg.min_units
+    minimum = _schaal.min_eenheden(cfg.min_units)
+    if units < minimum:
+        units = minimum
         capped_by = "min_units"
-        steps.append(f"opgehoogd naar het minimum {cfg.min_units} oz")
+        steps.append(f"opgehoogd naar het minimum {minimum} oz")
 
-    units = round(units, 2)
+    units = _schaal.rond_units(units, 2)
     return SizingResult(
         units=units,
         risk_amount=units * distance,

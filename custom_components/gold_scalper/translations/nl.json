@@ -82,6 +82,19 @@
           "timeframe": "Tijdsframe",
           "build_from_quotes": "Bars opbouwen uit live koersen (geen historie opvragen)"
         }
+      },
+      "bitvavo": {
+        "title": "Bitvavo verbinden (crypto)",
+        "description": "{note}",
+        "data": {
+          "bitvavo_markt": "Markt (bijv. BTC-EUR)",
+          "timeframe": "Tijdsframe",
+          "mode": "Modus",
+          "bitvavo_key_secret": "Sleutelnaam API-sleutel in secrets.yaml",
+          "bitvavo_geheim_secret": "Sleutelnaam API-geheim in secrets.yaml",
+          "bitvavo_max_inzet": "Maximale inzet per koop",
+          "starting_balance": "Startsaldo op papier"
+        }
       }
     },
     "error": {
@@ -190,7 +203,8 @@
         "ig": "IG (account nodig, kan echt handelen)",
         "capital": "Capital.com (account nodig, kan echt handelen)",
         "oanda": "OANDA (account nodig, EU-toegang onzeker)",
-        "ctrader": "Pepperstone / cTrader (account nodig, kan echt handelen)"
+        "ctrader": "Pepperstone / cTrader (account nodig, kan echt handelen)",
+        "bitvavo": "Bitvavo: crypto (account nodig voor live; papier zonder)"
       }
     },
     "strategie": {

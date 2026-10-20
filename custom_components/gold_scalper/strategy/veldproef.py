@@ -31,6 +31,7 @@ from ..analysis.signals import Candles
 from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, DEELWINST_FRACTIE, ExitConfig
 from .aggregator import BAR_SECONDS, QuoteAggregator
 from .scalping import ScalpConfig, ScalpSignal
+from . import schaal as _schaal
 
 VELDPROEF_VERSIE = "veldproef-2.1.0"  # 2.6.3: uitstap in R. 2.6.2: 2.6.2: grootte op risico, max 3 met risico per richting. 2.6.1: 2.6.1: groepsregel per tijdvak. 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.6: verliezende opzetten uit (1.5.0: break-even uiterlijk +1,5 USD)
 PREFIX = "vp:"
@@ -109,7 +110,7 @@ def min_stopafstand(kosten_per_oz: float | None) -> float:
         kosten = max(0.0, float(kosten_per_oz or 0.0))
     except (TypeError, ValueError):
         kosten = 0.0
-    return max(KOSTEN_MIN_STOP_USD, KOSTEN_STOP_FACTOR * kosten)
+    return max(_schaal.usd(KOSTEN_MIN_STOP_USD), KOSTEN_STOP_FACTOR * kosten)
 
 
 def stop_te_krap(instap: float, stop: float | None, kosten_per_oz: float | None) -> bool:
@@ -127,7 +128,9 @@ def grootte_op_risico(units: float, instap: float, stop: float | None) -> float:
     afstand = abs(float(instap) - float(stop))
     if afstand <= 0:
         return units
-    return max(1.0, min(units, math.floor(MAX_RISICO_PER_TRADE_USD / afstand * 10) / 10))
+    # 2.17.0: kleinste order en stap van het instrument (bij goud 1 oz en 0,1).
+    return max(_schaal.min_eenheden(1.0),
+               min(units, _schaal.omlaag(MAX_RISICO_PER_TRADE_USD / afstand, 0.1)))
 
 
 def loopt_risico(side: str, open_price: float | None, stop: float | None) -> bool:
@@ -280,8 +283,8 @@ def r_van(open_price, take_profit) -> float:
     try:
         r = abs(float(take_profit) - float(open_price)) / RR
     except (TypeError, ValueError):
-        return MIN_STOP_USD
-    return r if r > 0 else MIN_STOP_USD
+        return _schaal.usd(MIN_STOP_USD)
+    return r if r > 0 else _schaal.usd(MIN_STOP_USD)
 
 
 # -- indicatoren (op lijsten, laatste waarde) --------------------------------- #
@@ -583,15 +586,15 @@ def evalueer(
             sig.components = {**(sig.components or {}), "uitgezet": True}
             return sig
         return weiger("opzet_uitgezet", tekst)
-    if ask - bid > cfg.max_spread:
-        return weiger("spread_too_wide", f"Spread {ask - bid:.2f} boven {cfg.max_spread:.2f}")
+    if ask - bid > _schaal.usd(cfg.max_spread):
+        return weiger("spread_too_wide", f"Spread {ask - bid:.6g} boven {_schaal.usd(cfg.max_spread):.6g}")
     k = bars.kenmerken(tf)
     if k is None:
         return weiger("insufficient_data", f"{tf}: nog geen {MIN_BARS} bars")
     if k.atr <= 0:
         return weiger("insufficient_data", f"{tf}: geen ATR")
     d = k.richting.get(familie, 0)
-    onderdelen = {"tijdvak": tf, "familie": familie, "atr": round(k.atr, 3),
+    onderdelen = {"tijdvak": tf, "familie": familie, "atr": _schaal.rond_prijs(k.atr, 3),
                   "bar": k.ts, **{f"s_{f}": v for f, v in k.richting.items() if f == familie},
                   **instap_context(bars, tf, k)}
     if d == 0:
@@ -601,7 +604,7 @@ def evalueer(
         return weiger("al_gebruikt", f"{naam}: signaal van deze bar al gebruikt", d, onderdelen)
 
     instap = ask if d == 1 else bid
-    afstand = max(STOP_ATR * k.atr, MIN_STOP_USD)
+    afstand = max(STOP_ATR * k.atr, _schaal.usd(MIN_STOP_USD))
     # 2.4.8 (Ruud 13-10: "scalp moet kort, snel en kleine winsten pakken"):
     # het vaste winstdoel uit de instellingen geldt weer alleen voor scalp. De
     # veldproef houdt RR x de stop, passend bij het tijdvak van de opzet.
@@ -613,10 +616,10 @@ def evalueer(
         reason=(f"Veldproef {familie} op {tf}: {'long' if d == 1 else 'short'}, "
                 f"stop {STOP_ATR:g} x ATR ({afstand:.2f}), {doel_tekst}, "
                 f"hooguit {HOLD_BARS} bars"),
-        stop_loss=round(instap - d * afstand, 2),
-        take_profit=round(instap + d * doel, 2),
-        expected_move=round(doel, 3),
-        expected_cost=round(ask - bid + 2 * cfg.expected_slippage, 3),
+        stop_loss=_schaal.rond_prijs(instap - d * afstand, 2),
+        take_profit=_schaal.rond_prijs(instap + d * doel, 2),
+        expected_move=_schaal.rond_prijs(doel, 3),
+        expected_cost=_schaal.rond_prijs(ask - bid + 2 * cfg.expected_slippage, 3),
         components=onderdelen | {"strategie": naam},
     )
     if open_position_count >= 1:

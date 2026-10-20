@@ -23,6 +23,7 @@ from enum import Enum
 
 from ..timeutil import parse_utc, trading_day
 
+from ..strategy import schaal as _schaal
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -348,10 +349,11 @@ class RiskManager:
                 f"volume {volume} boven de limiet {self.limits.max_volume}"
             )
 
-        if spread > self.limits.max_spread:
+        grens = _schaal.usd(self.limits.max_spread)   # 2.17.0: schaalt met het instrument
+        if spread > grens:
             return False, (
-                f"spread {spread:.3f} boven de absolute vangnetgrens "
-                f"{self.limits.max_spread:.3f}"
+                f"spread {spread:.6g} boven de absolute vangnetgrens "
+                f"{grens:.6g}"
             )
 
         # Relatief aan de beweging: een spread van 0,80 is krap bij een ATR van

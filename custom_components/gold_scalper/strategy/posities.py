@@ -41,6 +41,7 @@ from __future__ import annotations
 import math
 from datetime import datetime
 from typing import Callable, Iterable
+from . import schaal as _schaal
 
 #: Minimale prijsafstand tot elke open positie in dezelfde richting, in ATR.
 MIN_SPREIDING_ATR = 0.3
@@ -186,7 +187,8 @@ def risico_plafond(units: float, instap: float | None, stop: float | None,
     afstand = abs(float(instap) - float(stop))
     if afstand <= 0:
         return units, False
-    maximaal = max(1.0, math.floor(plafond / afstand * 10) / 10)
+    # 2.17.0: kleinste order en stap van het instrument (bij goud 1 oz / 0,1).
+    maximaal = max(_schaal.min_eenheden(1.0), _schaal.omlaag(plafond / afstand, 0.1))
     if units > maximaal:
         return maximaal, True
     return units, False
@@ -256,7 +258,9 @@ def risicolimieten_ok(
     info["grens_totaal_pct"], info["grens_richting_pct"] = pct_totaal, pct_richting
     grens_totaal = equity_ref * pct_totaal / 100
     grens_richting = equity_ref * pct_richting / 100
-    grens_notional = equity_ref * MAX_NOTIONAL_X_EQUITY
+    # 2.17.0: spot kent geen hefboom: hooguit 1x de equity.
+    max_notional_x = 1.0 if _schaal.huidig().spot else MAX_NOTIONAL_X_EQUITY
+    grens_notional = equity_ref * max_notional_x
     if naar_account(totaal + nieuw_risico) > grens_totaal:
         return False, (f"open risico {naar_account(totaal + nieuw_risico):.0f} boven "
                        f"{pct_totaal:g}% ({grens_totaal:.0f})"), info
@@ -265,7 +269,7 @@ def risicolimieten_ok(
                        f"boven {pct_richting:g}% ({grens_richting:.0f})"), info
     if naar_account(notional + nieuw_notional) > grens_notional:
         return False, (f"notional in deze richting {naar_account(notional + nieuw_notional):.0f} boven "
-                       f"{MAX_NOTIONAL_X_EQUITY:g}x equity ({grens_notional:.0f})"), info
+                       f"{max_notional_x:g}x equity ({grens_notional:.0f})"), info
     return True, None, info
 
 
@@ -289,6 +293,9 @@ def marge_en_vloer_ok(
     nul betekent: niet gemeld, dan alleen de vloertoets.
     """
     open_posities = list(open_posities)
+    if _schaal.huidig().spot:
+        # 2.17.0: spot: het volle bedrag moet er zijn.
+        marge_factor = 1.0
     nieuw_afstand = abs(instap - stop) if stop is not None else 0.0
     marge_nodig = naar_account(units * prijs * marge_factor)
     open_risico = naar_account(sum(

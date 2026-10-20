@@ -8,7 +8,8 @@ PKG = Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalp
 
 def test_minimale_stop():
     assert vp.MIN_STOP_USD == 1.0
-    assert "afstand = max(STOP_ATR * k.atr, MIN_STOP_USD)" in (PKG / "strategy" / "veldproef.py").read_text()
+    # 2.17.0: de minimale stop schaalt mee met het instrument (goud: factor 1).
+    assert "afstand = max(STOP_ATR * k.atr, _schaal.usd(MIN_STOP_USD))" in (PKG / "strategy" / "veldproef.py").read_text()
 
 
 def test_afgewezen_niet_opnieuw():

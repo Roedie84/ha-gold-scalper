@@ -105,13 +105,31 @@ VENUE_IG: Final = "ig"
 VENUE_CAPITAL: Final = "capital"
 #: 2.8.0: Pepperstone (cTrader Open API).
 VENUE_CTRADER: Final = "ctrader"
+#: 2.17.0: Bitvavo (crypto spot).
+VENUE_BITVAVO: Final = "bitvavo"
 VENUES: Final = [
     VENUE_PUBLIC, VENUE_STOOQ, VENUE_SIMULATOR,
-    VENUE_IG, VENUE_CAPITAL, VENUE_OANDA, VENUE_CTRADER,
+    VENUE_IG, VENUE_CAPITAL, VENUE_OANDA, VENUE_CTRADER, VENUE_BITVAVO,
 ]
 
 #: Brokers die echt kunnen handelen; die krijgen live-modus aangeboden.
 TRADING_VENUES: Final = [VENUE_IG, VENUE_CAPITAL, VENUE_OANDA, VENUE_CTRADER]
+
+#: 2.17.0: Bitvavo. Net als bij cTrader staan de geheimen in secrets.yaml; de
+#: entry bewaart de sleutelnamen en een kopie van de waarden.
+CONF_BV_KEY_SECRET: Final = "bitvavo_key_secret"
+CONF_BV_GEHEIM_SECRET: Final = "bitvavo_geheim_secret"
+CONF_BV_KEY: Final = "bitvavo_api_key"
+CONF_BV_GEHEIM: Final = "bitvavo_api_secret"
+CONF_BV_MARKT: Final = "bitvavo_markt"
+#: Hard plafond per koop in de quote-valuta (euro's bij EUR-markten).
+CONF_BV_MAX_INZET: Final = "bitvavo_max_inzet"
+DEFAULT_BV_MAX_INZET: Final = 250.0
+DEFAULT_BV_MARKT: Final = "BTC-EUR"
+#: Startsaldo op papier voor een nieuwe Bitvavo-entry (euro's).
+DEFAULT_BV_STARTSALDO: Final = 10000.0
+#: Spreadgrens bij crypto, als goud-equivalent (USD bij 4000): 8 = 0,2 %.
+DEFAULT_BV_MAX_SPREAD: Final = 8.0
 
 #: 2.8.0: cTrader. De geheimen zelf staan in secrets.yaml; de entry bewaart
 #: de SLEUTELNAMEN plus een kopie van de tokens (die ververst de koppeling).
@@ -227,7 +245,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.16.0"
+INTEGRATION_VERSION: Final = "2.17.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

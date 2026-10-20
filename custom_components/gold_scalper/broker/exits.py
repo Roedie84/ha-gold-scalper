@@ -40,6 +40,7 @@ _LOGGER = logging.getLogger(__name__)
 # Uit const.py: één definitie, zodat de twee helften van de code
 # niet met verschillende eenheden kunnen gaan rekenen.
 from ..const import CONTRACT_SIZE
+from ..strategy import schaal as _schaal
 
 
 #: 2.5.1: minimale afstand tussen koers en een break-evenstop (USD/oz).
@@ -149,7 +150,7 @@ class ExitManager:
         c = self.config
         return profit_atr >= c.partial_close_trigger_atr or (
             c.partial_close_trigger_usd is not None
-            and profit_per_oz >= c.partial_close_trigger_usd - 1e-9
+            and profit_per_oz >= _schaal.usd(c.partial_close_trigger_usd) - 1e-9
         )
 
     @staticmethod
@@ -246,7 +247,7 @@ class ExitManager:
             winstslot_stop(
                 side, open_price, exit_price,
                 treden=self.config.winstslot_treden or WINSTSLOT_TREDEN,
-                schaal=atr if self.config.winstslot_in_atr else 1.0,
+                schaal=atr if self.config.winstslot_in_atr else _schaal.usd(1.0),
             )
             if self.config.winstslot and not deel_eerst
             else None
@@ -256,7 +257,7 @@ class ExitManager:
         if kandidaten:
             stop, reden = max(kandidaten, key=lambda k: k[0] * direction)
             if current_stop is None or (stop - current_stop) * direction > 1e-9:
-                return ExitAction("modify_stop", new_stop=round(stop, 3), reason=reden)
+                return ExitAction("modify_stop", new_stop=_schaal.rond_prijs(stop, 3), reason=reden)
 
         # --- Gedeeltelijk sluiten bij het eerste doel -------------------------
         if (
@@ -288,7 +289,7 @@ class ExitManager:
             # en de stop stond nog niet op de instap).
             gehaald = profit_atr >= self.config.breakeven_trigger_atr or (
                 self.config.breakeven_trigger_usd is not None
-                and profit_per_oz >= self.config.breakeven_trigger_usd - 1e-9
+                and profit_per_oz >= _schaal.usd(self.config.breakeven_trigger_usd) - 1e-9
             )
         if gehaald:
             buffer = round_trip_cost_per_oz * self.config.breakeven_buffer_cost_multiple
@@ -297,7 +298,7 @@ class ExitManager:
             # koers leggen (IG weigert dat, of de positie sluit meteen). Past
             # instap + kosten niet, dan de instap zelf; past ook die niet, dan
             # nog niets verplaatsen.
-            afstand = self.config.breakeven_min_afstand_usd - 1e-9
+            afstand = _schaal.usd(self.config.breakeven_min_afstand_usd) - 1e-9
             if afstand > 0 and (exit_price - breakeven) * direction < afstand:
                 buffer, breakeven = 0.0, open_price
             if afstand > 0 and (exit_price - breakeven) * direction < afstand:
@@ -305,7 +306,7 @@ class ExitManager:
             if current_stop is None or (breakeven - current_stop) * direction > 0:
                 return ExitAction(
                     "modify_stop",
-                    new_stop=round(breakeven, 3),
+                    new_stop=_schaal.rond_prijs(breakeven, 3),
                     reason=(
                         f"stop naar break-even plus kosten ({buffer:.3f} USD/oz); "
                         "deze trade kan vanaf nu niet meer verliezen"
@@ -359,6 +360,8 @@ def winstslot_stop(side: str, open_price: float, exit_price: float,
     Altijd minstens ``min_afstand`` van de koers (IG weigert een stop tegen
     de koers aan)."""
     d = 1.0 if side == "buy" else -1.0
+    # 2.17.0: een vaste koersafstand (USD/oz) schaalt mee met het instrument.
+    min_afstand = _schaal.usd(min_afstand)
     winst = (exit_price - open_price) * d
     fractie = None
     for vanaf, f in treden:
@@ -399,6 +402,7 @@ def omkeer_actie(side: str, open_price: float, bid: float, ask: float,
     d = 1 if side == "buy" else -1
     if not richting or richting != -d:
         return None
+    min_afstand = _schaal.usd(min_afstand)
     uit = bid if d == 1 else ask
     winst = (uit - open_price) * d
     if winst < min_afstand:
@@ -407,7 +411,7 @@ def omkeer_actie(side: str, open_price: float, bid: float, ask: float,
             reason=(f"signaal gedraaid, {'verlies beperkt' if winst < 0 else 'kleine winst genomen'} "
                     f"({winst:+.2f} USD/oz)"),
         )
-    nieuwe_stop = round(uit - d * min_afstand, 3)
+    nieuwe_stop = _schaal.rond_prijs(uit - d * min_afstand, 3)
     if current_stop is not None and (nieuwe_stop - current_stop) * d <= 0:
         return None
     return ExitAction(

@@ -23,6 +23,7 @@ from .broker.adapter import VenueError
 from .broker.ig_capital import CapitalVenue, IgVenue
 from .broker.oanda import OandaVenue
 from .broker.ctrader import CTraderVenue
+from .broker.bitvavo import STAND_LIVE, STAND_PAPER, BitvavoVenue
 from .geheimen import async_lees_geheimen
 from .broker.public_data import PublicDataVenue
 from .broker.stooq import StooqVenue
@@ -49,7 +50,10 @@ from .const import (
     TRADING_VENUES, VENUE_CAPITAL, VENUE_IG,
     CONF_SIM_SEED, CONF_SIM_SPREAD, CONF_VENUE,
     DEFAULT_SIM_SEED, DEFAULT_SIM_SPREAD, DEFAULT_VENUE, VENUES,
-    VENUE_OANDA, VENUE_SIMULATOR, VENUE_CTRADER,
+    VENUE_OANDA, VENUE_SIMULATOR, VENUE_CTRADER, VENUE_BITVAVO,
+    CONF_BV_KEY_SECRET, CONF_BV_GEHEIM_SECRET, CONF_BV_KEY, CONF_BV_GEHEIM, CONF_BV_MARKT,
+    CONF_BV_MAX_INZET, DEFAULT_BV_MAX_INZET, DEFAULT_BV_MARKT, DEFAULT_BV_STARTSALDO,
+    DEFAULT_BV_MAX_SPREAD,
     CONF_CT_CLIENT_ID_SECRET, CONF_CT_CLIENT_SECRET_SECRET, CONF_CT_ACCESS_SECRET,
     CONF_CT_REFRESH_SECRET, CONF_CT_ACCESS_TOKEN, CONF_CT_REFRESH_TOKEN,
     CONF_CT_TRADER_LOGIN, CONF_CT_CTID, DEFAULT_CT_SYMBOL, CONF_CT_CLIENT_ID, CONF_CT_CLIENT_SECRET, CONF_ENTRY_THRESHOLD, CONF_STRATEGIE, DEFAULT_STRATEGIE, STRATEGIEEN, CONF_SCALP_UNITS, DEFAULT_SCALP_UNITS, CONF_ENVIRONMENT, CONF_EQUITY_FLOOR_PCT,
@@ -111,6 +115,8 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_simulator()
             if venue == VENUE_CTRADER:
                 return await self.async_step_ctrader()
+            if venue == VENUE_BITVAVO:
+                return await self.async_step_bitvavo()
             return await self.async_step_oanda()
 
         return self.async_show_form(
@@ -606,6 +612,110 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
                 + (f"\n\nFoutdetails: {detail}" if detail else ""))},
         )
 
+    async def async_step_bitvavo(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """2.17.0: Bitvavo (crypto spot). De sleutels staan in secrets.yaml;
+        hier alleen de sleutelnamen. Op papier is geen sleutel nodig."""
+        errors: dict[str, str] = {}
+        detail = ""
+        sessie = async_get_clientsession(self.hass)
+        if user_input is not None:
+            markt = str(user_input[CONF_BV_MARKT]).strip().upper()
+            live = user_input[CONF_MODE] == TradingMode.LIVE.value
+            sleutels = [user_input[CONF_BV_KEY_SECRET], user_input[CONF_BV_GEHEIM_SECRET]]
+            geheimen = await async_lees_geheimen(self.hass, sleutels)
+            heeft = bool(geheimen.get(sleutels[0]) and geheimen.get(sleutels[1]))
+            if live and not heeft:
+                errors["base"] = "secret_missing"
+                detail = ("Voor live zijn de API-sleutel en het geheim nodig in secrets.yaml: "
+                          + ", ".join(k for k in sleutels if not geheimen.get(k)))
+            else:
+                try:
+                    venue = BitvavoVenue(
+                        sessie, markt,
+                        api_key=geheimen.get(sleutels[0]) if heeft else None,
+                        api_secret=geheimen.get(sleutels[1]) if heeft else None,
+                        stand=STAND_LIVE if live else STAND_PAPER,
+                    )
+                    info = await venue.markt()
+                    if info.get("status") != "trading":
+                        errors["base"] = "cannot_connect"
+                        detail = f"Markt {markt} handelt nu niet ({info.get('status')})."
+                    else:
+                        candles = await venue.candles(markt, user_input[CONF_TIMEFRAME], 120)
+                        if len(candles) < 60:
+                            errors["base"] = "insufficient_history"
+                        if heeft:
+                            # Sleutel nakijken: een saldo-opvraging (alleen lezen).
+                            await venue.account()
+                except (VenueError, ValueError) as err:
+                    errors["base"] = "cannot_connect"
+                    detail = str(err)
+                    _LOGGER.warning("Bitvavo-validatie faalde: %s", err)
+            if not errors:
+                data = {
+                    CONF_VENUE: VENUE_BITVAVO,
+                    CONF_SYMBOL: markt, CONF_BV_MARKT: markt,
+                    CONF_TIMEFRAME: user_input[CONF_TIMEFRAME],
+                    CONF_MODE: user_input[CONF_MODE],
+                    CONF_ENVIRONMENT: STAND_LIVE if live else STAND_PAPER,
+                    CONF_BV_KEY_SECRET: sleutels[0], CONF_BV_GEHEIM_SECRET: sleutels[1],
+                    CONF_BV_KEY: geheimen.get(sleutels[0]) if heeft else None,
+                    CONF_BV_GEHEIM: geheimen.get(sleutels[1]) if heeft else None,
+                    CONF_BV_MAX_INZET: float(user_input[CONF_BV_MAX_INZET]),
+                    CONF_STARTING_BALANCE: float(user_input[CONF_STARTING_BALANCE]),
+                    # Startinstellingen voor crypto: grootte op risico, geen
+                    # scalp (0,5 % kosten per rondreis), geen korte tijdvakken
+                    # in de veldproef, spreadgrens 0,2 % van de koers.
+                    CONF_RISK_BASED_SIZING: True, CONF_RISK_PER_TRADE_PCT: 0.5,
+                    CONF_SCALP_UIT: True, CONF_SCALP_TURBO: False, CONF_SCALP_REEKS: False,
+                    CONF_VP_TIJDVAKKEN_UIT: ["1m", "3m", "5m"],
+                    CONF_MAX_SPREAD: DEFAULT_BV_MAX_SPREAD,
+                }
+                if self.source == SOURCE_RECONFIGURE:
+                    return self.async_update_reload_and_abort(
+                        self._get_reconfigure_entry(), data_updates=data)
+                await self.async_set_unique_id(f"bitvavo_{markt}")
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(
+                    title=f"{markt} (Bitvavo {'live' if live else 'papier'})", data=data)
+
+        # De markten van Bitvavo als keuzelijst (alleen wat nu handelt).
+        markten: list[str] = []
+        try:
+            lijst = await BitvavoVenue(sessie, DEFAULT_BV_MARKT).markten()
+            markten = sorted(m["market"] for m in lijst
+                             if m.get("status") == "trading" and m.get("market"))
+        except VenueError as err:
+            _LOGGER.debug("Bitvavo-marktlijst niet op te halen: %s", err)
+        schema = vol.Schema({
+            vol.Required(CONF_BV_MARKT, default=DEFAULT_BV_MARKT): SelectSelector(
+                SelectSelectorConfig(options=markten or [DEFAULT_BV_MARKT], custom_value=True,
+                                     mode=SelectSelectorMode.DROPDOWN, sort=True)),
+            vol.Required(CONF_TIMEFRAME, default="1m"): SelectSelector(
+                SelectSelectorConfig(options=TIMEFRAMES, mode=SelectSelectorMode.DROPDOWN)),
+            vol.Required(CONF_MODE, default=TradingMode.PAPER.value): SelectSelector(
+                SelectSelectorConfig(options=[TradingMode.PAPER.value, TradingMode.LIVE.value],
+                                     mode=SelectSelectorMode.DROPDOWN)),
+            vol.Required(CONF_BV_KEY_SECRET, default="bitvavo_api_key"): str,
+            vol.Required(CONF_BV_GEHEIM_SECRET, default="bitvavo_api_secret"): str,
+            vol.Required(CONF_BV_MAX_INZET, default=DEFAULT_BV_MAX_INZET):
+                _number(5, 100000, 5, "EUR"),
+            vol.Required(CONF_STARTING_BALANCE, default=DEFAULT_BV_STARTSALDO):
+                _number(100, 10000000, 100, "EUR"),
+        })
+        return self.async_show_form(
+            step_id="bitvavo", data_schema=schema, errors=errors,
+            description_placeholders={"note": (
+                "Bitvavo heeft geen demo. 'paper' gebruikt de live koersen en het orderboek "
+                "van Bitvavo met de echte tarieven, zonder orders. 'live' plaatst echte "
+                "orders, maar pas nadat de laatste papieren run van deze markt de "
+                "bewijsfase haalde. Alleen kopen (spot). Maak in Bitvavo een sleutel met "
+                "alleen lees- en handelsrechten, nooit opnemen, en zet hem in secrets.yaml."
+                + (f"\n\nFoutdetails: {detail}" if detail else ""))},
+        )
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -628,6 +738,8 @@ class GoldScalperConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_simulator()
             if venue == VENUE_CTRADER:
                 return await self.async_step_ctrader()
+            if venue == VENUE_BITVAVO:
+                return await self.async_step_bitvavo()
             return await self.async_step_oanda()
 
         entry = self._get_reconfigure_entry()
@@ -778,7 +890,10 @@ class GoldScalperOptionsFlow(OptionsFlow):
         # geïmplementeerd en gedraagt zich identiek aan paper. Een keuze tonen
         # die niets verandert, wekt de indruk dat er iets anders gebeurt.
         venue = current.get(CONF_VENUE, DEFAULT_VENUE)
-        if venue in TRADING_VENUES:
+        if venue == VENUE_BITVAVO:
+            # 2.17.0: Bitvavo kent geen demo-account.
+            available_modes = [TradingMode.PAPER.value, TradingMode.LIVE.value]
+        elif venue in TRADING_VENUES:
             # Demo staat tussen paper en live: echte orders, gemeten kosten,
             # geen geld. Dat is de enige manier om te toetsen of de aannames
             # van de papersimulatie kloppen.

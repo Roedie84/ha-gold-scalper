@@ -32,6 +32,7 @@ from typing import Mapping, Sequence
 
 from ..storage.database import Trade
 from .adapter import VenuePosition
+from ..strategy import schaal as _schaal
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +51,10 @@ def afrondingsverschil(broker_units, database_units) -> bool:
         verschil = abs(float(broker_units) - float(database_units))
     except (TypeError, ValueError):
         return False
+    stap = _schaal.huidig().eenheid_stap
+    if stap:
+        # 2.17.0: crypto: tot één stap van de exchange.
+        return _schaal.gesloten_drempel(SIZE_TOLERANCE) < verschil <= stap * 1.01
     return SIZE_TOLERANCE < verschil <= AFRONDING_MAX
 
 
@@ -193,7 +198,7 @@ def compare_positions(
 
         expected_units = trade.volume * CONTRACT_SIZE
         if size_is_known(position.units) and \
-                abs(expected_units - position.units) > SIZE_TOLERANCE:
+                abs(expected_units - position.units) > _schaal.gesloten_drempel(SIZE_TOLERANCE):
             audit.findings.append(Finding(
                 "kritiek", "omvang_verschilt",
                 f"Positie {ticket}: broker meldt {position.units}, database "

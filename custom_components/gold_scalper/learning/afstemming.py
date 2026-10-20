@@ -390,7 +390,7 @@ def _overname(trade: Trade, match: dict, contract_size: float) -> tuple[dict, st
     units = (trade.volume or 0) * contract_size
     omvang = _omvang(match)
     if omvang is not None and abs(omvang - units) > OMVANG_TOLERANTIE:
-        velden["volume"] = round(omvang / contract_size, 6)
+        velden["volume"] = round(omvang / contract_size, 12)
         units = omvang
 
     richting = 1.0 if trade.side == "buy" else -1.0

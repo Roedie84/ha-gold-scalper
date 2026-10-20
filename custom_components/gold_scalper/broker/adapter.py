@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ..analysis.signals import Candles
+from ..strategy import schaal as _schaal
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,7 +75,9 @@ def size_says_closed(units) -> bool:
         return False
     if math.isnan(waarde) or math.isinf(waarde):
         return False
-    return abs(waarde) <= 0.005
+    # 2.17.0: bij crypto is 0,003 BTC een echte positie; de drempel komt dan
+    # van de kleinste stap van de exchange.
+    return abs(waarde) <= _schaal.gesloten_drempel(0.005)
 
 
 def size_is_known(units) -> bool:

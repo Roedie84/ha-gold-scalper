@@ -36,6 +36,8 @@ REDACT = {
     # 2.8.0: cTrader (de sleutelnamen zelf zijn geen geheim, maar staan erbij
     # zodat de test alles dekt wat "secret" of "token" heet).
     "ctrader_client_id", "ctrader_client_secret", "ctrader_access_token",
+    # 2.17.0: Bitvavo
+    "bitvavo_api_key", "bitvavo_api_secret", "bitvavo_key_secret", "bitvavo_geheim_secret",
     "ctrader_refresh_token", "ctrader_trader_login", "ctrader_client_id_secret",
     "ctrader_client_secret_secret", "ctrader_access_token_secret",
     "ctrader_refresh_token_secret", "ctrader_ctid",

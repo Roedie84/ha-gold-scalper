@@ -36,6 +36,8 @@ zag. Geen extra verzoeken bij de broker.
 
 from __future__ import annotations
 
+from . import schaal as _schaal
+
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from typing import Iterable
@@ -190,7 +192,7 @@ class VariantenBoek:
         """
         gewijzigd: list[VariantTrade] = []
         managers = {v: self.manager(v) for v in VARIANTEN}
-        rondreis = (ask - bid) + self.slippage_rondreis
+        rondreis = (ask - bid) + _schaal.usd(self.slippage_rondreis)
         for t in list(self.open_trades):
             geopend = _tijd(t.open_time)
             met_uitersten = not (

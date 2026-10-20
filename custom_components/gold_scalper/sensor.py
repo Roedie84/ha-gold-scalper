@@ -429,6 +429,10 @@ class ScalperSensorEntity(GoldScalperEntity, SensorEntity):
         super().__init__(coordinator, entry)
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        # 2.17.0: bij crypto (Bitvavo BTC-EUR) is het resultaat in euro's.
+        valuta = getattr(getattr(coordinator, "conversion", None), "instrument", None)
+        if description.native_unit_of_measurement == "USD" and valuta and valuta != "USD":
+            self._attr_native_unit_of_measurement = valuta
 
     @property
     def available(self) -> bool:

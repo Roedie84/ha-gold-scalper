@@ -67,6 +67,8 @@ class BrokerCosts:
     #: Reken hier met wat je wérkelijk krijgt, anders klopt je margeberekening
     #: niet en denkt de simulatie dat er ruimte is die er niet is.
     leverage: float = 20.0
+    #: 2.17.0: kosten per zijde als fractie van het bedrag (Bitvavo: 0,0025).
+    commission_rate: float = 0.0
 
 
 @dataclass(slots=True)
@@ -181,6 +183,7 @@ class PaperBroker:
         direction = 1.0 if trade.side == "buy" else -1.0
         gross = (exit_price - trade.open_price) * direction * trade.volume * CONTRACT_SIZE
         exit_commission = self.costs.commission_per_lot_per_side * trade.volume
+        exit_commission += self.costs.commission_rate * exit_price * trade.volume * CONTRACT_SIZE
         return gross - exit_commission
 
     # -- execution ---------------------------------------------------------- #
@@ -249,6 +252,7 @@ class PaperBroker:
             )
 
         commission = self.costs.commission_per_lot_per_side * volume
+        commission += self.costs.commission_rate * fill * volume * CONTRACT_SIZE
         spread_cost = quote.spread * volume * CONTRACT_SIZE
         slippage_cost = slippage * volume * CONTRACT_SIZE
 
@@ -297,6 +301,7 @@ class PaperBroker:
 
         units = trade.volume * CONTRACT_SIZE
         exit_commission = self.costs.commission_per_lot_per_side * trade.volume
+        exit_commission += self.costs.commission_rate * fill * units
         swap = self._swap(trade, quote.time)
 
         # Netto: wat je werkelijk overhoudt. De fills liggen al op ask/bid en

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from . import schaal as _schaal
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -159,8 +160,8 @@ def consider_addition(
 
     return PyramidDecision(
         add=True,
-        units=round(units, 2),
-        new_stop=round(new_stop, 3),
+        units=_schaal.rond_units(units, 2),
+        new_stop=_schaal.rond_prijs(new_stop, 3),
         reason=(
             f"winst {profit_atr:.2f}xATR bevestigt de richting; {units:.2f} oz "
             f"toegevoegd (toevoeging {additions_done + 1} van "

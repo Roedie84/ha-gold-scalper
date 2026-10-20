@@ -1,5 +1,21 @@
 # Changelog — Gold Scalper
 
+## 2.17.0 - 20-10-2026
+
+### Bitvavo: handelen in crypto
+- Gevraagd 20-10: "Kunnen we bitvavo ook integreren? Om ook in crypto te handelen?" en "Direct compleet maken, zodat met alles gehandeld kan worden en dat ik eventueel zou kunnen overstappen naar echt geld, ik heb al een API".
+- Nieuwe databron `bitvavo` (`broker/bitvavo.py`, REST API v2, HMAC-SHA256 zoals de officiele SDK): elke markt van Bitvavo te kiezen (keuzelijst uit `/markets`), per markt een eigen entry en database (`gold_scalper_bitvavo_<markt>.db`).
+- Twee standen. `paper`: live koersen en orderboek, uitvoering gesimuleerd met het tarief per zijde (0,25 %, daarna het werkelijke tarief uit `/account/fees`), geen hefboom, geen swap; geen sleutel nodig. `live`: echte orders, alleen als de laatste papieren run van die markt de bewijsfase (LiveGate) haalde; zolang niet gaat er niets uit (geen fout, een weigeringsreden). Bitvavo heeft geen demo; `demo` geldt daar als papier.
+- Spot: alleen kopen. Een short-signaal opent niets (ook op papier niet, anders meet de bewijsfase iets wat live niet kan); het blijft de omkeer-exit van een lopende long voeden. De venue weigert `sell` als opening sowieso.
+- Bitvavo kent geen posities: de bot houdt een grootboek bij (elke koop een regel, order-ID als ticket), bewaard in `.storage` en teruggezet na een herstart. Na elke koop een `stopLoss`-order bij Bitvavo (beste bieding); een afgegane stop sluit de regel. Sluiten: eerst de stop annuleren, dan precies de gekochte hoeveelheid verkopen, nooit meer dan vrij is - eigen munten blijven onaangeroerd. Onbevestigde kopen worden op hun clientOrderId teruggevonden. `operatorId` bij elke handelsopdracht.
+- Grenzen: hooguit de ingestelde inzet per koop (standaard 250 EUR), nooit meer dan het vrije geld, en de kleinste order en stap van de markt.
+- Schaal (`strategy/schaal.py`): de vaste afstanden in USD/oz uit de goudstrategieen (minimale stop, break-even, winstslot, deelwinst, spreadgrenzen, slippage) schalen met de koers mee (factor koers / 4000), koersen worden op significante cijfers afgerond in plaats van op 2-3 decimalen, eenheden volgen de stap van de exchange en procentuele kosten tellen mee in de kostenpoort, het veldproef-kostenfilter, de schaduwtrades en de papiersimulatie. Voor goud verandert er niets: zonder Bitvavo geldt de neutrale schaal en geven alle functies exact wat ze gaven.
+- Startinstellingen voor een Bitvavo-entry: grootte op risico (0,5 %), scalp uit (0,5 % kosten per rondreis), veldproef zonder 1m/3m/5m, spreadgrens 0,2 % van de koers. 3m-bars worden uit 1m opgebouwd.
+- Bedragen in de sensoren in de valuta van de markt (EUR).
+- Veiligheid bij echt geld: sluiten verkoopt pas als vaststaat dat de stop bij Bitvavo weg is (anders twee keer verkopen); een mislukte verkoop zet de stop terug; een stop verplaatsen controleert eerst of de oude al afging. Geen antwoord of time-out: de order wordt op een vaste clientOrderId teruggezocht en nooit blind herhaald, ook na een herstart. Een duidelijk nee (saldo, minimum) is een gewone weigering. Kosten in de munt zelf gaan van de positie af. Het vermogen telt alleen het geld van de markt en wat de bot kocht, niet je eigen munten. Live alleen in de stand `live`, en het bewijs moet een papieren run zijn met dezelfde strategie en markt.
+- De schaal geldt per entry en per aanroep (verversing en diensten) en wordt daarna teruggezet, zodat goud nooit de schaal van een crypto-entry erft. De commissie van een boeking komt rechtstreeks uit de eigen venue.
+- Tests: `test_v2170_bitvavo.py` (39), waaronder een volledige handelslus op papier met een spot-venue. Volledige suite: 1837 geslaagd, 5 overgeslagen.
+
 ## 2.16.0 - 19-10-2026
 
 ### Experiment Lab verwijderd

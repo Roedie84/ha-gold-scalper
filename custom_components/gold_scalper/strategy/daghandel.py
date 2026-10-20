@@ -35,6 +35,7 @@ from ..analysis.signals import Candles
 from ..broker.exits import BREAKEVEN_MIN_AFSTAND_USD, BREAKEVEN_UITERLIJK_USD, ExitConfig, deelwinst_velden
 from ..analysis.volatility import atr
 from .scalping import ScalpConfig, ScalpSignal
+from . import schaal as _schaal
 
 #: In runs.strategy_version; een andere strategie is altijd een nieuwe run.
 STRATEGIE_VERSIE = "daghandel-1.6.0"  # 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.5: 2.5.5: break-even 1 x ATR15 of +1,5 USD
@@ -160,9 +161,9 @@ def evaluate_daghandel(
     if len(candles) < KANAAL_BARS + 1:
         return weiger("insufficient_data", f"Slechts {len(candles)} candles beschikbaar")
     spread = ask - bid
-    if spread > cfg.max_spread:
+    if spread > _schaal.usd(cfg.max_spread):
         return weiger("spread_too_wide",
-                      f"Spread {spread:.3f} boven de absolute limiet {cfg.max_spread:.3f}")
+                      f"Spread {spread:.6g} boven de absolute limiet {_schaal.usd(cfg.max_spread):.6g}")
 
     s = stand(candles, cfg)
     onderdelen = {
@@ -170,7 +171,7 @@ def evaluate_daghandel(
         "ema20_uur": None if s.ema_snel is None else round(s.ema_snel, 3),
         "ema50_uur": None if s.ema_traag is None else round(s.ema_traag, 3),
         "kanaal_hoog": s.kanaal_hoog, "kanaal_laag": s.kanaal_laag,
-        "atr": None if s.atr15 is None else round(s.atr15, 3),
+        "atr": None if s.atr15 is None else _schaal.rond_prijs(s.atr15, 3),
         "spread_atr_ratio": None if not s.atr15 else round(spread / s.atr15, 3),
     }
     if s.ema_snel is None or s.ema_traag is None:
@@ -225,12 +226,12 @@ def evaluate_daghandel(
             f"Stop {STOP_ATR15:g} x ATR ({STOP_ATR15 * s.atr15:.2f} USD/oz), "
             f"volgstop {VOLGSTOP_ATR15:g} x ATR vanaf {VOLGSTOP_VANAF_ATR15:g} x ATR winst, dicht om 20:45 UTC"
         ),
-        stop_loss=round(stop, 3),
+        stop_loss=_schaal.rond_prijs(stop, 3),
         # 2.4.8 (Ruud 13-10: "scalp moet kort, snel en kleine winsten
         # pakken"): geen vast doel meer; de volgstop en 20:45 UTC beslissen.
         take_profit=None,
-        expected_move=round(STOP_ATR15 * s.atr15, 3),
-        expected_cost=round(spread + 2 * cfg.expected_slippage, 3),
+        expected_move=_schaal.rond_prijs(STOP_ATR15 * s.atr15, 3),
+        expected_cost=_schaal.rond_prijs(spread + 2 * cfg.expected_slippage, 3),
         components=onderdelen,
     )
     if open_position_count >= 1:

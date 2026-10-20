@@ -31,6 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 
 STRATEGY_VERSION = "scalp-0.4.0"  # 2.5.9: deelwinst; 2.5.7: winstslot
 
+from . import schaal as _schaal
 CONTRACT_SIZE = 100.0
 
 
@@ -332,10 +333,10 @@ def evaluate(
     if len(candles) < 60:
         return reject("insufficient_data", f"Slechts {len(candles)} candles beschikbaar")
 
-    if spread > cfg.max_spread:
+    if spread > _schaal.usd(cfg.max_spread):
         return reject(
             "spread_too_wide",
-            f"Spread {spread:.3f} boven de absolute limiet {cfg.max_spread:.3f}",
+            f"Spread {spread:.6g} boven de absolute limiet {_schaal.usd(cfg.max_spread):.6g}",
         )
 
     if cfg.enforce_trading_hours:
@@ -559,11 +560,11 @@ def evaluate(
 
     # Vaste afstand wint als hij is ingesteld; anders schaalt hij met de ATR.
     expected_move = (
-        cfg.take_profit_usd if cfg.take_profit_usd > 0
+        _schaal.usd(cfg.take_profit_usd) if cfg.take_profit_usd > 0
         else atr_value * cfg.take_profit_atr
     )
     stop_distance = (
-        cfg.stop_loss_usd if cfg.stop_loss_usd > 0
+        _schaal.usd(cfg.stop_loss_usd) if cfg.stop_loss_usd > 0
         else atr_value * cfg.stop_loss_atr
     )
     components["target_usd"] = round(expected_move, 3)
@@ -571,6 +572,8 @@ def evaluate(
     # Kosten per ounce: spread (één keer per round trip) + slippage (beide
     # zijden) + commissie omgerekend naar per ounce.
     commission_per_oz = (cfg.commission_per_lot_per_side * 2) / CONTRACT_SIZE
+    # 2.17.0: procentuele kosten (Bitvavo) per unit, in- en uitstappen.
+    commission_per_oz += _schaal.commissie_rondreis_per_unit(ask if direction == 1 else bid)
     expected_cost = spread + (cfg.expected_slippage * 2) + commission_per_oz
 
     if expected_move < expected_cost * cfg.min_edge_multiple:
@@ -628,8 +631,8 @@ def evaluate(
             + (f"; structuur: {structure_read.note}" if structure_read else "")
             + f". Doel {expected_move:.3f} USD/oz tegen kosten {expected_cost:.3f}"
         ),
-        stop_loss=round(stop, 3),
-        take_profit=round(target, 3),
+        stop_loss=_schaal.rond_prijs(stop, 3),
+        take_profit=_schaal.rond_prijs(target, 3),
         expected_move=expected_move,
         expected_cost=expected_cost,
         components=components,

@@ -46,6 +46,7 @@ from typing import Iterable
 
 from ..broker.exits import ExitManager
 from ..const import CONTRACT_SIZE
+from . import schaal as _schaal
 from .posities import MIN_SPREIDING_ATR, bar_index, richting_van
 
 
@@ -144,10 +145,12 @@ def sluit_trade(t, prijs: float, mid: float, nu: datetime, reden: str,
     r = t.richting
     lots = t.units / CONTRACT_SIZE
     commissie = 2 * kosten.commissie_per_lot * lots
-    slippage = 2 * kosten.slippage * t.units
+    # 2.17.0: procentuele kosten (Bitvavo) en geschaalde slippage.
+    commissie += _schaal.commissie_rondreis_per_unit(mid) * t.units
+    slippage = 2 * _schaal.usd(kosten.slippage) * t.units
     t.close_time = _iso(nu)
-    t.close_price = round(prijs, 3)
-    t.close_mid = round(mid, 3)
+    t.close_price = _schaal.rond_prijs(prijs, 3)
+    t.close_mid = _schaal.rond_prijs(mid, 3)
     t.close_reason = reden
     t.bruto = round((mid - t.open_mid) * r * t.units, 4)
     t.netto = round((prijs - t.open_price) * r * t.units - slippage - commissie, 4)

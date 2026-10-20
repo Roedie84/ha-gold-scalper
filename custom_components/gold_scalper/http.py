@@ -145,7 +145,7 @@ class GoldScalperOverviewView(HomeAssistantView):
 
 
 #: Naam van de broker in de keuzeknop van het dashboard (2.9.0).
-BROKER_NAMEN = {"ig": "IG", "ctrader": "Pepperstone", "paper": "Papier"}
+BROKER_NAMEN = {"ig": "IG", "ctrader": "Pepperstone", "bitvavo": "Bitvavo", "paper": "Papier"}
 
 
 def broker_keuzes(hass: HomeAssistant) -> list[dict]:
