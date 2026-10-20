@@ -1,5 +1,19 @@
 # Changelog — Gold Scalper
 
+## 2.18.2 - 20-10-2026
+
+### Mand: een mislukte instap houdt geen plek meer bezet
+- Live gezien 20-10 11:02: de mand telde 5 van 5 posities terwijl er maar 2 open stonden (PUMP-EUR). Drie markten kregen elke cyclus een plek toegezegd, openden niets (kostenfilter, grootte) en hielden de plek 30 s vast - en de volgende cyclus opnieuw. Zo bleven andere markten buiten.
+- Nu geeft de lus de plek meteen terug als hij niets opent (`BitvavoMand.vrijgeven`), op beide instappaden.
+- De reden van het kostenfilter toont de afstanden in 4 significante cijfers (bij munten van een paar cent stond er "stop 0.00, minimaal 0.02").
+- Tests: 2 in `test_v2180_mand.py`.
+
+### Mand: markt kiezen voor de grafiek, en live koersen
+- Gemeld 20-10: "Waar kan ik nu bijvoorbeeld een andere crypto munt voor de grafiek selecteren? ... heb nergens een dropdown keuze menu" en "En data is niet live, refreshed elke 5 seconden, graag live".
+- In het mandvak een keuzelijst *Grafiek* (markten met een open positie hebben een ●); een klik op een marktkaart doet hetzelfde. De grafiek, de positie, de markt en de trades eronder zijn dan van die markt; de mand blijft bovenaan staan en de knop *Bitvavo-mand* blijft gekozen. Valt een gekozen markt later uit de mand, dan toont het paneel de mand zelf.
+- Live: een verbinding met de publieke websocket van Bitvavo (`ticker`), ook op papier, zonder sleutel en zonder REST-verzoek. De gekozen markt voedt de grafiek en de koers (tot 4 keer per seconde), alle markten van de mand voeden de tabel met open posities, de kaarten en de tegel *Open P&L* (tot 2 keer per seconde). Alleen weergave: de handel blijft op de cyclus. Valt de verbinding weg, dan opnieuw verbinden met oplopende wachttijd en tot dan de 5-s-verversing.
+- Tests: `test_v2183_mandlive.py` (5).
+
 ## 2.18.1 - 20-10-2026
 
 ### De mand in één dashboard

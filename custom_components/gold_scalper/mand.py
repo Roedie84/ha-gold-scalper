@@ -206,6 +206,12 @@ class BitvavoMand:
         self._toegezegd[markt] = (time.monotonic(), self._open_bij(c))
         return True, None
 
+    def vrijgeven(self, c) -> None:
+        """2.18.2: de lus opende toch niets (kostenfilter, risico, grootte):
+        de toegezegde plek komt meteen vrij. Anders hield een markt die elke
+        cyclus een signaal had maar nooit opende, steeds een plek bezet."""
+        self._toegezegd.pop(getattr(c, "symbol", ""), None)
+
     async def poort(self) -> dict:
         """De poort naar live op het bewijs van de hele mand (hooguit eens per
         twee minuten berekend; alle leden lezen hetzelfde)."""
@@ -450,6 +456,12 @@ class BitvavoMand:
         if c is None:
             return
         self.hass.data.get(DOMAIN, {}).pop(c.entry.entry_id, None)
+        try:
+            from .broker_stream import async_stop_stream
+
+            await async_stop_stream(self.hass, c.entry.entry_id)
+        except Exception:  # noqa: BLE001
+            pass
         stop = getattr(c, "_mand_luisteraar", None)
         if stop:
             stop()

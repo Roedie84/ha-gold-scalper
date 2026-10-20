@@ -3105,6 +3105,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         uitgevoerd = await self._open_position(
                             r_signal, quote, now, gelijktijdig_open=aantal_open,
                         )
+                        if not uitgevoerd and getattr(self, "_mand", None) is not None:
+                            # 2.18.2: niets geopend: de toegezegde plek terug.
+                            self._mand.vrijgeven(self)
                         # 2.13.0: waarom niet geopend (kostenfilter), voor het
                         # signalenlog en de grafiek.
                         if not uitgevoerd and self._laatste_weigering:
@@ -3936,8 +3939,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if veldproef_mod.stop_te_krap(instap, signal.stop_loss, kosten):
                 self._noteer_kostenfilter(vp_naam, instap, signal.stop_loss, kosten)
                 self._laatste_weigering = (
-                    f"kostenfilter: stop {abs(instap - signal.stop_loss):.2f}, minimaal "
-                    f"{veldproef_mod.min_stopafstand(kosten):.2f}")
+                    f"kostenfilter: stop {abs(instap - signal.stop_loss):.4g}, minimaal "
+                    f"{veldproef_mod.min_stopafstand(kosten):.4g}")
                 self._vp_bar_gebruikt(vp_naam, signal)
                 return False
         if gelijktijdig_open is None:
@@ -6429,8 +6432,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 oud = self._geopend_in_cyclus
                 self._geopend_in_cyclus = 0
                 try:
-                    if await self._open_position(
-                            sig, quote, now, gelijktijdig_open=len(open_positions)):
+                    gelukt = await self._open_position(
+                        sig, quote, now, gelijktijdig_open=len(open_positions))
+                    if not gelukt and getattr(self, "_mand", None) is not None:
+                        self._mand.vrijgeven(self)
+                    if gelukt:
                         geplaatst += 1
                         if uitbraak:
                             self.turbo_stats["uitbraak_orders"] = (

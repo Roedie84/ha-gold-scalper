@@ -180,9 +180,12 @@ def _pick_coordinator(hass: HomeAssistant, wanted: str | None):
     coordinators = list(hass.data.get(DOMAIN, {}).values())
     if not coordinators:
         return None
-    return next(
-        (c for c in coordinators if c.entry.entry_id == wanted), coordinators[0]
-    )
+    gevonden = next((c for c in coordinators if c.entry.entry_id == wanted), None)
+    if gevonden is None and wanted:
+        # 2.18.3: een markt die uit de mand viel: terug naar de mand zelf.
+        gevonden = next((c for c in coordinators
+                         if wanted.startswith(f"{c.entry.entry_id}_")), None)
+    return gevonden or coordinators[0]
 
 
 class GoldScalperReportView(HomeAssistantView):
@@ -394,7 +397,8 @@ class GoldScalperBrokerView(HomeAssistantView):
             tz=dt_util.DEFAULT_TIME_ZONE,
         )
         mand = getattr(coordinator, "_mand", None)
-        if mand is not None and getattr(mand, "hoofd", None) is coordinator:
+        if mand is not None:
+            # 2.18.3: ook bij een gekozen markt van de mand staat de mand bovenaan.
             from .dashboard.broker import mand_payload
 
             leden = []
@@ -404,9 +408,12 @@ class GoldScalperBrokerView(HomeAssistantView):
                     st = build_status(d) if d else None
                 except Exception:  # noqa: BLE001
                     st = None
-                leden.append({"markt": c.symbol, "data": d, "status": st})
+                leden.append({"markt": c.symbol, "data": d, "status": st,
+                              "entry": c.entry.entry_id})
             try:
                 payload["mand"] = mand_payload(leden, mand.overzicht())
+                payload["mand"]["hoofd_entry"] = mand.hoofd.entry.entry_id
+                payload["mand"]["gekozen"] = coordinator.symbol
             except Exception:  # noqa: BLE001 - het dashboard mag hier niet op stuklopen
                 _LOGGER.debug("Mandoverzicht niet te bouwen", exc_info=True)
         return payload

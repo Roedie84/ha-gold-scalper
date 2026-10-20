@@ -931,6 +931,7 @@ def mand_payload(leden: list[dict], overzicht: dict | None) -> dict:
         stats = data.get("stats") or {}
         markten.append({
             "markt": markt,
+            "entry": lid.get("entry"),
             "koers": _num(data.get("price")),
             "spread_pct": _num(i.get("spread_pct"), 3),
             "volume_24u": _num(i.get("volume_24u"), 0),

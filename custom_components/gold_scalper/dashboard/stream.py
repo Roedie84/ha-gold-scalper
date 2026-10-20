@@ -821,3 +821,168 @@ class VenueTickStream(PriceStream):
                 await asyncio.sleep(5)
         finally:
             afmelden()
+
+
+#: 2.18.3: Bitvavo publieke websocket (geen sleutel nodig, ook op papier).
+BV_WS_URL = "wss://ws.bitvavo.com/v2/"
+#: Zo vaak gaan de koersen van de hele mand naar het paneel.
+BV_MAND_PER_SECOND = 2
+#: Zo vaak wordt gekeken of de mand andere markten heeft.
+BV_HERZIEN_SECONDS = 30.0
+
+
+def bitvavo_ticker(bericht: dict, laatste: dict) -> tuple[str, float, float] | None:
+    """Een ticker-bericht van Bitvavo naar (markt, bied, laat), samengevoegd met
+    de laatst bekende waarden: een bericht bevat alleen wat veranderde."""
+    if not isinstance(bericht, dict) or bericht.get("event") != "ticker":
+        return None
+    markt = str(bericht.get("market") or "").upper()
+    if not markt:
+        return None
+    oud = laatste.get(markt) or {}
+    bied = _getal(bericht.get("bestBid"))
+    laat = _getal(bericht.get("bestAsk"))
+    bied = bied if bied is not None else oud.get("bied")
+    laat = laat if laat is not None else oud.get("laat")
+    if not bied or not laat or bied <= 0 or laat <= 0 or laat < bied:
+        return None
+    laatste[markt] = {"bied": bied, "laat": laat}
+    return markt, bied, laat
+
+
+class BitvavoTickStream(PriceStream):
+    """2.18.3: live koersen van Bitvavo over de publieke websocket.
+
+    Eén verbinding per paneelkeuze. Het ``ticker``-kanaal voor de gekozen
+    markt voedt de grafiek (gewone ``tick``-berichten, zelfde smoorklep), en
+    bij een mand komen alle markten mee als ``mand``-bericht (hooguit
+    ``BV_MAND_PER_SECOND`` per seconde) voor de tabel met open posities.
+    Alleen weergave: de handel blijft op de cyclus.
+    """
+
+    def __init__(self, verbind: Callable[[], Any], markt: str, markten: Callable[[], list[str]], *,
+                 create_task=None, clock: Callable[[], float] = time.time,
+                 naam: str = "Gold Scalper") -> None:
+        # ``verbind`` opent de websocket (async context manager); die komt van
+        # buiten, zodat deze module zelf geen websocketcode bevat (zie 1.8.2).
+        super().__init__(lambda: None, None, create_task=create_task, clock=clock, naam=naam)
+        self._verbind = verbind
+        self._markt = markt.upper()
+        self._markten = markten
+        self._koersen: dict[str, dict] = {}
+        self._mand_vuil = False
+        self._mand_handle: asyncio.TimerHandle | None = None
+        self._laatste_mand = 0.0
+
+    def replay(self, callback: Callable[[dict], None]) -> None:
+        super().replay(callback)
+        if self._koersen and self.status == "live":
+            self._veilig(callback, self._mand_bericht())
+
+    def _gewenst(self) -> list[str]:
+        try:
+            lijst = [str(m).upper() for m in (self._markten() or [])]
+        except Exception:  # noqa: BLE001
+            lijst = []
+        return sorted(set(lijst) | {self._markt})
+
+    def _mand_bericht(self) -> dict:
+        return {"soort": "mand", "tijd": round(self._clock(), 3),
+                "koersen": {m: dict(v) for m, v in self._koersen.items()}}
+
+    def _plan_mand(self) -> None:
+        self._mand_vuil = True
+        if self._mand_handle is not None:
+            return
+        loop = asyncio.get_running_loop()
+        wacht = self._laatste_mand + 1.0 / BV_MAND_PER_SECOND - loop.time()
+        if wacht <= 0:
+            self._zend_mand()
+        else:
+            self._mand_handle = loop.call_later(wacht, self._zend_mand)
+
+    def _zend_mand(self) -> None:
+        self._mand_handle = None
+        if not self._mand_vuil:
+            return
+        self._mand_vuil = False
+        self._laatste_mand = asyncio.get_running_loop().time()
+        self._zend(self._mand_bericht())
+
+    def _annuleer(self) -> None:
+        if self._mand_handle is not None:
+            self._mand_handle.cancel()
+            self._mand_handle = None
+        super()._annuleer()
+
+    def _verwerk(self, bericht) -> None:
+        uit = bitvavo_ticker(bericht, self._koersen)
+        if uit is None:
+            return
+        markt, bied, laat = uit
+        if markt == self._markt:
+            mid = (bied + laat) / 2
+            if self.status != "live":
+                self._bij_live()
+            self._op_tick({
+                "soort": "tick", "bied": bied, "laat": laat, "mid": mid,
+                "spread": laat - bied, "verandering": None, "pct": None,
+                "hoog": None, "laag": None, "markt": "TRADEABLE", "broker_tijd": None,
+                "tijd": round(self._clock(), 3),
+            })
+        self._plan_mand()
+
+    async def _run(self) -> None:
+        import json
+
+        pogingen = 0
+        while True:
+            fout = None
+            try:
+                self.verbindingen += 1
+                async with self._verbind() as ws:
+                    geabonneerd: list[str] = []
+                    volgende = 0.0
+                    while True:
+                        if self._clock() >= volgende:
+                            gewenst = self._gewenst()
+                            if gewenst != geabonneerd:
+                                weg = [m for m in geabonneerd if m not in gewenst]
+                                if weg:
+                                    await ws.send_str(json.dumps({"action": "unsubscribe", "channels": [
+                                        {"name": "ticker", "markets": weg}]}))
+                                    for m in weg:
+                                        self._koersen.pop(m, None)
+                                await ws.send_str(json.dumps({"action": "subscribe", "channels": [
+                                    {"name": "ticker", "markets": gewenst}]}))
+                                geabonneerd = gewenst
+                            volgende = self._clock() + BV_HERZIEN_SECONDS
+                        try:
+                            msg = await ws.receive(timeout=VENUE_STIL_SECONDS)
+                        except asyncio.TimeoutError:
+                            self._zet_status("terugval", "geen koers van Bitvavo")
+                            break
+                        soort = getattr(msg.type, "name", str(msg.type))
+                        if soort == "TEXT":
+                            try:
+                                inhoud = json.loads(msg.data)
+                            except ValueError:
+                                continue
+                            for b in inhoud if isinstance(inhoud, list) else [inhoud]:
+                                self._verwerk(b)
+                            pogingen = 0
+                        elif soort in ("CLOSE", "CLOSED", "CLOSING", "ERROR"):
+                            break
+            except asyncio.CancelledError:
+                raise
+            except Exception as err:  # noqa: BLE001
+                fout = err
+            tekst = f"{type(fout).__name__}: {fout}" if fout is not None else "verbinding beëindigd"
+            if not self._gewaarschuwd:
+                self._gewaarschuwd = True
+                _LOGGER.warning("%s: live koers van Bitvavo onderbroken (%s); opnieuw verbinden. "
+                                "Geen invloed op de handel.", self._naam, tekst)
+            self._zet_status("terugval", tekst[:200])
+            wacht = LS_BACKOFF_SECONDS[min(pogingen, len(LS_BACKOFF_SECONDS) - 1)]
+            pogingen += 1
+            await asyncio.sleep(wacht)

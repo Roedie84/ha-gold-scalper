@@ -6,7 +6,7 @@
 <script>
 const MANDNU = Math.floor(Date.now() / 1000);
 const MAND = {
-  open: 4, max_posities: 5, pnl_open: 12.37, netto: -18.4, fout: null,
+  open: 4, max_posities: 5, hoofd_entry: "E1_btc-eur", gekozen: "BTC-EUR", pnl_open: 12.37, netto: -18.4, fout: null,
   posities: [
     {markt: "BTC-EUR", richting: "long", units: 0.00271, instap: 91234.5, koers: 91980.0, sl: 90410, tp: 93100, pnl: 2.02, geopend: MANDNU - 1500},
     {markt: "ETH-EUR", richting: "long", units: 0.0812, instap: 3071.2, koers: 3102.9, sl: 3020.5, tp: 3180, pnl: 2.57, geopend: MANDNU - 4200},
@@ -14,7 +14,7 @@ const MAND = {
     {markt: "SOL-EUR", richting: "long", units: 1.53, instap: 162.31, koers: 161.92, sl: 159.8, tp: 167.1, pnl: -0.6, geopend: MANDNU - 300},
   ],
   markten: ["BTC-EUR","ETH-EUR","SOL-EUR","XRP-EUR","PEPE-EUR","ADA-EUR","DOGE-EUR","LINK-EUR","AVAX-EUR","SUI-EUR","TRX-EUR","DOT-EUR"].map((m, i) => ({
-    markt: m, koers: [91980, 3102.9, 161.92, 2.3412, 0.00001201, 0.6712, 0.1712, 15.62, 24.81, 3.012, 0.2671, 4.211][i],
+    markt: m, entry: "E1_" + m.toLowerCase(), koers: [91980, 3102.9, 161.92, 2.3412, 0.00001201, 0.6712, 0.1712, 15.62, 24.81, 3.012, 0.2671, 4.211][i],
     spread_pct: 0.01 + i * 0.012, volume_24u: 5e7 / (i + 1), open: ["BTC-EUR","ETH-EUR","SOL-EUR","PEPE-EUR"].includes(m) ? 1 : 0,
     pnl_open: {"BTC-EUR": 2.02, "ETH-EUR": 2.57, "SOL-EUR": -0.6, "PEPE-EUR": 8.39}[m] ?? null,
     netto: (i % 3 - 1) * 4.6, trades: 3 + i, status: i === 4 ? "positie_open" : "wachtend",

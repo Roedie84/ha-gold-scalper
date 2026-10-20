@@ -450,3 +450,23 @@ def test_stoppen_is_veilig_twee_keer_en_bewaart_eerst():
     assert gestopt == ["ETH-EUR"]
     assert bewaard["met_positie"] == ["ETH-EUR"]
     assert m.mag_openen(_lid("BTC-EUR"))[0] is False
+
+
+def test_een_mislukte_instap_geeft_de_plek_meteen_terug():
+    """2.18.2: live gezien 20-10 11:02 - drie markten hielden elke cyclus een
+    plek bezet zonder te openen (kostenfilter/grootte), de mand telde 5 van 5
+    met maar 2 echte posities."""
+    hoofd = _lid("BTC-EUR")
+    m = _mand(hoofd, bitvavo_max_posities=1)
+    m.leden = {"ETH-EUR": _lid("ETH-EUR"), "SOL-EUR": _lid("SOL-EUR")}
+    assert m.mag_openen(m.leden["ETH-EUR"])[0] is True
+    m.vrijgeven(m.leden["ETH-EUR"])
+    assert m.aantal_open() == 0
+    assert m.mag_openen(m.leden["SOL-EUR"])[0] is True
+
+
+def test_de_lus_geeft_de_plek_terug_als_hij_niets_opent():
+    from pathlib import Path
+    bron = (Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalper"
+            / "coordinator.py").read_text(encoding="utf-8")
+    assert bron.count("self._mand.vrijgeven(self)") == 2

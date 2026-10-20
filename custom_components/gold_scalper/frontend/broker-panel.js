@@ -245,6 +245,12 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 .mm .r2 > span { overflow: hidden; text-overflow: ellipsis; }
 .mm .w { font-size: 11px; color: var(--tekst2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mm.heeft { border-color: rgba(52, 211, 153, .45); }
+.mm[data-entry] { cursor: pointer; }
+.mm[data-entry]:hover { border-color: var(--goud); }
+.mm.gekozen { box-shadow: inset 0 0 0 2px var(--goud); }
+.mandkeuze { font: inherit; font-size: 12px; font-weight: 700; color: var(--tekst); background: var(--paneel2); border: 1px solid var(--goud); border-radius: 999px; padding: 5px 12px; cursor: pointer; max-width: 100%; }
+.mandkeuze:focus-visible { outline: 2px solid var(--goud); outline-offset: 1px; }
+.mandkeuze-lbl { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--tekst2); }
 .mm.uit { opacity: .6; border-style: dashed; }
 .mand-sub { margin: 4px 16px 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--tekst2); }
 .paneel {
@@ -656,6 +662,12 @@ class GoldScalperBrokerPanel extends HTMLElement {
       if (m.status === "uit" && m.reden === "gestopt") { this._afmelden(); this._planHerabonneer(); }
       return;
     }
+    if (m.soort === "mand" && m.koersen) {
+      // 2.18.3: live koersen van alle markten van de mand.
+      this._mandLive = { koersen: m.koersen, ontvangen: Date.now() };
+      this._planLive();
+      return;
+    }
     if (m.soort === "tick" && isNum(m.bied) && isNum(m.laat) && isNum(m.tijd)) {
       this._live = { ...m, ontvangen: Date.now() };
       if (this._liveStatus !== "live") this._zetLive("live", null);
@@ -727,6 +739,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._renderPositie(d);
     this._renderMarkt(d);
     this._renderPosities(d);
+    this._renderMand(d);
     this._teken();
   }
   _renderLiveStatus() {
@@ -738,7 +751,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
   }
   // Gegevens met de live koers erin verwerkt; zonder live: de poll-gegevens.
   _eff() {
-    const d = this._data;
+    const d = this._effMand(this._data);
     if (!d || !this._liveActief()) return d;
     const t = this._live;
     const k = { ...d.koers, bied: t.bied, laat: t.laat, mid: t.mid, spread: t.spread, tijd: t.tijd,
@@ -763,6 +776,29 @@ class GoldScalperBrokerPanel extends HTMLElement {
         pnl_broker: p.pnl_account, live: true };
     });
     return { ...d, koers: k, posities };
+  }
+
+  // 2.18.3: de mand met de live koersen erin (posities, kaarten, totaal).
+  _effMand(d) {
+    const ml = this._mandLive;
+    if (!d || !d.mand || !ml || Date.now() - ml.ontvangen > LIVE_MAX_LEEFTIJD_MS) return d;
+    const k = ml.koersen;
+    const posities = (d.mand.posities || []).map((p) => {
+      const q = k[p.markt];
+      if (!q || !isNum(p.instap) || !isNum(p.units)) return p;
+      const koers = p.richting === "long" ? q.bied : q.laat;
+      const pnl = (p.richting === "long" ? koers - p.instap : p.instap - koers) * p.units;
+      return { ...p, koers, pnl, live: true };
+    });
+    const perMarkt = {};
+    posities.forEach((p) => { perMarkt[p.markt] = (perMarkt[p.markt] || 0) + (isNum(p.pnl) ? p.pnl : 0); });
+    const markten = (d.mand.markten || []).map((m) => {
+      const q = k[m.markt];
+      if (!q) return m;
+      return { ...m, koers: (q.bied + q.laat) / 2, pnl_open: m.open ? perMarkt[m.markt] : m.pnl_open, live: true };
+    });
+    const pnl_open = posities.reduce((s, p) => s + (isNum(p.pnl) ? p.pnl : 0), 0);
+    return { ...d, mand: { ...d.mand, posities, markten, pnl_open, live: true } };
   }
 
   async _laad() {
@@ -801,7 +837,10 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._brokers = lijst;
     const el = this._q("#brokers");
     if (!el) return;
-    const huidig = this._entry || actief;
+    let huidig = this._entry || actief;
+    // 2.18.3: een gekozen markt van de mand hoort bij de knop van de mand.
+    const mand = this._data && this._data.mand;
+    if (mand && mand.hoofd_entry && !lijst.some((b) => b.entry === huidig)) huidig = mand.hoofd_entry;
     el.hidden = lijst.length < 2;
     const html = lijst.map((b) => {
       const modus = b.modus && b.modus !== "live" ? ` <small>${esc(b.modus)}</small>` : "";
@@ -841,7 +880,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
   <div class="meldingen" id="meldingen"></div>
   <section class="strip" id="strip"></section>
   <section class="raster zonder-mand" id="raster">
-    <div class="paneel p-mand" id="p-mand" hidden><div class="ph">${IC.lijst}<h2>Bitvavo-mand · alle open posities</h2><div class="ph-r" id="mand-r"></div></div><div class="tabel" id="mandposities"></div><div class="mand-sub">Markten</div><div class="mandmarkten" id="mandmarkten"></div></div>
+    <div class="paneel p-mand" id="p-mand" hidden><div class="ph">${IC.lijst}<h2>Bitvavo-mand · alle open posities</h2><label class="mandkeuze-lbl" for="mandkeuze">Grafiek</label><select class="mandkeuze" id="mandkeuze" aria-label="Markt in de grafiek"></select><div class="ph-r" id="mand-r"></div></div><div class="tabel" id="mandposities"></div><div class="mand-sub">Markten</div><div class="mandmarkten" id="mandmarkten"></div></div>
     <div class="paneel p-grafiek">
       <div class="ph">${IC.grafiek}<h2 id="g-titel">Koers</h2><div class="ph-r"><div class="wissel ind" id="ind" role="group" aria-label="Indicatoren"></div><div class="wissel" id="tf"></div></div></div>
       <div class="gkop" id="gkop"></div>
@@ -876,6 +915,12 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._q("#brokers").addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (b && b.dataset.entry) this._kiesBroker(b.dataset.entry);
+    });
+    // 2.18.3: een markt van de mand in de grafiek (keuzelijst of kaart).
+    this._q("#mandkeuze").addEventListener("change", (e) => { if (e.target.value) this._kiesBroker(e.target.value); });
+    this._q("#mandmarkten").addEventListener("click", (e) => {
+      const k = e.target.closest(".mm[data-entry]");
+      if (k) this._kiesBroker(k.dataset.entry);
     });
     this._q("#ind").addEventListener("click", (e) => {
       const b = e.target.closest("button");
@@ -1224,6 +1269,10 @@ class GoldScalperBrokerPanel extends HTMLElement {
     vak.hidden = !m;
     if (!m) return;
     const v = (d.account && d.account.valuta) || "EUR";
+    const keuze = this._q("#mandkeuze");
+    const opties = (m.markten || []).filter((k) => k.entry)
+      .map((k) => `<option value="${esc(k.entry)}"${k.markt === m.gekozen ? " selected" : ""}>${esc(k.markt)}${k.open ? " ●" : ""}</option>`).join("");
+    if (keuze.dataset.html !== opties) { keuze.innerHTML = opties; keuze.dataset.html = opties; }
     this._q("#mand-r").innerHTML =
       `<span class="chip ${m.open ? "ok" : "neutraal"}" title="Open posities over de hele mand">${m.open}${isNum(m.max_posities) ? ` / max ${m.max_posities}` : ""} open</span>` +
       `<span class="chip ${toon(m.pnl_open) === "neg" ? "gevaar" : "neutraal"}" title="Openstaand resultaat van alle posities">open <b>${fmtS(m.pnl_open)}</b> ${esc(v)}</span>` +
@@ -1247,7 +1296,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
       }).join("") + "</tbody></table>";
     this._q("#mandmarkten").innerHTML = (m.markten || []).map((k) => {
       const reden = k.open ? "" : (k.weigering || k.toelichting || "");
-      return `<div class="mm${k.open ? " heeft" : ""}${k.uitfaseren ? " uit" : ""}" title="${esc(k.toelichting || "")}${k.uitfaseren ? " · valt uit de mand: alleen nog afbouwen" : ""}">` +
+      return `<div class="mm${k.open ? " heeft" : ""}${k.uitfaseren ? " uit" : ""}${k.markt === m.gekozen ? " gekozen" : ""}"${k.entry ? ` data-entry="${esc(k.entry)}" role="button" tabindex="0"` : ""} title="${esc(k.toelichting || "")}${k.uitfaseren ? " · valt uit de mand: alleen nog afbouwen" : ""}">` +
         `<div class="k"><span>${esc(k.markt)}</span><span class="chip ${esc(k.status_toon || "neutraal")}">${esc(k.status_label || "")}</span></div>` +
         `<div class="r2"><span>${fmtA(k.koers)}</span><span>${k.open ? `<b class="${toon(k.pnl_open)}">${fmtS(k.pnl_open)}</b> open` : "geen positie"}</span></div>` +
         `<div class="r2"><span>netto ${fmtS(k.netto)}${isNum(k.trades) ? ` · ${k.trades} tr` : ""}</span><span>${isNum(k.spread_pct) ? `spread ${fmt(k.spread_pct, 3)}%` : ""}</span></div>` +

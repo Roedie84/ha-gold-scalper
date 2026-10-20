@@ -34,6 +34,9 @@ def stream_eligibility(coordinator) -> tuple[bool, str]:
     """(beschikbaar, reden). IG of cTrader (2.9.1), alleen demo of live."""
     venue = getattr(coordinator, "venue", None)
     naam = getattr(venue, "name", None)
+    if naam == "bitvavo":
+        # 2.18.3: publieke koersen van Bitvavo; ook op papier.
+        return True, ""
     if not ((naam == "ig" and hasattr(venue, "streaming_credentials"))
             or (naam == "ctrader" and hasattr(venue, "luister_koers"))):
         return False, "live koers alleen met IG of Pepperstone als broker"
@@ -65,6 +68,23 @@ def _get_stream(hass: HomeAssistant, coordinator):
         return hass.async_create_background_task(
             coro, f"{DOMAIN} koersstroom {entry_id}")
 
+    if getattr(venue, "name", None) == "bitvavo":
+        from .dashboard.stream import BV_WS_URL, LS_CONNECT_TIMEOUT, BitvavoTickStream
+
+        mand = getattr(coordinator, "_mand", None)
+
+        def _markten() -> list[str]:
+            if mand is None:
+                return [coordinator.symbol]
+            return [c.symbol for c in mand.alle()]
+
+        def _verbind():
+            # 2.18.3: publieke websocket van Bitvavo (geen sleutel).
+            return session.ws_connect(BV_WS_URL, heartbeat=30, timeout=LS_CONNECT_TIMEOUT)
+
+        stream = BitvavoTickStream(_verbind, coordinator.symbol, _markten, create_task=_taak)
+        streams[entry_id] = stream
+        return stream
     if getattr(venue, "name", None) == "ctrader":
         from .dashboard.stream import VenueTickStream
 
