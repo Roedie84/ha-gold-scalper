@@ -128,6 +128,11 @@ class BitvavoMand:
         self._stop_timer = None
         self._store = None
         self._gestopt = False
+        #: 2.18.3: pas nieuwe posities als alle markten draaien. Bij het
+        #: opstarten zetten markten hun posities terug terwijl andere al
+        #: instappen; die teruggezette posities telden nog niet mee (live
+        #: gezien 20-10 11:30: 8 van hooguit 5 open na een herstart).
+        self._gereed = False
         #: Een plek die net is toegezegd: markt -> (tijdstip, open op dat moment).
         #: Twee leden in dezelfde seconde zien anders allebei nog een vrije plek.
         self._toegezegd: dict[str, tuple[float, int]] = {}
@@ -193,6 +198,8 @@ class BitvavoMand:
         markt = getattr(c, "symbol", "")
         if self._gestopt:
             return False, "mand: wordt gestopt"
+        if not self._gereed:
+            return False, "mand: start nog op (eerst alle markten met hun posities)"
         if markt in self.uitfaseren or markt not in {x.symbol for x in self.alle()}:
             return False, "mand: markt valt uit de mand, alleen nog sluiten"
         gestopt = [x.symbol for x in self.alle() if self._gestopt_door_risico(x)]
@@ -302,7 +309,10 @@ class BitvavoMand:
         """Bij het opstarten: eerst de markten met een open positie, dan de toppers."""
         bewaard = await self._bewaarde_markten()
         self._bewaard_met_positie = set(bewaard)
-        await self._herzien(extra=bewaard)
+        try:
+            await self._herzien(extra=bewaard)
+        finally:
+            self._gereed = True
         self._stop_timer = async_track_time_interval(
             self.hass, self._tik, timedelta(minutes=BV_MAND_HERZIEN_MINUTEN))
 

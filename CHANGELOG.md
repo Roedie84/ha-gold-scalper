@@ -1,5 +1,12 @@
 # Changelog — Gold Scalper
 
+## 2.18.3 - 20-10-2026
+
+### Mand: geen instap tijdens het opstarten
+- Live gezien 20-10 11:30, na de herstart van 11:26: 8 posities open bij een maximum van 5 (PEPE-EUR 3, PUMP-EUR 3, PHA-EUR 1, EPIC-EUR 1). De markten starten met vier tegelijk; wie al draaide stapte in terwijl andere markten hun open posities nog terugzetten, en die telden pas mee als ze klaar waren.
+- Nu opent de mand niets nieuws tot alle markten (met hun posities) draaien. Bestaande posities blijven gewoon lopen en sluiten op hun eigen stop, doel of tijd.
+- Test: 1 in `test_v2180_mand.py`.
+
 ## 2.18.2 - 20-10-2026
 
 ### Mand: een mislukte instap houdt geen plek meer bezet

@@ -73,9 +73,11 @@ def _lid(symbol, open_=0, live=False, grootboek=None):
     )
 
 
-def _mand(hoofd, **opties):
+def _mand(hoofd, gereed=True, **opties):
     entry = SimpleNamespace(entry_id="E1", data={"venue": "bitvavo", **opties}, options={})
-    return mand_mod.BitvavoMand(FakeHass(), entry, hoofd)
+    m = mand_mod.BitvavoMand(FakeHass(), entry, hoofd)
+    m._gereed = gereed
+    return m
 
 
 def test_hooguit_het_maximum_aantal_posities_over_de_hele_mand():
@@ -470,3 +472,22 @@ def test_de_lus_geeft_de_plek_terug_als_hij_niets_opent():
     bron = (Path(__file__).resolve().parent.parent / "custom_components" / "gold_scalper"
             / "coordinator.py").read_text(encoding="utf-8")
     assert bron.count("self._mand.vrijgeven(self)") == 2
+
+
+def test_geen_nieuwe_posities_tot_alle_markten_draaien(monkeypatch):
+    """2.18.3: live gezien 20-10 11:30 - na een herstart 8 van hooguit 5 open.
+    Markten die al draaiden stapten in terwijl andere hun posities nog
+    terugzetten."""
+    hoofd = _lid("BTC-EUR")
+    m = _mand(hoofd, gereed=False, bitvavo_max_posities=5)
+    mag, waarom = m.mag_openen(hoofd)
+    assert not mag and "start nog op" in waarom
+
+    async def start(markt):
+        m.leden[markt] = _lid(markt, open_=1)
+
+    monkeypatch.setattr(m, "_start_lid", start)
+    monkeypatch.setattr(mand_mod, "async_track_time_interval", lambda *a, **k: (lambda: None))
+    monkeypatch.setattr(bv, "mand_toppers", lambda *a, **k: _als([{"market": "BTC-EUR"}, {"market": "ETH-EUR"}]))
+    asyncio.run(m.async_start())
+    assert m._gereed and m.mag_openen(hoofd)[0] is True
