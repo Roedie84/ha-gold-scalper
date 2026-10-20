@@ -4790,14 +4790,30 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         }
         await self._bewaar_resultaten(direct=True)
         if uitslag.afwijkingen:
-            regels = "; ".join(a.uitleg for a in uitslag.afwijkingen[:5])
-            _LOGGER.warning(
-                "Afstemming met de broker: %s %s", uitslag.samenvatting(), regels
-            )
-            await self.notifier.alert(
-                "afstemming", "Gold Scalper: administratie wijkt af",
-                uitslag.samenvatting() + " " + regels,
-            )
+            # 2.18.5: alleen nieuwe afwijkingen melden. Dezelfde oude
+            # afwijkingen kwamen elke vier uur opnieuw binnen, per broker; ze
+            # blijven zichtbaar in het dashboard (meetkwaliteit).
+            # Overgang: wat de oude melding al meldde, telt als gemeld.
+            sleutels = self.notifier._sent.keys
+            overgang = "afstemming" in sleutels and not any(
+                k.startswith("afstemming:") for k in sleutels)
+            nieuw = set(self.notifier.nieuw(
+                "afstemming:", [f"{a.ticket}:{a.soort}" for a in uitslag.afwijkingen]))
+            nieuwe = [] if overgang else [
+                a for a in uitslag.afwijkingen if f"{a.ticket}:{a.soort}" in nieuw]
+            regels = "; ".join(a.uitleg for a in (nieuwe or uitslag.afwijkingen)[:5])
+            if nieuwe:
+                _LOGGER.warning(
+                    "Afstemming met de broker: %s Nieuw: %s", uitslag.samenvatting(), regels
+                )
+                await self.notifier._send(
+                    "Gold Scalper: administratie wijkt af",
+                    f"{len(nieuwe)} nieuwe afwijking(en). {regels}",
+                    critical=True, tag="afstemming",
+                )
+            else:
+                _LOGGER.debug("Afstemming met de broker: %s (al gemeld) %s",
+                              uitslag.samenvatting(), regels)
         return self.reconciliation
 
     #: Hooguit zoveel onbekende sluitredenen per afstemming bij de broker

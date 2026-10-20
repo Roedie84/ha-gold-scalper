@@ -1,5 +1,12 @@
 # Changelog — Gold Scalper
 
+## 2.18.5 - 20-10-2026
+
+### Afwijkingen bij de broker één keer melden
+- Gemeld 20-10 17:42: "Ik blijf van goldscalper maar de afwijkende melding krijgen". Dezelfde oude afwijkingen (o.a. een IG-trade van bijna zes dagen geleden die niet in het brokeroverzicht staat, uitstapprijzen een paar tienden anders) stonden in elke afstemming en kwamen per broker elke vier uur opnieuw binnen.
+- Nu krijg je per afwijking één melding; bekende afwijkingen blijven zichtbaar in het dashboard (meetkwaliteit), maar sturen geen bericht meer. Wat al gemeld was, telt bij de overgang als gemeld. Het onthouden overleeft een herstart en vervalt na drie weken.
+- Test: `test_v2185_afstemmingsmelding.py` (4).
+
 ## 2.18.4 - 20-10-2026
 
 ### Mand: posities op risico, niet op de kleinste order

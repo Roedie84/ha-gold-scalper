@@ -237,6 +237,24 @@ class Notifier:
         self._sent.keys[key] = now
         await self._send(title, message, critical=critical, tag=key)
 
+    def nieuw(self, prefix: str, sleutels: list[str],
+              bewaar: timedelta = timedelta(days=21)) -> list[str]:
+        """2.18.5: welke van deze sleutels nog nooit gemeld zijn.
+
+        Voor meldingen over dingen die blijven staan (een afwijking bij de
+        broker blijft dagenlang in elke afstemming terugkomen): één keer per
+        ding, niet elke vier uur opnieuw. De sleutels worden als gemeld
+        vastgelegd en bewaard over een herstart; na ``bewaar`` vervallen ze.
+        """
+        now = datetime.now(timezone.utc)
+        for k in [k for k, t in self._sent.keys.items()
+                  if k.startswith(prefix) and now - t > bewaar]:
+            del self._sent.keys[k]
+        nieuwe = [s for s in dict.fromkeys(sleutels) if f"{prefix}{s}" not in self._sent.keys]
+        for s in nieuwe:
+            self._sent.keys[f"{prefix}{s}"] = now
+        return nieuwe
+
     def clear(self, key: str) -> None:
         """Meld dat een toestand voorbij is, zodat hij opnieuw kan waarschuwen."""
         self._sent.keys.pop(key, None)
