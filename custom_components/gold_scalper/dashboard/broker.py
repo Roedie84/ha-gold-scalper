@@ -413,7 +413,8 @@ def _position_rows(data: dict, db_open: list[dict], exit_cfg: dict, quote,
             "turbo": str(db.get("open_reason") or "").startswith("turbo"),
             "ticket": ticket,
             "richting": "long" if side == "buy" else "short",
-            "units": _num(units, 2),
+            # 2.18.0: crypto (0,0021 BTC) verdwijnt bij twee decimalen.
+            "units": _num(units, 2 if abs(float(units or 0)) >= 100 else 8),
             "instap": instap,
             "koers": koers,
             "sl": _num(getattr(p, "stop_loss", None)) or _num(db.get("stop_loss")),
@@ -904,4 +905,56 @@ def _signaal(signal) -> dict | None:
         "richting": "long" if richting > 0 else "short" if richting < 0 else "vlak",
         "score": _num(getattr(signal, "score", None), 2),
         "zekerheid": _num(getattr(signal, "confidence", None), 2),
+    }
+
+
+def mand_payload(leden: list[dict], overzicht: dict | None) -> dict:
+    """2.18.0: de Bitvavo-mand in één oogopslag: alle open posities van alle
+    markten in één tabel, en per markt een regel.
+
+    ``leden``: per markt ``{"markt", "data", "status": (code, tekst)}``, met
+    ``data`` de laatste cyclus van die markt (of None als hij nog opstart).
+    """
+    posities = []
+    markten = []
+    info = {r.get("markt"): r for r in (overzicht or {}).get("per_markt") or []}
+    for lid in leden:
+        markt = lid.get("markt")
+        data = lid.get("data") or {}
+        quote = data.get("quote")
+        rijen = _position_rows(data, [], {}, quote) if data else []
+        for r in rijen:
+            r["markt"] = markt
+        posities.extend(rijen)
+        code, tekst = lid.get("status") or (None, None)
+        i = info.get(markt) or {}
+        stats = data.get("stats") or {}
+        markten.append({
+            "markt": markt,
+            "koers": _num(data.get("price")),
+            "spread_pct": _num(i.get("spread_pct"), 3),
+            "volume_24u": _num(i.get("volume_24u"), 0),
+            "open": len(rijen),
+            "pnl_open": _num(sum(r["pnl"] or 0 for r in rijen), 2) if rijen else None,
+            "netto": _num(stats.get("net_pnl"), 2),
+            "trades": stats.get("trades"),
+            "status": code or ("opstarten" if not data else None),
+            "status_label": STATUS_LABELS.get(code, code or "Opstarten"),
+            "status_toon": STATUS_TOON.get(code, "neutraal"),
+            "toelichting": tekst,
+            "weigering": i.get("weigering"),
+            "uitfaseren": bool(i.get("uitfaseren")),
+        })
+    posities.sort(key=lambda r: r.get("geopend") or 0, reverse=True)
+    totaal_open = sum(r["pnl"] or 0 for r in posities)
+    netto = [m["netto"] for m in markten if m["netto"] is not None]
+    return {
+        "posities": posities,
+        "markten": markten,
+        "open": len(posities),
+        "max_posities": (overzicht or {}).get("max_posities"),
+        "pnl_open": _num(totaal_open, 2),
+        "netto": _num(sum(netto), 2) if netto else None,
+        "herzien_om": (overzicht or {}).get("herzien_om"),
+        "fout": (overzicht or {}).get("fout"),
     }

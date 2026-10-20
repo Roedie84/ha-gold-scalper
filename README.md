@@ -126,7 +126,9 @@ heeft een eigen handelslus en database; samen hooguit het ingestelde aantal
 open posities (standaard 5), per koop hooguit de maximale inzet. Live gaat
 open op het papieren bewijs van de hele mand. Een markt die uit de mand valt
 met een open positie, sluit eerst af en opent niets nieuws. De sensor *Mand*
-toont de markten, open posities en weigeringen.
+toont de markten, open posities en weigeringen. In het Gold Scalper-paneel is de mand één knop
+(*Bitvavo-mand*) met bovenaan alle open posities van alle markten in één tabel
+en per markt een kaart (2.18.1).
 
 Zie `VENUES.md` en `BROKERS.md`.
 
@@ -197,7 +199,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **2.18.0** (zie `CHANGELOG.md`).
+Huidige versie: **2.18.1** (zie `CHANGELOG.md`).
 
 Sinds 2.0.0 is de standaardstrategie **daghandel** (trend op uurbasis, uiterlijk
 20:45 UTC dicht); scalpen blijft kiesbaar via de instelling *Strategie*, en sinds 2.1.0 ook

@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.18.1 - 20-10-2026
+
+### De mand in één dashboard
+- Gemeld 20-10: "Ik wil 1 dashboard, niet legio aan tabladen, ik wil in 1 oogopslag alle openstaande orders voor alle markten zien." In 2.18.0 stond elke markt van de mand als eigen knop in de brokerkeuze.
+- Nu één knop *Bitvavo-mand*. Bovenaan het paneel het vak *Bitvavo-mand · alle open posities*: één tabel met markt, richting, units, instap, koers, stop, doel, resultaat (bedrag en %), resultaat bij de stop en duur; daaronder per markt een kaart met koers, open resultaat, netto, aantal trades, spread, status en waarom hij niet instapt. Markten die uit de mand vallen zijn gestippeld.
+- De tegel *Open P&L* telt bij de mand alle markten.
+- Koersen en hoeveelheden met decimalen naar grootte (0,0027 BTC en 0,00001162 EUR bleven anders 0,00). Bij goud verandert er niets.
+- Tests: `test_v2181_mandpaneel.py` (4), waaronder een weergavetest op desktop en mobiel.
+
 ## 2.18.0 - 20-10-2026
 
 ### Bitvavo-mand: handelen op de meest liquide markten

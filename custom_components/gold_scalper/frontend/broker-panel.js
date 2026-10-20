@@ -233,7 +233,20 @@ small { font-size: .62em; font-weight: 600; color: var(--tekst2); margin-left: 3
 
 /* raster */
 .raster { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "grafiek" "positie" "markt" "posities" "equity" "stats" "trades" "schaduw"; }
+  grid-template-areas: "mand" "grafiek" "positie" "markt" "posities" "equity" "stats" "trades" "schaduw"; }
+.raster.zonder-mand { grid-template-areas: "grafiek" "positie" "markt" "posities" "equity" "stats" "trades" "schaduw"; }
+.p-mand { grid-area: mand; }
+.p-mand[hidden] { display: none; }
+.mandmarkten { display: grid; gap: 8px; padding: 0 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); }
+.mm { border: 1px solid var(--rand); border-radius: 12px; padding: 8px 10px; background: rgba(255,255,255,.02); min-width: 0; }
+.mm .k { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-weight: 800; white-space: nowrap; }
+.mm .k .chip { padding: 2px 8px; font-size: 11px; }
+.mm .r2 { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--tekst2); margin-top: 3px; white-space: nowrap; }
+.mm .r2 > span { overflow: hidden; text-overflow: ellipsis; }
+.mm .w { font-size: 11px; color: var(--tekst2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mm.heeft { border-color: rgba(52, 211, 153, .45); }
+.mm.uit { opacity: .6; border-style: dashed; }
+.mand-sub { margin: 4px 16px 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--tekst2); }
 .paneel {
   min-width: 0; border-radius: var(--r);
   background: linear-gradient(180deg, var(--paneel), var(--paneel2));
@@ -374,11 +387,21 @@ footer .demo { color: var(--goud); font-weight: 700; }
 @container (min-width: 720px) {
   .strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .raster { grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas: "grafiek grafiek" "positie markt" "posities posities" "equity equity" "stats stats" "trades trades" "schaduw schaduw"; }
+    grid-template-areas: "mand mand" "grafiek grafiek" "positie markt" "posities posities" "equity equity" "stats stats" "trades trades" "schaduw schaduw"; }
+  .raster.zonder-mand { grid-template-areas: "grafiek grafiek" "positie markt" "posities posities" "equity equity" "stats stats" "trades trades" "schaduw schaduw"; }
 }
 @container (min-width: 1180px) {
   .strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .raster { grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas:
+      "mand mand mand mand mand mand mand mand mand mand mand mand"
+      "grafiek grafiek grafiek grafiek grafiek grafiek grafiek grafiek positie positie positie positie"
+      "grafiek grafiek grafiek grafiek grafiek grafiek grafiek grafiek markt markt markt markt"
+      "posities posities posities posities posities posities posities posities posities posities posities posities"
+      "equity equity equity equity equity equity equity stats stats stats stats stats"
+      "trades trades trades trades trades trades trades stats stats stats stats stats"
+      "schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw schaduw"; }
+  .raster.zonder-mand {
     grid-template-areas:
       "grafiek grafiek grafiek grafiek grafiek grafiek grafiek grafiek positie positie positie positie"
       "grafiek grafiek grafiek grafiek grafiek grafiek grafiek grafiek markt markt markt markt"
@@ -449,6 +472,13 @@ function fmtS(v, d = 2) {
   const s = fmt(Math.abs(v), d);
   if (Math.abs(v) < Math.pow(10, -d) / 2) return s;
   return (v > 0 ? "+" : MIN) + s;
+}
+// 2.18.0: crypto: 91.234,50 maar ook 0,00001234 - decimalen naar grootte.
+function fmtA(v) {
+  if (!isNum(v)) return "—";
+  const a = Math.abs(v);
+  const d = a === 0 ? 2 : a >= 1000 ? 2 : a >= 1 ? 4 : Math.min(10, 3 - Math.floor(Math.log10(a)) + 1);
+  return fmt(v, d);
 }
 const toon = (v) => (!isNum(v) || v === 0 ? "" : v > 0 ? "pos" : "neg");
 function duur(s) {
@@ -810,7 +840,8 @@ class GoldScalperBrokerPanel extends HTMLElement {
   </header>
   <div class="meldingen" id="meldingen"></div>
   <section class="strip" id="strip"></section>
-  <section class="raster">
+  <section class="raster zonder-mand" id="raster">
+    <div class="paneel p-mand" id="p-mand" hidden><div class="ph">${IC.lijst}<h2>Bitvavo-mand · alle open posities</h2><div class="ph-r" id="mand-r"></div></div><div class="tabel" id="mandposities"></div><div class="mand-sub">Markten</div><div class="mandmarkten" id="mandmarkten"></div></div>
     <div class="paneel p-grafiek">
       <div class="ph">${IC.grafiek}<h2 id="g-titel">Koers</h2><div class="ph-r"><div class="wissel ind" id="ind" role="group" aria-label="Indicatoren"></div><div class="wissel" id="tf"></div></div></div>
       <div class="gkop" id="gkop"></div>
@@ -913,6 +944,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._renderPositie(d);
     this._renderMarkt(d);
     this._renderPosities(d);
+    this._renderMand(d);
     this._renderEquity(d);
     this._renderStats(d);
     this._renderTrades(d);
@@ -972,7 +1004,11 @@ class GoldScalperBrokerPanel extends HTMLElement {
 
   _renderStrip(d) {
     const a = d.account, v = val(a.valuta), sv = val(a.stats_valuta);
-    const open = (d.posities || []).reduce((s, p) => s + (isNum(p.pnl_account) ? p.pnl_account : isNum(p.pnl) ? p.pnl : 0), 0);
+    // 2.18.0: bij de mand telt de tegel alle markten, niet alleen de hoofdmarkt.
+    const mand = d.mand;
+    const open = mand && isNum(mand.pnl_open) ? mand.pnl_open
+      : (d.posities || []).reduce((s, p) => s + (isNum(p.pnl_account) ? p.pnl_account : isNum(p.pnl) ? p.pnl : 0), 0);
+    const aantalOpen = mand ? mand.open : (d.posities || []).length;
     const kl = (x) => (x > 0 ? "var(--groen)" : x < 0 ? "var(--rood)" : null);
     let vloer = "";
     if (isNum(a.vloer) && isNum(a.equity) && a.equity > 0) {
@@ -985,7 +1021,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
     this._q("#strip").innerHTML = [
       this._tegel("Equity", `${v}${fmt(a.equity)}`, `saldo ${v}${fmt(a.saldo)}`, "var(--goud)"),
       this._tegel("Open P&L", `<span class="${toon(open)}">${fmtS(open)}</span><small>${esc(a.valuta || "")}</small>`,
-        `${(d.posities || []).length} positie(s) open${(d.posities || []).some((p) => p.live) ? ' <span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}`, kl(open)),
+        `${aantalOpen} positie(s) open${mand ? " · hele mand" : ""}${!mand && (d.posities || []).some((p) => p.live) ? ' <span class="ind" title="Berekend uit de live koers; het officiële bedrag komt per cyclus van de broker">live, indicatief</span>' : ""}`, kl(open)),
       this._tegel("Dag-P&L", `<span class="${toon(a.dag_pnl)}">${fmtS(a.dag_pnl)}</span><small>${esc(a.valuta || "")}</small>`, (isNum(a.dag_verlies_pct) && isNum(a.daglimiet_pct) ? `verlies ${fmt(Math.max(0, a.dag_verlies_pct), 2)}% van daglimiet ${fmt(a.daglimiet_pct, 0)}% (${v}${fmt(a.daglimiet)})` : "equity t.o.v. dagstart"), kl(a.dag_pnl)),
       ...this._tegelsResultaat(a, d, sv, v, kl),
       this._tegel("Vermogensvloer", `${v}${fmt(a.vloer)}`, `afstand ${v}${fmt(a.vloer_afstand)}`, "var(--blauw)", vloer),
@@ -1180,6 +1216,45 @@ class GoldScalperBrokerPanel extends HTMLElement {
       `</div>`;
   }
 
+  // 2.18.0: de Bitvavo-mand - alle open posities van alle markten in één tabel.
+  _renderMand(d) {
+    const m = d.mand;
+    const vak = this._q("#p-mand");
+    this._q("#raster").classList.toggle("zonder-mand", !m);
+    vak.hidden = !m;
+    if (!m) return;
+    const v = (d.account && d.account.valuta) || "EUR";
+    this._q("#mand-r").innerHTML =
+      `<span class="chip ${m.open ? "ok" : "neutraal"}" title="Open posities over de hele mand">${m.open}${isNum(m.max_posities) ? ` / max ${m.max_posities}` : ""} open</span>` +
+      `<span class="chip ${toon(m.pnl_open) === "neg" ? "gevaar" : "neutraal"}" title="Openstaand resultaat van alle posities">open <b>${fmtS(m.pnl_open)}</b> ${esc(v)}</span>` +
+      `<span class="chip" title="Gerealiseerd resultaat van de lopende runs, alle markten">netto <b>${fmtS(m.netto)}</b> ${esc(v)}</span>` +
+      `<span class="chip neutraal">${(m.markten || []).length} markten</span>` +
+      (m.fout ? `<span class="chip let" title="${esc(m.fout)}">samenstelling mislukt</span>` : "");
+    const ps = m.posities || [];
+    this._q("#mandposities").innerHTML = !ps.length ? '<div class="leeg">Geen open posities in de mand.</div>' :
+      `<table><thead><tr><th>Markt</th><th>Richting</th><th class="r">Units</th><th class="r">Instap</th><th class="r">Koers</th><th class="r">SL</th><th class="r">TP</th><th class="r">P&amp;L</th><th class="r">%</th><th class="r" title="Resultaat als de stop nu geraakt wordt">Bij SL</th><th class="r">Duur</th></tr></thead><tbody>` +
+      ps.map((p) => {
+        const pct = isNum(p.instap) && isNum(p.koers) && p.instap ? (p.koers / p.instap - 1) * 100 * (p.richting === "long" ? 1 : -1) : null;
+        const bijSl = isNum(p.sl) && isNum(p.instap) && isNum(p.units) ? (p.richting === "long" ? p.sl - p.instap : p.instap - p.sl) * p.units : null;
+        return `<tr>${cel("Markt", `<b>${esc(p.markt)}</b>`)}` +
+          cel("Richting", `<span class="tag ${p.richting}">${p.richting.toUpperCase()}</span>`) +
+          cel("Units", fmtA(p.units), "r") + cel("Instap", fmtA(p.instap), "r") + cel("Koers", fmtA(p.koers), "r") +
+          cel("SL", fmtA(p.sl), "r neg") + cel("TP", fmtA(p.tp), "r pos") +
+          cel("P&amp;L", `<b>${fmtS(p.pnl)}</b> <span class="dim">${esc(v)}</span>`, `r ${toon(p.pnl)}`) +
+          cel("%", pct === null ? "—" : fmtS(pct, 2) + "%", `r ${toon(pct)}`) +
+          cel("Bij SL", bijSl === null ? "—" : `<b>${fmtS(bijSl)}</b><div class="dim">${bijSl >= 0 ? "vastgezet" : "risico"}</div>`, `r ${bijSl === null ? "" : toon(bijSl)}`) +
+          cel("Duur", duur(this._nu() - p.geopend), "r") + "</tr>";
+      }).join("") + "</tbody></table>";
+    this._q("#mandmarkten").innerHTML = (m.markten || []).map((k) => {
+      const reden = k.open ? "" : (k.weigering || k.toelichting || "");
+      return `<div class="mm${k.open ? " heeft" : ""}${k.uitfaseren ? " uit" : ""}" title="${esc(k.toelichting || "")}${k.uitfaseren ? " · valt uit de mand: alleen nog afbouwen" : ""}">` +
+        `<div class="k"><span>${esc(k.markt)}</span><span class="chip ${esc(k.status_toon || "neutraal")}">${esc(k.status_label || "")}</span></div>` +
+        `<div class="r2"><span>${fmtA(k.koers)}</span><span>${k.open ? `<b class="${toon(k.pnl_open)}">${fmtS(k.pnl_open)}</b> open` : "geen positie"}</span></div>` +
+        `<div class="r2"><span>netto ${fmtS(k.netto)}${isNum(k.trades) ? ` · ${k.trades} tr` : ""}</span><span>${isNum(k.spread_pct) ? `spread ${fmt(k.spread_pct, 3)}%` : ""}</span></div>` +
+        (reden ? `<div class="w">${esc(reden)}</div>` : "") + "</div>";
+    }).join("");
+  }
+
   _renderPosities(d) {
     const ps = d.posities || [];
     const tel = d.posities_telling;
@@ -1208,7 +1283,7 @@ class GoldScalperBrokerPanel extends HTMLElement {
         cel("Richting", `<span class="tag ${p.richting}">${p.richting.toUpperCase()}</span>`) +
         cel("Strategie", (p.strategie ? `<span class="strat ${p.turbo ? "turbo" : stratKlasse(p.strategie)}">${stratLabel(p.strategie, p.turbo)}</span>` : "—") +
           (p.bijkoop ? ' <span class="dim" title="Bijkoop (pyramide) van een andere positie">+ bijkoop</span>' : "")) +
-        cel("Units", fmt(p.units), "r") + cel("Instap", fmt(p.instap), "r") +
+        cel("Units", fmtA(p.units), "r") + cel("Instap", fmt(p.instap), "r") +
         cel("Koers", fmt(p.koers), "r") + cel("SL", fmt(p.sl) + (isNum(p.sl_gewijzigd) ? `<div class="dim" title="${esc(p.sl_reden || "")}">↕ ${this._hm(p.sl_gewijzigd)}${p.sl_wijzigingen > 1 ? ` (${p.sl_wijzigingen}×)` : ""}</div>` : ""), "r neg") + cel("TP", fmt(p.tp), "r pos") +
         cel("P&amp;L", `<b>${fmtS(pnl)}</b> <span class="dim">${esc(pv || "")}</span>${p.live ? '<span class="ind" title="live, indicatief">live</span>' : ""}`, `r ${toon(pnl)}`) +
         cel("Gerealiseerd", ger === null ? "—" : `<b>${fmtS(ger)}</b> <span class="dim">${esc(bijSlV || "")}</span><div class="dim">deelwinst</div>`,

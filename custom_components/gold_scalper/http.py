@@ -155,13 +155,18 @@ def broker_keuzes(hass: HomeAssistant) -> list[dict]:
         entry = getattr(c, "entry", None)
         if entry is None:
             continue
+        if getattr(entry, "hoofd_entry_id", None):
+            # 2.18.0: de markten van een mand staan samen onder de mand, niet
+            # elk als eigen knop.
+            continue
         venue = (getattr(entry, "data", None) or {}).get("venue") \
             or getattr(getattr(c, "venue", None), "name", "")
         mode = getattr(getattr(c, "mode", None), "value", None) \
             or (getattr(entry, "options", None) or {}).get("mode")
         keuzes.append({
             "entry": entry.entry_id,
-            "naam": (f"Bitvavo {getattr(c, 'symbol', '')}".strip() if venue == "bitvavo"
+            "naam": (("Bitvavo-mand" if getattr(c, "_mand", None) is not None
+                      else f"Bitvavo {getattr(c, 'symbol', '')}".strip()) if venue == "bitvavo"
                      else BROKER_NAMEN.get(venue, str(venue or getattr(entry, "title", "") or "?"))),
             "venue": venue,
             "modus": mode,
@@ -374,7 +379,7 @@ class GoldScalperBrokerView(HomeAssistantView):
             k: getattr(exits, k, None)
             for k in ("time_stop_seconds", "time_stop_deadzone_atr", "max_hold_seconds")
         } if exits is not None else {}
-        return build_payload(
+        payload = build_payload(
             data,
             symbol=coordinator.symbol,
             timeframe=getattr(coordinator, "timeframe", None),
@@ -388,6 +393,23 @@ class GoldScalperBrokerView(HomeAssistantView):
             uses_real_money=uses_real_money,
             tz=dt_util.DEFAULT_TIME_ZONE,
         )
+        mand = getattr(coordinator, "_mand", None)
+        if mand is not None and getattr(mand, "hoofd", None) is coordinator:
+            from .dashboard.broker import mand_payload
+
+            leden = []
+            for c in mand.alle():
+                d = getattr(c, "data", None)
+                try:
+                    st = build_status(d) if d else None
+                except Exception:  # noqa: BLE001
+                    st = None
+                leden.append({"markt": c.symbol, "data": d, "status": st})
+            try:
+                payload["mand"] = mand_payload(leden, mand.overzicht())
+            except Exception:  # noqa: BLE001 - het dashboard mag hier niet op stuklopen
+                _LOGGER.debug("Mandoverzicht niet te bouwen", exc_info=True)
+        return payload
 
 
 def _placeholder(title: str, message: str) -> str:
