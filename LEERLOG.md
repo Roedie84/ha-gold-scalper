@@ -384,3 +384,16 @@ laatste ronde: 12-10 23:40, gemeten t/m 12-10 23:43
 - Geen release; geen knoppen, geen instellingen gewijzigd.
 
 laatste ronde: 21-10 19:40, gemeten t/m 21-10 19:45
+
+## 21-10 23:40 · tussenronde
+- Actief **2.19.1** (2.19.2 gereleased 22:15, niet geïnstalleerd; HACS ververst). Herstart 20:58; daarna afstemming "cannot commit - no transaction is active" (20:59) = wat 2.19.2 oplost. Markt goud dicht 23:00-00:00.
+- **L-GS-020 geverifieerd:** IG *Max. drawdown* 0,01 % (was 100 %), 0 noodstops.
+- **IG** run: 175 trades / 11 clusters, netto −32 (bruto +1.077, kosten 1.110 = 6,34/trade), PF 0,99, t_cluster −0,04. Sinds 19:45: 15 trades, netto +69. Uurblokken 49, t_bruto 1,29 (was 1,12/44).
+- **Pepperstone:** 1.585 trades / 8 clusters, netto −9.096, bruto −2.859; t_netto −2,17 over 114 blokken (was −2,09/111). Sinds 19:45: 14 trades, −357.
+- **H-GS-13** (IG New York positief): t_netto 2,35 / 21 blokken (5 nieuw, eis ≥ 30 nieuwe). Tegenproef op Pepperstone (zelfde goud, ander opzetmengsel): NY t_netto −0,28 / t_bruto 0,41 over 44 blokken → repliceert niet; wijst eerder op toeval of opzetmix dan op een sessie-effect. Blijft open, geen voorstel.
+- Latency p99: IG 34,7 s (max 104,6 s), Pepperstone 14,6 s, Bitvavo 6,7 s; bij IG en Pepperstone domineert `candles->exits`, bij Bitvavo niet (0,6 s) → H-GS-12 (mand vertraagt de goudlussen) blijft plausibel.
+- Logruis: na elke herstart worden alle eerder uitgezette veldproefopzetten opnieuw als "uitgezet" gemeld (21 WARNINGs om 20:58-21:56); de lijst start leeg (`_vp_uitgezet`). Meetbaarheid: "nieuw" is niet nieuw → meenemen bij de volgende diagnose-release (zelf bouwen).
+- Bitvavo-papier: 11× "Openen geweigerd (papermarge)" (nodig 1.6-2,0k, vrij ~0,7k), 0 trades.
+- Geen release; geen knoppen, geen instellingen.
+
+laatste ronde: 21-10 23:40, gemeten t/m 21-10 23:43
