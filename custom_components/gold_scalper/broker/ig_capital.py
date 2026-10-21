@@ -1100,6 +1100,11 @@ class IgStyleVenue(ExecutionVenue):
             (a for a in accounts if a.get("accountId") == self._account_id), accounts[0]
         )
         balance = chosen.get("balance") or {}
+        # 2.19.1: een ontbrekend saldo is geen saldo van 0. Op 21-10 13:14
+        # gaf IG één keer saldo en equity 0: de vloertoets gaf een NOODSTOP en
+        # de drawdown van de run bleef op 100 % staan.
+        if balance.get("balance") is None:
+            raise VenueError("De broker gaf geen saldo in het accountantwoord")
         return AccountSnapshot(
             balance=float(balance.get("balance", 0)),
             equity=float(balance.get("balance", 0)) + float(balance.get("profitLoss", 0)),

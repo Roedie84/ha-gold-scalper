@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.19.1 - 21-10-2026
+
+### Leeg accountantwoord is geen meting (geen valse noodstop, geen 100 % drawdown)
+- Gemeten 21-10 13:14:07: IG gaf één keer saldo 0 en equity 0 (ervoor en erna ~10,03 mln). De vloertoets zag 0 onder de vloer van 9,53 mln: NOODSTOP om 13:15 (hervat 13:42 met de knop). Daarna bleef *Max. drawdown* van de IG-run op 100 % staan en noemde het oordeel "drawdown te groot".
+- Nu: (1) IG zonder saldo in het accountantwoord = fout (geen 0 invullen); (2) saldo én equity precies 0 terwijl er eerder een positieve equity gemeten was = leeg antwoord: zelfde pad als een mislukte opvraging (2.4.4: geen risicotoets, geen instap, geen equitypunt; exitbeheer loopt door); (3) de drawdown slaat zulke 0/0-punten over bij een run met een gemeten positieve opening - dat herstelt de 100 % van de lopende IG-run na de herstart.
+- Raakt geen strategie, risicogrenzen of ordergrootte; geen nieuwe run.
+- Test: `test_v2191_leeg_account.py` (6).
+
 ## 2.19.0 - 21-10-2026
 
 ### Daghandel draait weer (op kwartierbars)

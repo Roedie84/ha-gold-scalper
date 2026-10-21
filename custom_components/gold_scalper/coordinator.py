@@ -218,6 +218,15 @@ def _per_richting(value) -> int:
 HERKANSING_SCHEMA = (20, 60, 120, 240)
 
 
+def _leeg_accountantwoord(balance, equity, laatst) -> bool:
+    """2.19.1: saldo en equity precies 0 na een gemeten positieve equity."""
+    try:
+        return (float(balance) == 0.0 and float(equity) == 0.0
+                and float(laatst or 0.0) > 0.0)
+    except (TypeError, ValueError):
+        return False
+
+
 @dataclass(slots=True)
 class _TicketOnly:
     """Minimale positieverwijzing voor het afsluiten van een verdwenen trade.
@@ -2902,6 +2911,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         else:
             try:
                 snapshot = await self.venue.account()
+                if _leeg_accountantwoord(
+                    snapshot.balance, snapshot.equity, self.current_equity
+                ):
+                    # 2.19.1: saldo én equity precies 0 terwijl er eerder een
+                    # positieve equity gemeten was: een leeg antwoord, geen
+                    # meting (IG 21-10 13:14 -> valse NOODSTOP en 100 %
+                    # drawdown). Zelfde pad als een mislukte opvraging.
+                    raise VenueError("saldo en equity 0 in het antwoord (leeg)")
                 balance, equity = snapshot.balance, snapshot.equity
                 self.current_equity = equity
                 gemeten_equity = equity

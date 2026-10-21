@@ -1387,6 +1387,9 @@ class TradeDatabase:
             "AND e.equity = r.starting_balance AND e.balance = r.starting_balance "
             "AND ABS(r.opening_equity_account - r.starting_balance) "
             "> 0.01 * ABS(r.opening_equity_account)"
+            # 2.19.1: een leeg accountantwoord (saldo en equity 0) bij een run
+            # met een positieve opening is ook geen meting (IG 21-10 13:14).
+            " OR (COALESCE(r.opening_equity_account, 0) > 0 AND e.equity = 0 AND e.balance = 0)"
         )
         rij = self.conn.execute(
             "SELECT MAX(piek - equity) AS dd, "
