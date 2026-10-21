@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.19.2 - 21-10-2026
+
+### Database: geen transactiefout meer bij gelijktijdige aanroepen
+- Gemeten 21-10 20:59: de afstemming na de herstart faalde met *cannot commit - no transaction is active*; de IG-afwijkingen bleven daardoor staan tot de volgende ronde.
+- Oorzaak: alle databaseaanroepen delen één SQLite-verbinding en lopen via de executor in verschillende threads. Rondde de ene thread zijn commit af terwijl de andere net wilde committen, dan vond die geen transactie meer (in de test ook *bad parameter or other API misuse*).
+- Nu: elke methode van de tradedatabase houdt één herintreedbare slot vast, en de gebufferde signaalwegschrijver gebruikt dezelfde slot. Raakt geen strategie, risico of orders; geen nieuwe run.
+- Test: `test_v2192_db_gelijktijdig.py` (3; faalde vóór de fix).
+
 ## 2.19.1 - 21-10-2026
 
 ### Leeg accountantwoord is geen meting (geen valse noodstop, geen 100 % drawdown)

@@ -256,7 +256,15 @@ def install_buffered_signals(database: Any, flush_interval: float = 5.0) -> Buff
     daarmee de grootste schrijfbelasting. Trades blijven ongebufferd.
     """
 
+    # 2.19.2: dezelfde slot als de database zelf; anders kon deze commit de
+    # transactie van een andere aanroep afronden.
+    slot = getattr(database, "_slot", None) or threading.RLock()
+
     def _flush(rows: list[tuple]) -> None:
+        with slot:
+            _schrijf(rows)
+
+    def _schrijf(rows: list[tuple]) -> None:
         database.conn.executemany(
             """INSERT INTO signals
                (run_id, ts, score, confidence, state, regime, spread, acted,

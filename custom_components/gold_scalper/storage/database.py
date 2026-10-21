@@ -16,9 +16,11 @@ dependency, en de schrijfvolumes zijn klein genoeg dat het niet uitmaakt.
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import sqlite3
+import threading
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -520,6 +522,12 @@ class TradeDatabase:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn: sqlite3.Connection | None = None
+        #: 2.19.2: één verbinding, aanroepen uit meerdere executor-threads.
+        #: Zonder slot rondde de ene thread de transactie van de andere af
+        #: (21-10 20:59: *cannot commit - no transaction is active* in de
+        #: afstemming na de herstart). Herintreedbaar: methoden roepen elkaar
+        #: aan. Zie ook ``install_buffered_signals``.
+        self._slot = threading.RLock()
 
     # -- lifecycle ---------------------------------------------------------- #
 
@@ -1648,3 +1656,22 @@ class TradeDatabase:
         cur = self.conn.execute("DELETE FROM signals WHERE ts < ?", (cutoff_iso,))
         self.conn.commit()
         return cur.rowcount
+
+
+def _onder_slot(functie):
+    @functools.wraps(functie)
+    def binnen_slot(self, *args, **kwargs):
+        with self._slot:
+            return functie(self, *args, **kwargs)
+    return binnen_slot
+
+
+# 2.19.2: elke methode van TradeDatabase houdt de slot vast, zodat een
+# execute en de bijbehorende commit nooit met een andere thread verweven raken.
+for _naam, _functie in list(vars(TradeDatabase).items()):
+    if _naam.startswith("__") or not callable(_functie):
+        continue
+    if isinstance(_functie, (staticmethod, classmethod)):
+        continue
+    setattr(TradeDatabase, _naam, _onder_slot(_functie))
+del _naam, _functie
