@@ -219,3 +219,14 @@ laatste ronde: 13-10 19:15
 - Meten: 5m-30m bij n ≥ 100 in run 132 (eerder +; nu klein −); trades/uur na de uitschakeling.
 
 laatste ronde: 13-10 20:15
+
+## 21-10 ~19:55 · ronde 13 (geplande controle; 2.19.0 actief sinds herstart 16:47 UTC)
+- **Gebouwd 2.19.1** (L-GS-020, suite 1892 groen + 5 skip, in HACS gedownload, herstart door Ruud): leeg accountantwoord (saldo én equity 0 na gemeten > 0, of IG zonder saldo) = geen meting → geen vloertoets/noodstop, geen equitypunt; drawdown slaat 0/0-punten over (herstelt IG *Max. drawdown* 100 %). Geen strategie/vingerafdruk geraakt. Test test_v2191_leeg_account (6).
+- **Bitvavo-mand staat stil:** "mand: noodstop bij PUMP-EUR" (dagverlies 10,31 % ≥ 10 %, al actief bij herstart 13:45 UTC) blokkeert alle 20 markten. Mand netto −1.392 EUR (PUMP n=86 −1.045, ICNT n=15 −197, PEPE n=46 −150). Hervatten = knop Ruud.
+- **Pepperstone** (sensor n=1.571): netto −8.739, bruto −2.477, kosten 6.262 (3,99/trade). Per tijdvak netto: 5m −3.579 (bruto −2.232, n=411), 3m −1.604 (bruto +1.090), 1m −1.430, 15m −1.266, 30m −861. Families: alleen bb_fade (+287, n=97) en structuur_hl (+35) ≥ 0; beste opzet structuur_hl:3m t 1,98 bij 45 opzetten → overleeft Bonferroni niet (|t| ≳ 3,2).
+- **IG** run 135: n=161, netto −86, PF 0,97, t −0,11. Veldproef 1m/3m/5m uitgezet; 15m/30m deels via kostregel. Afstemming IG 2/2232, XAUUSD 7/1687 afwijkingen (oud).
+- **Daghandel** draait nu (2.19.0): reden "geen_uitbraak" op kanaal 20 uur/uur-EMA bij beide; nog 0 trades sinds 16:47 UTC.
+- Instellingen: niets (geen gemeten verlies met voldoende n dat een instelling verklaart; Bitvavo: eerst noodstop oorzaak, memecoins PUMP/ICNT dragen 89 % van het verlies → volgende ronde min_volume/marktkeuze overwegen bij n ≥ 200 mand).
+- Meten: na herstart IG drawdown ≈ 0 %; daghandeltrades per dag; mand per markt na hervatten.
+
+laatste ronde: 21-10 19:55
