@@ -26,3 +26,7 @@
 | Run 101 totaal | 78 trades / 8 clusters: netto −97,38 · bruto +26,30 · kosten 123,68 (per trade −1,25 / +0,34 / 1,59); PF 0,472; t_cluster −2,86 | t/m 12-10 03:45 | 12-10 03:40 |
 | Handelsnacht ma 00:15-02:19 per trade | netto −1,23 · bruto +0,59 · kosten 1,82 USD | 14 trades | 12-10 03:40 |
 | Latency handel p50 / p99 | 188 / 667 ms (incl. herstart 03:33) | n=2000 | 12-10 03:40 |
+| IG run 19-10.. (veldproef 15m/30m + daghandel) | 160 trades / 10 clusters: netto −101 · bruto +926 · kosten 1.027 (6,42/trade); PF 0,967; t_cluster −0,13; uurblokken t_bruto 1,12 (44) → ~140 blokken voor bruto t=2; netto geen edge | 19-10 09:00..21-10 19:45 UTC | 21-10 19:45 |
+| Pepperstone XAUUSD (start 14-10) | 1.571 trades / 6 clusters: netto −8.739 · bruto −2.477 · kosten 6.262 (3,99/trade); PF 0,79; uurblokken t_netto −2,09 (111), t_bruto −0,60 | 14-10..21-10 | 21-10 19:45 |
+| Latency p99 (cycli) | IG 35,2 s · Pepperstone 15,1 s (p50 445 / 355 ms); Pepperstone dagmiddel 5,0 s (14..16-10, 19-10) → 9,3 s (20-10) → 13,9 s (21-10) | n=2000 | 21-10 19:45 |
+| Sluitreden onbekend Pepperstone | 26,1 % (410/1.571) | 14..21-10 | 21-10 19:45 |

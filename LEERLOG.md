@@ -372,3 +372,15 @@ laatste ronde: 12-10 19:40, gemeten t/m 12-10 19:46
 - Hypotheses: H-GS-10 (vrijdagsluiting, toets 16-10), H-GS-11 (daghandelkosten ≈ 20 % van de beweging: nog 0 daghandeltrades). Nieuw meetdoel veldproef: per opzet en tijdvak trades, bruto/kosten; per opzet zijn ≥ 30 trades nodig voor een ruwe toets, bij 45 opzetten dus ≥ 1.350 trades vóór een eerste vergelijking. Geen release. L-GS-011 moet nu op 2.4.1 worden gezet (dagafsluiting 13-10).
 
 laatste ronde: 12-10 23:40, gemeten t/m 12-10 23:43
+
+## 21-10 19:40 · dagafsluiting (inhaalronde na gat 13-10 20:15 → 21-10)
+- Gat 13..20-10: geen leerrondes. Intussen 2.6.2 → **2.19.0** (actief; o.a. Pepperstone 14-10, Bitvavo-mand papier 20-10, daghandel op kwartierbars 21-10). IG-runhistorie vóór 19-10 niet meer in de sensoren (alleen lopende run) → 13..18-10 IG niet per dag meetbaar; 12-10 uit `analyse/` overgenomen in KPI.csv.
+- **IG** (run sinds 19-10 09:00 UTC, veldproef 15m/30m): 160 trades / 10 clusters, netto −101 (bruto +926, kosten 1.027 = 6,42/trade), PF 0,97, t_cluster −0,13. Per dag +134 / −446 / +215. Uurblokken t_bruto 1,12 (44) → ~140 blokken nodig voor bruto t=2; netto geen edge.
+- **Pepperstone** (sinds 14-10): 1.571 trades / 6 clusters, netto −8.739, bruto −2.477 (al negatief vóór kosten), kosten 6.262; t_netto −2,09 over 111 uurblokken → aantoonbaar verliesgevend, niet alleen kosten. Sluitreden onbekend 26,1 %.
+- **Meetfout/bug (L-GS-020):** IG-equity 0/0 om 13:14:07 → NOODSTOP 13:15, hervat 13:42 (knop, niet door deze ronde); drawdown IG staat sindsdien op 100 %. Bouwen geweigerd door de toestemmingscontrole van deze sessie → gepland, geen release.
+- **Latency** verslechterd: p99 IG 35,2 s, Pepperstone 15,1 s (exitbeheer `candles->exits` domineert); Pepperstone dagmiddel 5,0 s → 9,3 (20-10) → 13,9 s (21-10).
+- Hypotheses: **H-GS-11** daghandelkosten ≈ 20 % van de beweging (1 daghandeltrade sinds 2.19.0 → niet meetbaar); **H-GS-12** latency stijgt met de Bitvavo-mand (20 lussen sinds 20-10; samenhang in de tijd, oorzaak niet bewezen); **H-GS-13** IG New York-sessie positief (t_netto 2,23 / 16 blokken; 3 sessies vergeleken = meervoudig toetsen, eerst ≥ 30 nieuwe blokken). H-GS-10 vervallen (vrijdagtoets 16-10 niet gemeten).
+- Niet meetbaar: slippage verwacht/gerealiseerd per trade (geen attribuut), IG-dagen vóór 19-10, IG-latencystatistiek (geen long-term statistics).
+- Geen release; geen knoppen, geen instellingen gewijzigd.
+
+laatste ronde: 21-10 19:40, gemeten t/m 21-10 19:45
