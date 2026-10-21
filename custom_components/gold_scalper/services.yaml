@@ -130,6 +130,12 @@ export_data:
       selector:
         select:
           options: [bars, trades, available]
+    entry_id:
+      name: Gold Scalper
+      description: Welke Gold Scalper (IG, Pepperstone, Bitvavo). Leeg = de eerste.
+      selector:
+        config_entry:
+          integration: gold_scalper
     timeframe:
       name: Tijdvak
       description: Tijdvak in het archief (bijv. 15m). Leeg = het tijdvak van de strategie.

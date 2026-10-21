@@ -166,7 +166,8 @@ def test_standaard_daghandel_en_keuze():
 
 def test_coordinator_kiest_beslisser_uitstap_en_nieuwe_run():
     bron = (PKG / "coordinator.py").read_text(encoding="utf-8")
-    assert "self._beslisser(now, strategie), self._candles" in bron
+    # 2.19.0: de invoer is per strategie (daghandel: kwartierbars)
+    assert "self._beslisser(now, strategie), invoer" in bron
     assert "daghandel_mod.exit_config()\n            if self._strategie in (STRATEGIE_DAGHANDEL, STRATEGIE_COMBINATIE)" in bron
     assert '"strategy": self.strategie_versie,' in bron
     assert bron.count("self.db.start_run, self.mode.value, self.strategie_versie,") == 2

@@ -31,6 +31,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .analysis.signals import Candles
+from .analysis.volatility import atr as _atr_reeks
 from .broker.adapter import (
     ExecutionVenue, OrderResult, VenueError, VenueQuote, size_says_closed, size_is_known,
 )
@@ -2981,12 +2982,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 else self._last_entry_ts
             )
             r_signal = None
-            if self._candles is not None and len(self._candles) >= 60:
+            # 2.19.0: de daghandel rekent op kwartierbars (zie _daghandel_candles)
+            invoer = self._daghandel_candles() if strategie == STRATEGIE_DAGHANDEL else self._candles
+            if invoer is not None and len(invoer) >= 60:
                 # 2.17.0: met de context mee, anders rekent de strategie in de
                 # werkthread met de neutrale (goud)schaal.
                 r_signal = await self.hass.async_add_executor_job(
                     contextvars.copy_context().run,
-                    self._beslisser(now, strategie), self._candles, quote.bid, quote.ask,
+                    self._beslisser(now, strategie), invoer, quote.bid, quote.ask,
                     self.strategy_cfg, now.hour, eigen_open,
                     now.timestamp() - laatste_instap, 0, eigen_richting,
                 )
@@ -3731,6 +3734,42 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 return g["richting"]
         return eigen
 
+    def _daghandel_candles(self):
+        """2.19.0: kwartierbars voor de daghandel.
+
+        De daghandel is gebouwd en getoetst op kwartierbars: een kanaal van 80
+        bars (20 uur), uur-EMA's 20/50 (minstens 51 afgesloten uren) en stops in
+        ATR(15m). Hij kreeg de bars van het tijdvak van de entry - bij XAUUSD
+        en de Bitvavo-mand 1m, hooguit 800 stuks (13 uur): de uur-EMA's kwamen
+        nooit rond ("Nog geen 50 afgesloten uren") en de daghandel handelde
+        nooit. De veldproef houdt al 400 kwartierbars bij (100 uur, bij het
+        opstarten uit het archief of de broker); die krijgt hij nu.
+        """
+        kandidaten = []
+        try:
+            c15 = self.veldproef.candles("15m")
+            if c15 is not None:
+                kandidaten.append(c15)
+        except Exception:  # noqa: BLE001 - nog geen kwartierbars
+            pass
+        if self.timeframe == "15m" and self._candles is not None:
+            kandidaten.append(self._candles)
+        return max(kandidaten, key=len) if kandidaten else None
+
+    def _atr15(self) -> float | None:
+        """2.19.0: ATR(14) op kwartierbars, voor de exits van de daghandel."""
+        c = self._daghandel_candles()
+        if c is None or len(c) < 15:
+            return None
+        sleutel = (len(c), c.timestamp[-1])
+        if getattr(self, "_atr15_cache", (None, None))[0] != sleutel:
+            try:
+                waarde = float(_atr_reeks(c, 14)[-1])
+            except Exception:  # noqa: BLE001
+                waarde = None
+            self._atr15_cache = (sleutel, waarde if waarde and waarde > 0 else None)
+        return self._atr15_cache[1]
+
     async def _manage_open_positions(self, quote: VenueQuote, now: datetime) -> None:
         """Break-even, gedeeltelijk sluiten, trailing en tijdstops."""
         atr = self.state.atr.value or 0.0
@@ -3753,7 +3792,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 2.4.10: de veldproef rekent break-even en volgstop in R.
             maat = (
                 veldproef_mod.r_van(position.open_price, getattr(position, "take_profit", None))
-                if veldproef_mod.is_veldproef(strategie) else atr
+                if veldproef_mod.is_veldproef(strategie)
+                # 2.19.0: de volgstop van de daghandel staat in ATR(15m)
+                else (self._atr15() or atr) if strategie == STRATEGIE_DAGHANDEL
+                else atr
             )
             action = self._exits_voor(strategie).evaluate(
                 side=position.side,

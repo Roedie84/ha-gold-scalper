@@ -93,6 +93,8 @@ def _combinatie(tmp_path, monkeypatch, scalp_units=0.5):
     coordinator, venue, hass = _opzet(tmp_path, monkeypatch)
     coordinator._strategie = STRATEGIE_COMBINATIE
     coordinator._scalp_units = scalp_units
+    # 2.19.0: de daghandel krijgt kwartierbars; hier is de daghandel nep
+    coordinator._daghandel_candles = lambda: coordinator._candles
     coordinator.risk.limits.max_open_positions = 7
     houd = lambda **kw: ExitAction("hold", reason="test")  # noqa: E731
     coordinator.exits = ExitManager(D.exit_config())

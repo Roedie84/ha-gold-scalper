@@ -1,5 +1,17 @@
 # Changelog — Gold Scalper
 
+## 2.19.0 - 21-10-2026
+
+### Daghandel draait weer (op kwartierbars)
+- Gevraagd 21-10 06:13: "Gold scalper helemaal controleren en waar mogelijk de strategie verbeteren".
+- Gevonden: de daghandel - de enige opzet met een backtest over 2011-2018 (kosten ~20 % van de beweging) - heeft sinds de overstap naar 1m nooit gehandeld. Hij kreeg de bars van het tijdvak van de entry (1m, hooguit 800 = 13 uur) en wachtte op "50 afgesloten uren voor de uur-EMA's"; zijn kanaal van 80 bars was 80 minuten in plaats van 20 uur, en zijn volgstop rekende in ATR(1m) in plaats van ATR(15m). Bij XAUUSD 1 trade in een week, bij IG 1, in de Bitvavo-mand 0.
+- Nu krijgt de daghandel de kwartierbars die de veldproef al bijhoudt (400 = 100 uur, bij het opstarten uit het archief of de broker), en zijn exits ATR(15m). Geen kwartierbars: geen daghandel (niet op 1m). Regels en strategieversie ongewijzigd: geen nieuwe run.
+
+### Overig
+- Sensor Evaluaties: alleen de 30 meest voorkomende weigeringsredenen (plus het aantal soorten). Redenen met getallen erin maakten de attributen groter dan 16 KB; de recorder waarschuwde 3.269 keer in één nacht.
+- Dienst `export_data`: kies de Gold Scalper met `entry_id` (zonder keuze kwam de eerste terug: de Bitvavo-mand, 0 trades) en de trades hebben nu ook strategie, modus, id en ticket - voor onderzoek naar uitstappen (MFE/MAE per opzet).
+- Tests: `test_v2190_daghandel_kwartier.py` (7); `test_v200_daghandel.py` en `test_v210_combinatie.py` aangepast aan de invoer per strategie.
+
 ## 2.18.5 - 20-10-2026
 
 ### Afwijkingen bij de broker één keer melden

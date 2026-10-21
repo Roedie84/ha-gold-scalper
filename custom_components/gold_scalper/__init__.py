@@ -505,7 +505,13 @@ def _register_services(hass: HomeAssistant) -> None:
         soort = call.data.get("kind", "bars")
         offset = int(call.data.get("offset", 0))
         limit = int(call.data.get("limit", 2000))
-        for coordinator in _hoofden():
+        # 2.19.0: per entry (IG, Pepperstone, Bitvavo-mand); zonder keuze de
+        # eerste - en dat was de Bitvavo-mand, met 0 trades.
+        gekozen = call.data.get("entry_id")
+        hoofden = [c for c in _hoofden() if not gekozen or c.entry.entry_id == gekozen]
+        if gekozen and not hoofden:
+            raise HomeAssistantError(f"Geen Gold Scalper met entry_id {gekozen}")
+        for coordinator in hoofden:
             if soort == "available":
                 if coordinator.archive is None:
                     raise HomeAssistantError("Het archief is niet geopend.")
@@ -535,10 +541,10 @@ def _register_services(hass: HomeAssistant) -> None:
                           "close_mid", "close_reason", "stop_loss", "take_profit",
                           "total_cost", "gross_pnl", "net_pnl", "mae", "mfe",
                           "duration_seconds", "signal_score", "entry_atr",
-                          "exit_regime")
+                          "exit_regime", "strategie", "mode", "id", "broker_ticket")
                 rijen = [[getattr(t, v, None) for v in velden]
                          for t in trades[offset:offset + limit]]
-                return {"total": len(trades), "offset": offset,
+                return {"total": len(trades), "offset": offset, "entry_id": coordinator.entry.entry_id,
                         "columns": list(velden), "rows": rijen}
         raise HomeAssistantError(f"Onbekende soort of geen Gold Scalper: {soort}")
 
@@ -546,6 +552,7 @@ def _register_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_EXPORT_DATA, _zeg_wat_er_misging("export_data")(export_data),
         schema=vol.Schema({
             vol.Optional("kind", default="bars"): vol.In(["bars", "trades", "available"]),
+            vol.Optional("entry_id"): str,
             vol.Optional("timeframe"): str,
             vol.Optional("run_id"): vol.Coerce(int),
             vol.Optional("offset", default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),

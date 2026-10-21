@@ -343,7 +343,11 @@ SENSORS: tuple[ScalperSensor, ...] = (
         value_fn=lambda d: (_stats(d).get("signals") or {}).get("evaluations"),
         attrs_fn=lambda d: {
             "acted": (_stats(d).get("signals") or {}).get("acted"),
-            "rejections": (_stats(d).get("signals") or {}).get("rejections", {}),
+            # 2.19.0: de 30 meest voorkomende. Redenen met getallen erin
+            # (kostenfilter) maakten van elke weigering een eigen sleutel:
+            # meer dan 16 KB, en de recorder klaagde 3.269 keer per nacht.
+            "rejections": dict(list(((_stats(d).get("signals") or {}).get("rejections") or {}).items())[:30]),
+            "rejections_soorten": len((_stats(d).get("signals") or {}).get("rejections") or {}),
         },
     ),
     ScalperSensor(
