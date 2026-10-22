@@ -420,3 +420,14 @@ laatste ronde: 22-10 11:40, gemeten t/m 22-10 11:45
 - Hypotheses: H-GS-11 (daghandelkosten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
 
 laatste ronde: 22-10 15:40, gemeten t/m 22-10 15:45
+
+## 22-10 19:40 · tussenronde
+- Actief **2.20.3** (andere sessies: 2.19.5, 2.20.0-2.20.3 tussen 15:01 en 19:03; herstart 19:07). Demo/papier; noodstops alle uit (ook de Bitvavo-mand). Geen knoppen, geen instellingen.
+- **Nieuwe runs IG en Pepperstone sinds 16:48** (config-entry herladen 16:49; oorzaak niet in deze ronde vastgesteld). IG 19 trades / 1 cluster: netto +125,9 (bruto +226, kosten 100 = 5,3/trade, 44 % van bruto), PF 1,57. Pepperstone 24 trades / 1 cluster: netto +614,8, PF 5,28. Eén cluster → géén toets mogelijk (≥ 30 clusters nodig); oude runs eindigden op IG −417 (15 cl.) en Pepperstone −9.050 (t −1,45).
+- H-GS-13 (IG NY): de NY-middag valt nu in een nieuwe run; uitslag van de oude run in de dagafsluiting uit de uurblokken.
+- Latency p99: IG 32,3 s, Pepperstone 25,5 s (was 18,2), Bitvavo 13,3 s → H-GS-12: achtergrond-afstemming (2.20.0) liet IG p99 nog niet zakken; 1 dag meten.
+- **Afstemming beter:** IG 0 afwijkingen (was 2, opgelost door 2.20.0/2.20.1), Pepperstone 3 (was 7).
+- **L-GS-021 geverifieerd:** herstart 19:07 0× "uitgezet"/"Opgewarmd" (was 22× per herstart).
+- Hypotheses: H-GS-11 (daghandelkosten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
+
+laatste ronde: 22-10 19:40, gemeten t/m 22-10 19:45
