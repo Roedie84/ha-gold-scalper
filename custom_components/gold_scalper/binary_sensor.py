@@ -84,6 +84,25 @@ class LiveUnlocked(GoldScalperEntity, BinarySensorEntity):
         }
 
 
+def _mand_gestopt(c) -> list[tuple[str, str | None]]:
+    """2.19.4: de noodstop van een mandlid stopt de hele mand (``mag_openen``),
+    dus de noodstop van de mand (hoofdlus) staat dan ook aan. Geeft
+    ``(markt, reden)`` van de gestopte leden; leeg buiten een mand en voor
+    de leden zelf."""
+    mand = getattr(c, "_mand", None)
+    if mand is None or getattr(mand, "hoofd", None) is not c:
+        return []
+    gestopt = []
+    for lid in list(getattr(mand, "leden", {}).values()):
+        try:
+            toestand = lid.risk.as_dict()
+        except Exception:  # noqa: BLE001 - een lid zonder risico telt niet
+            continue
+        if toestand.get("state") == "halted":
+            gestopt.append((getattr(lid, "symbol", "?"), toestand.get("halt_reason")))
+    return gestopt
+
+
 class RiskHalted(GoldScalperEntity, BinarySensorEntity):
     """Aan bij een noodstop. Vereist handmatig hervatten."""
 
@@ -110,6 +129,8 @@ class RiskHalted(GoldScalperEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         risk = self._risk()
+        if _mand_gestopt(self.coordinator):
+            return True
         if not risk:
             return None
         return risk.get("state") == "halted"
@@ -117,11 +138,17 @@ class RiskHalted(GoldScalperEntity, BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         risk = self._risk()
-        return {
+        attrs = {
             "reason": risk.get("halt_reason"),
             "recent_triggers": risk.get("recent_triggers", []),
             "hint": "Roep gold_scalper.resume aan nadat je de oorzaak hebt vastgesteld.",
         }
+        gestopt = _mand_gestopt(self.coordinator)
+        if gestopt:
+            attrs["markten"] = [m for m, _ in gestopt]
+            if not attrs["reason"]:
+                attrs["reason"] = "; ".join(f"{m}: {r}" for m, r in gestopt)
+        return attrs
 
 
 class MarketTradeable(GoldScalperEntity, BinarySensorEntity):

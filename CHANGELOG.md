@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.19.4 - 22-10-2026
+
+### Mand: noodstop van een markt zichtbaar op de noodstop van de mand
+- Gemeten 22-10 08:10: PUMP-EUR en BILL-EUR stonden in noodstop (dagverlies 10,06 % en 10,03 %, papier) en blokkeerden de hele Bitvavo-mand ("mand: noodstop bij PUMP-EUR, BILL-EUR"), maar `binary_sensor.gold_scalper_btc_eur_noodstop` stond uit. Alleen het attribuut `per_markt` van de mandsensor liet het zien.
+- Nu staat de noodstop van de mand (hoofdlus) aan zodra een lid in noodstop staat, met de gestopte markten in het attribuut `markten` en hun reden. De leden zelf en IG/Pepperstone veranderen niet. Hervatten blijft via de knop van de mand (die hervat ook de leden).
+- Raakt geen strategie, risicogrenzen of orders; geen nieuwe run.
+- Test: `test_v2194_mand_noodstop.py` (4).
+
 ## 2.19.3 - 22-10-2026
 
 ### export_data: de Bitvavo-mand geeft de trades van alle markten
