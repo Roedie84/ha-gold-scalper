@@ -407,3 +407,16 @@ laatste ronde: 22-10 07:40, gemeten t/m 22-10 07:45
 - Hypotheses: H-GS-11 (daghandelkosten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
 
 laatste ronde: 22-10 11:40, gemeten t/m 22-10 11:45
+
+## 22-10 15:40 · tussenronde
+- Actief 2.19.4 (herstarts 14:18, 14:34, 15:27 door EMS-installaties). Demo/papier; geen knoppen, geen instellingen.
+- **IG** sinds 11:45: +22 trades, netto −187,2 (run 226 / 15 clusters, −417, PF 0,91, t_cluster −0,50). Cluster 15 (08:45-15:45, 29 trades): bruto −3,3, netto −146,3 → kosten ~4,9 USD/trade maken het verlies (H-GS-11). Grootste cluster (nr 7, −443) weg: netto +25 → geen edge, geen conclusie bij 15 clusters (≥ 30 nodig voor een redelijke t-toets).
+- **Pepperstone**: +33 trades, netto −235,5 (run 1.681, −9.050, PF 0,80, t −1,45).
+- Latency p99: IG 32,2 s, Pepperstone 18,2 s, Bitvavo 13,5 s → H-GS-12 ongewijzigd.
+- Afstemming: IG 2.225/2.227 (2 uitstapverschillen ~7,5 USD; 4 nog niet bij de broker), Pepperstone 1.790/1.795 (7; 1 trade na 7,8 dagen niet bij de broker).
+- Bitvavo-mand: noodstop aan sinds 2.19.4 (PUMP-EUR, dagverlies 10,03 % uit een eerdere sessie; BILL-EUR sinds 14:19 niet meer). Na elke herstart ~1 min "uit" (14:18, 14:34, 15:27) tot de opslag geladen is → kort vals "uit" (n=3, meetbaarheid; volgen).
+- L-GS-021 4e keer (15:28: 22× "uitgezet"); daarnaast bij elke herstart 10× "Opgewarmd met 96-247 candles" (Bitvavo).
+- H-GS-13 (IG NY): sessie pas 15:30 begonnen; uitslag in de dagafsluiting.
+- Hypotheses: H-GS-11 (daghandelkosten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
+
+laatste ronde: 22-10 15:40, gemeten t/m 22-10 15:45
