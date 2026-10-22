@@ -74,6 +74,12 @@ CENT_TOLERANTIE = 0.015
 #: Omvang in ounce: kleinere verschillen zijn afronding.
 OMVANG_TOLERANTIE = 0.005
 
+#: 2.20.1: rekenmarge op die grens. IG rondt op honderdsten af: een rest van
+#: 2,675 oz staat bij de broker als 2,68, en 2,68 - 2,675 is in drijvende
+#: komma 0,0050000000000003 - net boven de grens. Daardoor bleven de twee
+#: IG-restposities van 15-10 een afwijking (niet sterk, niet eenduidig).
+OMVANG_EPS = 1e-9
+
 
 @dataclass(slots=True)
 class Afwijking:
@@ -400,7 +406,7 @@ def _sterk(trade: Trade, match: dict, units: float) -> bool:
     if abs(instap - trade.open_price) > PRIJS_TOLERANTIE + 1e-9:
         return False
     omvang = _omvang(match)
-    if omvang is not None and units and abs(omvang - units) > OMVANG_TOLERANTIE:
+    if omvang is not None and units and abs(omvang - units) > OMVANG_TOLERANTIE + OMVANG_EPS:
         return False
     return True
 
@@ -434,7 +440,7 @@ def _eenduidig(trade: Trade, match: dict, claims: dict,
     # (1,40 tegen 1,53) is mogelijk een andere positie.
     omvang = _omvang(match)
     units = (trade.volume or 0) * contract_size
-    if omvang is None or not units or abs(omvang - units) <= OMVANG_TOLERANTIE:
+    if omvang is None or not units or abs(omvang - units) <= OMVANG_TOLERANTIE + OMVANG_EPS:
         return True
     return abs(omvang - round(omvang)) <= 1e-6 and abs(omvang - units) <= 1.01
 
@@ -457,7 +463,7 @@ def _overname(trade: Trade, match: dict, contract_size: float) -> tuple[dict, st
 
     units = (trade.volume or 0) * contract_size
     omvang = _omvang(match)
-    if omvang is not None and abs(omvang - units) > OMVANG_TOLERANTIE:
+    if omvang is not None and abs(omvang - units) > OMVANG_TOLERANTIE + OMVANG_EPS:
         velden["volume"] = round(omvang / contract_size, 12)
         units = omvang
 

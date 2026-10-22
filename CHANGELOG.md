@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.20.1 - 22-10-2026
+
+### Afstemming: omvang op honderdsten afgerond telt als gelijk
+- Live na de herstart van 22-10 17:23 (2.20.0): IG nog steeds 2 afwijkingen (instap 4143,62: uitstap 4154,07 tegen 4150,96, +24,90 tegen +17,39; instap 4143,83: 4154,13 tegen 4151,06, +24,54 tegen +17,13).
+- Oorzaak: de resten (2,675 oz) van twee posities die op 15-10 twee keer gedeeltelijk sloten. IG rondt de omvang af op honderdsten (2,68), en 2,68 − 2,675 is in drijvende komma 0,0050000000000003: net boven de omvangsgrens van 0,005. Daardoor was de koppeling niet sterk en ook niet eenduidig (2.20.0), en bleef de eigen uitstap van de deelsluiting staan. Het scenario met de zes trades en transacties van die posities geeft precies de live meldingen; met 2,67 bij de broker was er niets aan de hand.
+- Nu een rekenmarge van 1e-9 op de omvangsgrens (sterke koppeling, eenduidige koppeling en overname van de omvang). De grens zelf blijft 0,005.
+- Pepperstone (bekeken, geen wijziging): de twee meldingen "instap 4093,48 ontbreekt" zijn deelsluiting en rest van positie 58312111 (14-10) die niet in het dealoverzicht van de broker staan - niet aangeraakt, zoals bedoeld. "Instap 4174,32: 4181,94 tegen 4184,55" is de rest van positie 58383755: zijn sluitende deal ontbreekt in het overzicht, waardoor hij aan de transactie van zijn deelsluiting (4184,55) koppelt; die transactie wordt door twee trades geclaimd en dus terecht niet overgenomen. IG `sluitreden_ingevuld` 0: de lopende IG-run heeft 0 % onbekend, er is niets in te vullen; bij XAUUSD vult de afstemming 25 per ronde (2.19.5).
+- Test: `test_v2201_afstemming_omvang.py` (4; 2 faalden vóór de fix).
+
 ## 2.20.0 - 22-10-2026
 
 ### Afstemming: uitstapprijs van de broker overnemen bij een eenduidige koppeling
