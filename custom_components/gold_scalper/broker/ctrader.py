@@ -73,10 +73,12 @@ ACCOUNTS_BY_TOKEN_REQ, ACCOUNTS_BY_TOKEN_RES = 2149, 2150
 ACCOUNT_DISCONNECT_EVENT = 2164
 REFRESH_TOKEN_REQ, REFRESH_TOKEN_RES = 2173, 2174
 DEALS_BY_POSITION_REQ, DEALS_BY_POSITION_RES = 2179, 2180
+ORDER_DETAILS_REQ, ORDER_DETAILS_RES = 2181, 2182
 UNREALIZED_PNL_REQ, UNREALIZED_PNL_RES = 2187, 2188
 
 #: Historische verzoeken: cTrader staat er 5 per seconde toe (overige 50/s).
-HISTORISCH = frozenset({TRENDBARS_REQ, DEAL_LIST_REQ, DEALS_BY_POSITION_REQ})
+HISTORISCH = frozenset({TRENDBARS_REQ, DEAL_LIST_REQ, DEALS_BY_POSITION_REQ,
+                        ORDER_DETAILS_REQ})
 HISTORISCH_INTERVAL_S = 0.4
 ALGEMEEN_INTERVAL_S = 0.05
 #: Pogingen na "You are being rate limited" (BLOCKED_PAYLOAD_TYPE).
@@ -204,6 +206,38 @@ def deal_naar_transactie(deal: dict, opening: dict | None, valuta: str | None) -
         "commissie": round(float(detail.get("commission") or 0) / schaal, 2),
         "swap": round(float(detail.get("swap") or 0) / schaal, 2),
     }
+
+
+#: 2.19.5: soort van de sluitende order (ProtoOAOrderType).
+ORDER_MARKT = {"MARKET", 1, "1"}
+ORDER_STOP_DOEL = {"STOP_LOSS_TAKE_PROFIT", 4, "4"}
+#: Label dat ``place_order`` aan elke eigen order meegeeft.
+EIGEN_LABEL = "gold_scalper"
+
+
+def kanaal_van_order(order: dict | None) -> str | None:
+    """2.19.5: wie sloot, uit de sluitende order van cTrader.
+
+    In de vorm van het activiteitenkanaal van IG, zodat
+    ``learning/sluitreden.reden_uit_broker`` er ongewijzigd mee werkt:
+
+    * ``SYSTEM``: de broker sloot - een stop- of doelorder
+      (``STOP_LOSS_TAKE_PROFIT``) of een stop-out;
+    * ``OPEN_API``: een marktorder met ons label, dus deze integratie;
+    * None: geen bewijs (bijv. een marktorder zonder ons label: dat kan ook
+      met de hand zijn geweest).
+    """
+    if not order:
+        return None
+    if order.get("isStopOut"):
+        return "SYSTEM"
+    soort = order.get("orderType")
+    if soort in ORDER_STOP_DOEL:
+        return "SYSTEM"
+    label = (order.get("tradeData") or {}).get("label")
+    if soort in ORDER_MARKT and order.get("closingOrder") and label == EIGEN_LABEL:
+        return "OPEN_API"
+    return None
 
 
 class CTraderVenue(ExecutionVenue):
@@ -958,6 +992,48 @@ class CTraderVenue(ExecutionVenue):
             "closed_at": tx["dateUtc"],
             "opened_at": tx["openDateUtc"],
             "reference": tx["reference"],
+        }
+
+    async def sluitkanaal(self, ticket: str, side: str | None = None,
+                          open_price: float | None = None, since=None) -> dict | None:
+        """2.19.5: uitstap en wie sloot, voor het achteraf invullen van een
+        onbekende sluitreden (``coordinator._vul_sluitredenen_in``).
+
+        IG heeft daarvoor het activiteitenoverzicht met ``channel``; cTrader
+        niet. Hier: de sluitende deal van de positie, en van de order achter
+        die deal de soort (``ORDER_DETAILS``). Twee verzoeken, alleen lezen.
+        None als er (nog) geen sluitende deal is; ``channel`` None als de
+        order geen bewijs geeft.
+        """
+        await self._klaar()
+        nu = datetime.now(timezone.utc)
+        begin = since if isinstance(since, datetime) else None
+        if begin is not None and begin.tzinfo is None:
+            begin = begin.replace(tzinfo=timezone.utc)
+        if begin is None:
+            begin = nu - timedelta(days=7)
+        begin = begin - timedelta(hours=1)
+        eind = min(nu, begin + timedelta(days=7))
+        deals = await self._deals_van_positie(str(ticket).split("-")[0], begin, eind)
+        sluitend = [d for d in deals if d.get("closePositionDetail")]
+        if not sluitend:
+            return None
+        deal = max(sluitend, key=lambda d: int(d.get("executionTimestamp") or 0))
+        order = None
+        order_id = deal.get("orderId")
+        if order_id:
+            antw = await self._verzoek(ORDER_DETAILS_REQ, {
+                "ctidTraderAccountId": self.ctid, "orderId": int(order_id)},
+                ORDER_DETAILS_RES)
+            order = antw.get("order") or None
+        uitstap = deal.get("executionPrice")
+        return {
+            "exit_price": float(uitstap) if uitstap is not None else None,
+            "channel": kanaal_van_order(order),
+            "activity_date": _iso(deal.get("executionTimestamp")),
+            "source": "ctrader_order",
+            "order_type": (order or {}).get("orderType"),
+            "order_id": order_id,
         }
 
     @property

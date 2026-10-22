@@ -38,7 +38,7 @@ _MAX_DUUR = re.compile(
 )
 
 #: Kanalen van IG: wie de sluiting deed.
-_KANAAL_API = {"PUBLIC_WEB_API", "PUBLIC_FIX_API"}
+_KANAAL_API = {"PUBLIC_WEB_API", "PUBLIC_FIX_API", "OPEN_API"}  # OPEN_API: cTrader (2.19.5)
 _KANAAL_HAND = {"WEB", "MOBILE", "DEALER"}
 _KANAAL_SYSTEEM = {"SYSTEM"}
 
@@ -155,6 +155,19 @@ def reden_uit_broker(
     if not kanaal:
         return None
     if kanaal in _KANAAL_SYSTEEM:
+        # 2.19.5: een doelorder vult op het doel of beter, nooit slechter. Een
+        # uitstap voorbij het doel (in de winstrichting) is dus het doel; een
+        # stop kan daar niet liggen zonder dat het doel eerst geraakt was.
+        kant = str(getattr(trade, "side", "") or "").lower()
+        if uitstap is not None and doel is not None and (
+            (kant == "buy" and uitstap >= doel - PRIJS_BEWIJS)
+            or (kant == "sell" and uitstap <= doel + PRIJS_BEWIJS)
+        ):
+            return BrokerReden(
+                "take_profit",
+                f"door de broker ({kanaal}) gesloten op {uitstap}, op of voorbij "
+                f"doel {doel} (achteraf uit de afstemming)",
+            )
         if uitstap is not None and stop is not None and abs(uitstap - stop) <= PRIJS_BEWIJS:
             return BrokerReden(
                 "stop_loss",

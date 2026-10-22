@@ -4838,8 +4838,24 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 uitslag.kosten_gemeten,
             )
         # 1.10.0: onbekende sluitredenen uit de broker invullen.
+        # 2.19.5: bij een venue die per positie kan nazoeken (cTrader) ook de
+        # oudere onbekende trades tot AFSTEMMING_MAX_DAGEN terug; die vielen
+        # buiten het venster van drie dagen en bleven anders voor altijd
+        # onbekend (22-10: 433 van 1.681 bij Pepperstone).
+        kandidaten = recent
+        if getattr(self.venue, "sluitkanaal", None) is not None:
+            try:
+                ouder = await self.hass.async_add_executor_job(
+                    self.db.closed_trades_since,
+                    (nu - timedelta(days=AFSTEMMING_MAX_DAGEN)).isoformat(),
+                    self.mode.value,
+                )
+            except Exception:  # noqa: BLE001 - alleen een ruimer venster
+                ouder = []
+            bekend = {t.id for t in recent}
+            kandidaten = [t for t in ouder if t.id not in bekend] + list(recent)
         try:
-            ingevuld = await self._vul_sluitredenen_in(recent, transacties, nu)
+            ingevuld = await self._vul_sluitredenen_in(kandidaten, transacties, nu)
         except Exception as err:  # noqa: BLE001 - invullen mag de afstemming niet slopen
             _LOGGER.debug("Sluitredenen niet ingevuld: %s", err)
             ingevuld = 0
@@ -4878,6 +4894,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     #: Hooguit zoveel onbekende sluitredenen per afstemming bij de broker
     #: nazoeken (één verzoek per trade).
     SLUITREDEN_MAX_PER_RONDE = 10
+    #: 2.19.5: bij nazoeken per positie (cTrader, twee verzoeken per trade).
+    SLUITREDEN_MAX_PER_RONDE_POSITIE = 25
+    #: 2.19.5: voorvoegsel van het bewijsveld als nazoeken niets opleverde;
+    #: zo'n trade wordt niet elke ronde opnieuw nagevraagd.
+    NAGEVRAAGD = "nagevraagd"
 
     async def _vul_sluitredenen_in(self, recent: list, transacties: list,
                                    nu: datetime) -> int:
@@ -4892,13 +4913,22 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         from .learning.exit_stats import effective_reason, exit_stats
         from .learning.sluitreden import BRON_AFSTEMMING, looptijd_van, reden_uit_broker
 
+        zoek = getattr(self.venue, "closed_deal_activity", None)
+        # 2.19.5: cTrader kent geen activiteitenoverzicht; daar zegt de
+        # sluitende order wie sloot (``CTraderVenue.sluitkanaal``).
+        per_positie = zoek is None and getattr(self.venue, "sluitkanaal", None) is not None
+        if per_positie:
+            zoek = self.venue.sluitkanaal
+        maximum = (self.SLUITREDEN_MAX_PER_RONDE_POSITIE if per_positie
+                   else self.SLUITREDEN_MAX_PER_RONDE)
         onbekend = [
             t for t in recent
             if t.close_time and t.broker_ticket and effective_reason(t) == "unknown"
-        ][: self.SLUITREDEN_MAX_PER_RONDE]
+            and not str(getattr(t, "close_reason_evidence", None) or "").startswith(
+                self.NAGEVRAAGD)
+        ][:maximum]
         if not onbekend:
             return 0
-        zoek = getattr(self.venue, "closed_deal_activity", None)
         cfg = self.exits.config
         ingevuld = 0
         for trade in onbekend:
@@ -4910,12 +4940,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             uitstap = (match or {}).get("exit_price")
             gesloten = (match or {}).get("closed_at")
             activiteit = None
+            gevraagd = False
             if zoek is not None:
                 try:
                     activiteit = await zoek(
                         str(trade.broker_ticket), trade.side, trade.open_price,
                         _as_datetime(trade.open_time, None),
                     )
+                    gevraagd = True
                 except Exception as err:  # noqa: BLE001 - alleen lezen; falen mag
                     _LOGGER.debug(
                         "Activiteit van %s niet op te halen: %s",
@@ -4939,6 +4971,19 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 tijdstop, cfg.max_hold_seconds, gesloten,
             )
             if reden is None:
+                # 2.19.5: per positie nagevraagd en de broker gaf antwoord,
+                # maar zonder bewijs: vastleggen, niet elke ronde opnieuw.
+                # Alleen als de sluiting al een uur oud is (de deal kan nog
+                # onderweg zijn).
+                oud = (nu - _as_datetime(trade.close_time, nu)).total_seconds() > 3600
+                if per_positie and gevraagd and oud:
+                    soort = (activiteit or {}).get("order_type")
+                    trade.close_reason_evidence = (
+                        f"{self.NAGEVRAAGD} {nu.strftime('%d-%m %H:%M')}: "
+                        + ("geen sluitende deal gevonden" if not activiteit else
+                           f"sluitende order {soort} geeft geen bewijs")
+                    )
+                    await self.hass.async_add_executor_job(self.db.update_trade, trade)
                 continue
             trade.reconciled_close_reason = reden.reden
             trade.close_reason_source = BRON_AFSTEMMING
@@ -4946,7 +4991,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             trade.reconciliation_status = "reconciled"
             trade.reconciled_at = nu.isoformat()
             trade.reconciliation_source = (
-                "broker_activity" if activiteit else "broker_transactions"
+                ("ctrader_order" if per_positie else "broker_activity")
+                if activiteit else "broker_transactions"
             )
             if trade.looptijd_s is None:
                 trade.looptijd_s = looptijd_van(

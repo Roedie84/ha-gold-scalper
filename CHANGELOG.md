@@ -1,5 +1,16 @@
 # Changelog — Gold Scalper
 
+## 2.19.5 - 22-10-2026
+
+### Pepperstone: onbekende sluitreden achteraf ingevuld uit de sluitende order
+- Gemeten 22-10: bij XAUUSD (Pepperstone) was de sluitreden van 433 van de 1.681 trades onbekend (25,8 %), vandaag nog +5 bij 44 nieuwe trades, en `achteraf_ingevuld` stond op 0 terwijl 1.795 trades bij de broker gevonden waren. Daardoor waren de doel- en stoppercentages (2,5/36 %) onbetrouwbaar.
+- Oorzaak: het achteraf invullen (1.10.0) leunde op het activiteitenoverzicht van IG, dat zegt wie sloot (`channel`). cTrader heeft dat niet; zonder kanaal werd alleen een uitstap precies op het doel herkend. Bovendien keek het invullen alleen naar de laatste drie dagen, zodat oudere onbekende trades nooit meer aan de beurt kwamen.
+- Nu: `CTraderVenue.sluitkanaal` haalt de sluitende deal van de positie op en daarvan de order (`ORDER_DETAILS`). Stop-/doelorder of stop-out = door de broker gesloten; marktorder met ons label = deze integratie. Uitstap op of voorbij het doel = doel, anders stop; via de API = tijdslimiet/max. duur/eigen exit zoals bij IG.
+- Bij Pepperstone ook de onbekende trades tot 10 dagen terug, 25 per afstemmingsronde. Geeft de order geen bewijs, dan staat dat in het bewijsveld (`nagevraagd …`) en wordt de trade niet elke ronde opnieuw nagevraagd. De oorspronkelijke sluitreden blijft staan.
+- Ook bij IG: een door de broker gesloten trade met een uitstap voorbij het doel telt als doel (een doelorder vult op het doel of beter), niet meer als stop.
+- Alleen lezen bij de broker; raakt geen strategie, risico of orders; geen nieuwe run.
+- Test: `test_v2195_sluitreden_ctrader.py` (7; 5 faalden vóór de fix). Volledige suite: 1.910 geslaagd, 5 overgeslagen.
+
 ## 2.19.4 - 22-10-2026
 
 ### Mand: noodstop van een markt zichtbaar op de noodstop van de mand
