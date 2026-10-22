@@ -124,7 +124,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Effect meten: IG *Max. drawdown* weer ≈ 0,0x %, geen noodstop met "equity 0.00 onder de ondergrens" meer.
 
 ## L-GS-021 · veldproef: "uitgezet" alleen melden als het nieuw is (logging/meetbaarheid)
-- Status: **geverifieerd 22-10 19:40** — gebouwd 2.20.2 (andere sessie 18:10); herstart 19:07 op 2.20.3: 0× "Veldproefopzet … uitgezet" en 0× "Opgewarmd"-waarschuwing (was 22× per herstart, 4× gezien). n=1 herstart; bij de volgende herstart nogmaals kijken. Was: **gepland** (zelf bouwen: logging; strategie, risico en handelslogica ongewijzigd). Bouwen in de eerste dagafsluiting nadat 2.19.2 geïnstalleerd is.
+- Status: **geverifieerd 22-10 19:40**, bevestigd 23:40 (herstarts 20:10 en 22:11 op 2.20.3/2.20.4: 0× ruis; 21:01 één echte uitschakeling vp:donchian:15m wél gemeld) — gebouwd 2.20.2 (andere sessie 18:10); herstart 19:07 op 2.20.3: 0× "Veldproefopzet … uitgezet" en 0× "Opgewarmd"-waarschuwing (was 22× per herstart, 4× gezien). n=1 herstart; bij de volgende herstart nogmaals kijken. Was: **gepland** (zelf bouwen: logging; strategie, risico en handelslogica ongewijzigd). Bouwen in de eerste dagafsluiting nadat 2.19.2 geïnstalleerd is.
 - Onderbouwing: na elke herstart worden alle eerder uitgezette veldproefopzetten opnieuw als WARNING "Veldproefopzet … uitgezet" gemeld (21× na de herstart van 21-10 20:58; lijst `_vp_uitgezet` start leeg). Dat vervuilt het systeemlog en maakt "nieuw uitgezet" onmeetbaar.
 - Bouw: uitgezette opzetten over herstarts onthouden (of bij opstart stil vullen), alleen een echte nieuwe uitzetting als WARNING. Test: herstart met bestaande uitgezette opzetten → 0 WARNINGs.
 - Effect meten: aantal "uitgezet"-WARNINGs na een herstart = 0.

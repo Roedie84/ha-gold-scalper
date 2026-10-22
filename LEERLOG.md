@@ -431,3 +431,14 @@ laatste ronde: 22-10 15:40, gemeten t/m 22-10 15:45
 - Hypotheses: H-GS-11 (daghandelkosten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
 
 laatste ronde: 22-10 19:40, gemeten t/m 22-10 19:45
+
+## 22-10 23:40 · tussenronde
+- Actief **2.20.4** (andere sessie 20:06: Pepperstone-afstemming op positienummer; herstarts 20:10 en 22:11). Demo/papier; geen knoppen, geen instellingen. Markten dicht (dagpauze).
+- **IG** (run sinds 16:48): +11 trades, netto −116,9 → 30 trades / 1 cluster, netto +8,96, bruto 167,3, kosten 158,3 (5,28/trade = **95 % van bruto**), PF 1,02. `vp:rsi_rev:15m` 9 trades −181,9 (11 % winst). → H-GS-11: op IG eten de kosten de bruto winst vrijwel op.
+- **Pepperstone**: +15 trades, netto +160,4 → 39 trades / 2 clusters, netto 775,2, kosten 78,3 (2,0/trade, 9 %), PF 3,14, t 1,71. 2 clusters → geen conclusie (≥ 30 nodig).
+- Latency p99 na de herstart van 22:11 (venster opnieuw gevuld, markt dicht): IG 2,3 s (was 32,3), Pepperstone 13,7 s (25,5), Bitvavo 2,9 s (13,3) → H-GS-12 pas op een volle handelsdag beoordelen.
+- Afstemming: IG 2249/2249 (0), Pepperstone 1848/1849 (1: uitstap 4181,94 tegen 4184,55; was 3 → 2.20.4 werkt).
+- Logs: 21:01 "Veldproefopzet vp:donchian:15m uitgezet" (n=40, netto −644,5) = echte uitschakeling, geen herstartruis; herstarts 20:10 en 22:11 0× ruis → L-GS-021 nu 3× schoon. 23:24 1× "Openen geweigerd (papermarge)" (1999,54 nodig, 1997,93 vrij; zo bedoeld sinds 1.9.0). 17 koerstime-outs IG/Bitvavo (steeds 1 van 3, hersteld).
+- Hypotheses: H-GS-11 (daghandelkosten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
+
+laatste ronde: 22-10 23:40, gemeten t/m 22-10 23:45
