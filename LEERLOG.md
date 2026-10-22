@@ -395,3 +395,15 @@ laatste ronde: 22-10 03:40, gemeten t/m 22-10 03:45
 - Hypotheses: H-GS-11, H-GS-12, H-GS-13 (IG NY; vandaag nog geen NY-sessie). Geen release.
 
 laatste ronde: 22-10 07:40, gemeten t/m 22-10 07:45
+
+## 22-10 11:40 · tussenronde
+- Actief **2.19.4** (andere sessie 08:22; herstarts ~09:02 en ~11:03). Demo/papier; geen knoppen, geen instellingen.
+- **IG** sinds 07:45: +10 trades, netto **+189,5** (run 204 trades / 15 clusters, −230, PF 0,94, t_cluster −0,28). Uurblokken 59: t_bruto 1,20, t_netto −0,26; NY nog 22 blokken (t_netto 1,93, geen nieuwe NY-sessie) → H-GS-13 ongewijzigd.
+- **Pepperstone**: +17 trades, netto −116 (run 1.648, −8.814, PF 0,80, t −1,41); blokken 125 t_netto −2,09, t_bruto −0,58 → blijft aantoonbaar verliesgevend.
+- Latency p99: IG 32,5 s, Pepperstone 16,9 s, Bitvavo 11,0 s (was 5,5; DNS-storing 10:24-10:40 met 286 koers-/positiewaarschuwingen) → H-GS-12: storing extern, geen nieuwe oorzaak.
+- Afstemming: IG 2.224/2.226 (2 uitstapverschillen ~7 USD, 1 nog niet bij de broker), Pepperstone 1.757/1.762 (7; 1 trade na 7,6 dagen niet bij de broker).
+- **L-GS-021 3e keer:** herstart 09:02 op 2.19.4 weer 22× "Veldproefopzet … uitgezet". Blijft gepland voor de dagafsluiting 23-10.
+- **Kandidaat "papiersaldo reset bij herladen" (GS-LEERLOG 06:25) nagelezen:** `risk_per_trade_pct` zit in de vingerafdruk (`_fingerprint_material` → `sizing`), dus 0,5 → 0,25 % start een **nieuwe run** en die begint bewust op 10.000 (`_herstel_uit_run` telt alleen trades van de lopende run). Geen bug; vervallen.
+- Hypotheses: H-GS-11 (daghandelkosten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
+
+laatste ronde: 22-10 11:40, gemeten t/m 22-10 11:45
