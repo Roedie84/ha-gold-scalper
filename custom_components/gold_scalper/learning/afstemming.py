@@ -95,6 +95,9 @@ class Afstemming:
     slippage_overgenomen: int = 0
     #: Trades waarvan de kosten in deze ronde zijn gemeten.
     kosten_gemeten: int = 0
+    #: 2.20.0: uitstapprijzen overgenomen omdat de trade eenduidig bij de
+    #: broker gevonden is (ook zonder sterke koppeling).
+    eenduidig_overgenomen: int = 0
     #: 1.7.3: voorlopige afwikkelingen (geschatte uitstap) die hier hun
     #: brokerprijs en sluitreden kregen.
     voorlopig_bijgewerkt: int = 0
@@ -138,6 +141,7 @@ class Afstemming:
             "afwijkingen": [a.as_dict() for a in self.afwijkingen],
             "bijgewerkt": len(self.overnames),
             "slippage_overgenomen": self.slippage_overgenomen,
+            "eenduidig_overgenomen": self.eenduidig_overgenomen,
             "kosten_gemeten": self.kosten_gemeten,
             "voorlopig_bijgewerkt": self.voorlopig_bijgewerkt,
             "in_orde": self.in_orde,
@@ -166,17 +170,27 @@ def stem_af(
     from ..broker.ig_capital import match_transaction
 
     uitslag = Afstemming()
+    # 2.20.0: eerst alle koppelingen, dan pas oordelen. Zo is te zien of een
+    # brokertransactie door precies één eigen trade wordt geclaimd.
+    koppelingen = []
+    claims: dict = {}
     for trade in trades:
         if not trade.close_time or not trade.broker_ticket:
             continue
-        # Stops en doelen die de lus zelf afwikkelde staan ook in het
-        # overzicht; alles wat bij de broker liep, wordt gecontroleerd.
-        uitslag.trades += 1
         units = (trade.volume or 0) * contract_size
         match = match_transaction(
             transacties, trade.broker_ticket, trade.open_price,
             trade.side, units or None, trade.open_time, trade.close_time,
         )
+        koppelingen.append((trade, units, match))
+        sleutel = (match or {}).get("tx_sleutel")
+        if sleutel:
+            claims[sleutel] = claims.get(sleutel, 0) + 1
+
+    for trade, units, match in koppelingen:
+        # Stops en doelen die de lus zelf afwikkelde staan ook in het
+        # overzicht; alles wat bij de broker liep, wordt gecontroleerd.
+        uitslag.trades += 1
 
         if match is None:
             gesloten = _moment(trade.close_time)
@@ -227,6 +241,26 @@ def stem_af(
                         "original_local": trade.close_price, "broker": broker_uit,
                         "difference": verschil,
                         "status": "ADOPTED_BROKER_SETTLEMENT_SLIPPAGE",
+                        "matched_on": match.get("matched_on"),
+                        "broker_reference": match.get("reference"),
+                        "source": "broker_transactions", "at": now.isoformat(),
+                    }, sort_keys=True),
+                }
+            elif abs(verschil) > PRIJS_TOLERANTIE + 1e-9 and _eenduidig(trade, match, claims, contract_size):
+                # 2.20.0 (Ruud 22-10): eenduidig bij de broker gevonden - zijn
+                # positienummer of instap op de cent met hetzelfde
+                # openingsmoment, en geen andere eigen trade claimt deze
+                # transactie. Dan is de broker de afrekening, ook als de
+                # omvang door afronding of een deelsluiting niet op de cent
+                # gelijk is.
+                slippage = True
+                uitslag.eenduidig_overgenomen += 1
+                uit_velden = {
+                    "close_price": broker_uit,
+                    "exit_price_provenance": json.dumps({
+                        "original_local": trade.close_price, "broker": broker_uit,
+                        "difference": verschil,
+                        "status": "ADOPTED_BROKER_SETTLEMENT_UNIQUE_MATCH",
                         "matched_on": match.get("matched_on"),
                         "broker_reference": match.get("reference"),
                         "source": "broker_transactions", "at": now.isoformat(),
@@ -369,6 +403,40 @@ def _sterk(trade: Trade, match: dict, units: float) -> bool:
     if omvang is not None and units and abs(omvang - units) > OMVANG_TOLERANTIE:
         return False
     return True
+
+
+def _eenduidig(trade: Trade, match: dict, claims: dict,
+               contract_size: float = 100.0) -> bool:
+    """2.20.0: is dit zonder twijfel de transactie van deze trade?
+
+    Twee voorwaarden. (1) Geen andere eigen trade in deze ronde koppelt aan
+    dezelfde brokertransactie. (2) De koppeling zelf is specifiek: het
+    positienummer van de broker is het eigen ticket (cTrader), of de instap
+    klopt op de cent én het openingsmoment van de broker ligt bij de eigen
+    instap (IG). Een koppeling alleen op prijs telt niet.
+    """
+    sleutel = match.get("tx_sleutel")
+    if not sleutel or claims.get(sleutel, 0) != 1:
+        return False
+    ticket = str(trade.broker_ticket or "").split("-")[0]
+    deal = str(match.get("deal_id") or "")
+    if ticket and deal and deal == ticket:
+        return True
+    if match.get("matched_on") != "instapprijs+opentijd":
+        return False
+    instap = match.get("open_price")
+    if instap is None or trade.open_price is None:
+        return False
+    if abs(instap - trade.open_price) > PRIJS_TOLERANTIE + 1e-9:
+        return False
+    # Omvang: gelijk, of de broker sloot op hele ounces (een deelsluiting van
+    # vóór 2.11.1: 2,675 eigen tegen 3 bij de broker). Een andere omvang
+    # (1,40 tegen 1,53) is mogelijk een andere positie.
+    omvang = _omvang(match)
+    units = (trade.volume or 0) * contract_size
+    if omvang is None or not units or abs(omvang - units) <= OMVANG_TOLERANTIE:
+        return True
+    return abs(omvang - round(omvang)) <= 1e-6 and abs(omvang - units) <= 1.01
 
 
 def _overname(trade: Trade, match: dict, contract_size: float) -> tuple[dict, str | None]:

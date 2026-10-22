@@ -22,11 +22,12 @@ import logging
 import sqlite3
 import threading
 from dataclasses import asdict, dataclass, field
+from dataclasses import fields as dataclass_fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..learning.sluitreden import normaliseer_trade
+from ..learning.sluitreden import normaliseer, normaliseer_trade
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -892,6 +893,35 @@ class TradeDatabase:
             f"UPDATE trades SET {assignments} WHERE id=?",
             (*data.values(), trade.id),
         )
+        self.conn.commit()
+
+    def update_trade_velden(self, trade_id: int, velden: dict) -> None:
+        """2.20.0: alleen deze kolommen van één trade bijwerken.
+
+        Voor de afstemming, die op de achtergrond loopt: een volledig
+        ``update_trade`` met een object van vóór de ronde zou wat de lus in
+        de tussentijd aan dezelfde trade schreef terugdraaien.
+        """
+        toegestaan = {f.name for f in dataclass_fields(Trade)} - {"id", "stop_reden"}
+        data = {k: v for k, v in velden.items() if k in toegestaan}
+        if not data:
+            return
+        for veld in ("close_reason", "original_close_reason"):
+            if data.get(veld):
+                data[veld] = normaliseer(data[veld])[0]
+        assignments = ", ".join(
+            "original_close_reason=COALESCE(original_close_reason, ?)"
+            if k == "original_close_reason" else f"{k}=?"
+            for k in data
+        )
+        try:
+            self.conn.execute(
+                f"UPDATE trades SET {assignments} WHERE id=?",
+                (*data.values(), int(trade_id)),
+            )
+        except sqlite3.Error:
+            self.conn.rollback()
+            raise
         self.conn.commit()
 
     def mark_for_recheck(self, run_id: int) -> int:

@@ -1,5 +1,22 @@
 # Changelog — Gold Scalper
 
+## 2.20.0 - 22-10-2026
+
+### Afstemming: uitstapprijs van de broker overnemen bij een eenduidige koppeling
+- Gemeten 22-10: IG 2 afwijkingen (instap 4143,62 en 4143,83, 15-10: rest van een deelsluiting met de eigen uitstap van de deelsluiting, 4154,07/4154,13, terwijl de broker op de stop 4150,96/4151,06 sloot; +24,93/+24,56 tegen +17,39/+17,13), XAUUSD 5 uitstappen 0,14-0,30 hoger dan bij de broker (plus 2 trades die niet bij de broker staan). Ze werden niet hersteld omdat de koppeling niet "sterk" was (omvang niet op de cent: de broker sloot hele ounces; of instap een paar cent anders).
+- Nu neemt de afstemming de uitstapprijs en het resultaat (bedrag, koers, omvang) van de broker over als de trade **eenduidig** gevonden is: geen andere eigen trade in de ronde claimt dezelfde transactie, en de koppeling is specifiek - het positienummer van de broker is het eigen ticket (Pepperstone), of instap op de cent met hetzelfde openingsmoment en een omvang die gelijk is of de afronding naar hele ounces (IG). Herkomst in `exit_price_provenance` (`ADOPTED_BROKER_SETTLEMENT_UNIQUE_MATCH`, oude waarde erbij); teller `eenduidig_overgenomen`. Daarna is de afstemming in orde.
+- Niet gevonden trades (XAUUSD: instap 4093,48, 7,8 dag) en koppelingen alleen op prijs of met een andere omvang blijven een zichtbare afwijking en worden niet aangeraakt.
+
+### Sluitreden achteraf uit de uitstapprijs van de broker
+- Aanvulling op 2.19.5: geeft de broker geen kanaal of sluitende order, dan legt het achteraf invullen de uitstapprijs van de broker naast stop en doel - alleen bij een trade die de broker sloot (`broker_gesloten_*`) en alleen met een prijs van de broker zelf, nooit een schatting. Doel = limietorder: op of voorbij het doel. Stop = stoporder: op of slechter, binnen 0,025 % van de prijs (~1 USD op goud) of 0,25 x ATR. Gemeten bij Pepperstone (503 door de broker gesloten trades, 14-22/10): alle uitstappen buiten het doel lagen 0-0,77 aan de slechte kant van de stop, geen enkele aan de goede kant.
+- De grens per ronde geldt nu voor de verzoeken bij de broker; zonder nazoekmogelijkheid worden alle onbekende trades in één ronde bekeken.
+
+### Latency: de afstemming loopt op de achtergrond
+- Gemeten 22-10: p99 IG 32,2 s (daarvoor 9,8 s), vrijwel geheel candles->exits (p99 32,0 s, mediaan 0,12 s); XAUUSD 14,6 s. Oorzaak: de periodieke afstemming draaide ín de cyclus, en sinds de afwijkingen elk kwartier (900 s-interval bij open punten). Eén cyclus op de ~100 wachtte op het transactieoverzicht van tot tien dagen, het nalopen van ruim 2.000 trades en het wegschrijven van honderden overnames - precies het 1 %-staartje.
+- Nu start de cyclus de afstemming als eigen taak en gaat meteen door met exitbeheer en signaal; nooit twee tegelijk. De duur staat in `reconciliation.duur_s`. Schrijven gebeurt per kolom (`update_trade_velden`) in één executorsprong, zodat een afstemming die naast de lus loopt niets terugdraait wat de lus intussen schreef.
+- Raakt geen strategie, vingerafdrukken, risico of orders; alleen lezen bij de broker; geen nieuwe run.
+- Test: `test_v2200_afstemming.py` (13).
+
 ## 2.19.5 - 22-10-2026
 
 ### Pepperstone: onbekende sluitreden achteraf ingevuld uit de sluitende order

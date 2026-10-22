@@ -331,6 +331,12 @@ def match_transaction(
             "closed_at": tx.get("dateUtc") or tx.get("date"),
             "opened_at": tx.get("openDateUtc"),
             "reference": tx.get("reference"),
+            # 2.20.0: het positienummer (cTrader: gelijk aan het eigen ticket)
+            # en een sleutel van deze ene transactie, zodat de afstemming kan
+            # zien of twee eigen trades dezelfde brokertransactie claimen.
+            "deal_id": tx.get("dealId"),
+            "tx_sleutel": "|".join(str(tx.get(k) or "") for k in (
+                "reference", "dealId", "dateUtc", "closeLevel", "size", "openLevel")),
         }
 
     # Niets gevonden: laat zien wat er gezocht werd en wat er lag.

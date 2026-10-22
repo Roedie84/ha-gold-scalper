@@ -606,6 +606,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: tegelijk zou dubbel opvragen zijn), en waarom de laatste mislukte.
         self._afstemming_bezig = False
         self._afstemming_fout: str | None = None
+        #: 2.20.0: de periodieke afstemming loopt als eigen taak.
+        self._afstemming_taak = None
         #: Kosten uit het ledger en hoeveel daarvan gemeten zijn.
         self.ledger_cost_info: dict = {}
         self._ledger_cost_value: float | None = None
@@ -2807,10 +2809,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if (self._afgestemd_op != dag and now.hour >= 6) or uur_voorbij:
                 self._afgestemd_op = dag
                 self._afgestemd_om = now
-                try:
-                    await self.async_reconcile()
-                except Exception as err:  # noqa: BLE001 - controle mag de lus niet slopen
-                    _LOGGER.debug("Afstemming niet gelukt: %s", err)
+                # 2.20.0: op de achtergrond, niet in de cyclus. Gemeten 22-10:
+                # p99 van candles->exits 32 s (mediaan 0,12 s) sinds de
+                # afwijkingen de afstemming elk kwartier lieten lopen - één
+                # cyclus op de honderd wachtte op het transactieoverzicht van
+                # tien dagen en het nalopen van ruim 2.000 trades. Exitbeheer
+                # en instap wachten daar niet meer op. Alleen lezen bij de
+                # broker; nooit twee tegelijk (``_afstemming_bezig``).
+                self._start_afstemming_op_achtergrond()
 
         # 2.4.0: bars op 1m-30m voor de veldproef (15m ook in het archief).
         await self._vp_bijwerken(quote, now)
@@ -4742,6 +4748,43 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._meld_afstemming()
         return uitslag
 
+    def _start_afstemming_op_achtergrond(self) -> bool:
+        """2.20.0: de periodieke afstemming los van de handelscyclus starten.
+
+        Geeft False als er al een loopt. De duur komt in
+        ``reconciliation["duur_s"]`` (en in het log), zodat te zien blijft wat
+        hij kost zonder dat de cycluslatency het draagt.
+        """
+        taak = getattr(self, "_afstemming_taak", None)
+        if getattr(self, "_afstemming_bezig", False) or (taak is not None and not taak.done()):
+            return False
+
+        async def afstemmen() -> None:
+            begin = time.monotonic()
+            try:
+                await self.async_reconcile()
+            except Exception as err:  # noqa: BLE001 - controle mag niets slopen
+                _LOGGER.debug("Afstemming niet gelukt: %s", err)
+                return
+            duur = round(time.monotonic() - begin, 2)
+            if isinstance(self.reconciliation, dict) and self.reconciliation:
+                self.reconciliation["duur_s"] = duur
+            _LOGGER.debug("Afstemming op de achtergrond klaar in %.2f s.", duur)
+
+        coro = afstemmen()
+        try:
+            maak = getattr(self.entry, "async_create_background_task", None)
+            if maak is not None:
+                self._afstemming_taak = maak(
+                    self.hass, coro, f"gold_scalper afstemming {self.symbol}")
+            else:
+                self._afstemming_taak = self.hass.async_create_task(coro)
+        except Exception as err:  # noqa: BLE001 - nooit de cyclus breken
+            coro.close()
+            _LOGGER.debug("Afstemming niet gestart: %s", err)
+            return False
+        return True
+
     def _meld_afstemming(self) -> None:
         """Sensoren meteen bijwerken, zonder op de volgende cyclus te wachten."""
         try:
@@ -4824,18 +4867,26 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 trade = per_id.get(overname["trade_id"])
                 if trade is None:
                     continue
-                for veld, waarde in overname["velden"].items():
+                velden = {
+                    **overname["velden"],
+                    "account_currency": self.conversion.account,
+                    "fx_timestamp": nu.isoformat(),
+                }
+                for veld, waarde in velden.items():
                     setattr(trade, veld, waarde)
-                trade.account_currency = self.conversion.account
-                trade.fx_timestamp = nu.isoformat()
-                bijgewerkt.append(trade)
-            for trade in bijgewerkt:
-                await self.hass.async_add_executor_job(self.db.update_trade, trade)
+                bijgewerkt.append((trade.id, velden))
+            # 2.20.0: alleen de gewijzigde kolommen, in één executorsprong. De
+            # afstemming loopt op de achtergrond; een volledig object van vóór
+            # de ronde zou wat de lus intussen schreef terugdraaien.
+            if bijgewerkt:
+                await self.hass.async_add_executor_job(
+                    self._schrijf_velden, bijgewerkt)
             _LOGGER.info(
                 "Afstemming: %d trade(s) bijgewerkt naar de broker (%d met "
-                "slippage op de uitstap, %d met gemeten kosten).",
+                "slippage op de uitstap, %d eenduidig gevonden en overgenomen, "
+                "%d met gemeten kosten).",
                 len(bijgewerkt), uitslag.slippage_overgenomen,
-                uitslag.kosten_gemeten,
+                uitslag.eenduidig_overgenomen, uitslag.kosten_gemeten,
             )
         # 1.10.0: onbekende sluitredenen uit de broker invullen.
         # 2.19.5: bij een venue die per positie kan nazoeken (cTrader) ook de
@@ -4891,6 +4942,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                               uitslag.samenvatting(), regels)
         return self.reconciliation
 
+    def _schrijf_velden(self, lijst: list) -> None:
+        """2.20.0: ``[(trade_id, velden), ...]`` in de executor wegschrijven."""
+        for trade_id, velden in lijst:
+            self.db.update_trade_velden(trade_id, velden)
+
     #: Hooguit zoveel onbekende sluitredenen per afstemming bij de broker
     #: nazoeken (één verzoek per trade).
     SLUITREDEN_MAX_PER_RONDE = 10
@@ -4921,16 +4977,21 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             zoek = self.venue.sluitkanaal
         maximum = (self.SLUITREDEN_MAX_PER_RONDE_POSITIE if per_positie
                    else self.SLUITREDEN_MAX_PER_RONDE)
+        # 2.20.0: de grens per ronde geldt voor de verzoeken bij de broker;
+        # zonder nazoekmogelijkheid worden alle onbekende trades bekeken (op
+        # de uitstapprijs van de broker).
         onbekend = [
             t for t in recent
             if t.close_time and t.broker_ticket and effective_reason(t) == "unknown"
             and not str(getattr(t, "close_reason_evidence", None) or "").startswith(
                 self.NAGEVRAAGD)
-        ][:maximum]
+        ]
         if not onbekend:
             return 0
         cfg = self.exits.config
         ingevuld = 0
+        verzoeken = 0
+        schrijven: list = []
         for trade in onbekend:
             units = (trade.volume or 0) * CONTRACT_SIZE
             match = match_transaction(
@@ -4942,6 +5003,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             activiteit = None
             gevraagd = False
             if zoek is not None:
+                # Hooguit ``maximum`` verzoeken per ronde; de rest volgt in de
+                # volgende ronde.
+                if verzoeken >= maximum:
+                    break
+                verzoeken += 1
                 try:
                     activiteit = await zoek(
                         str(trade.broker_ticket), trade.side, trade.open_price,
@@ -4955,6 +5021,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     )
             if uitstap is None and activiteit:
                 uitstap = activiteit.get("exit_price")
+            van_broker = uitstap is not None
             if uitstap is None:
                 uitstap = trade.close_price
             # 2.1.0: de uitstapregels van de strategie van deze trade.
@@ -4969,6 +5036,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             reden = reden_uit_broker(
                 trade, uitstap, activiteit,
                 tijdstop, cfg.max_hold_seconds, gesloten,
+                uitstap_van_broker=van_broker,
             )
             if reden is None:
                 # 2.19.5: per positie nagevraagd en de broker gaf antwoord,
@@ -4983,26 +5051,37 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         + ("geen sluitende deal gevonden" if not activiteit else
                            f"sluitende order {soort} geeft geen bewijs")
                     )
-                    await self.hass.async_add_executor_job(self.db.update_trade, trade)
+                    schrijven.append((trade.id, {
+                        "close_reason_evidence": trade.close_reason_evidence}))
                 continue
-            trade.reconciled_close_reason = reden.reden
-            trade.close_reason_source = BRON_AFSTEMMING
-            trade.close_reason_evidence = reden.bewijs
-            trade.reconciliation_status = "reconciled"
-            trade.reconciled_at = nu.isoformat()
-            trade.reconciliation_source = (
-                ("ctrader_order" if per_positie else "broker_activity")
-                if activiteit else "broker_transactions"
-            )
+            velden = {
+                "reconciled_close_reason": reden.reden,
+                "close_reason_source": BRON_AFSTEMMING,
+                "close_reason_evidence": reden.bewijs,
+                "reconciliation_status": "reconciled",
+                "reconciled_at": nu.isoformat(),
+                "reconciliation_source": (
+                    ("ctrader_order" if per_positie else "broker_activity")
+                    if activiteit else "broker_transactions"
+                ),
+            }
             if trade.looptijd_s is None:
-                trade.looptijd_s = looptijd_van(
+                velden["looptijd_s"] = looptijd_van(
                     trade, gesloten or (activiteit or {}).get("activity_date"),
                 )
-            await self.hass.async_add_executor_job(self.db.update_trade, trade)
+            for veld, waarde in velden.items():
+                setattr(trade, veld, waarde)
+            schrijven.append((trade.id, velden))
             ingevuld += 1
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Sluitreden van %s achteraf ingevuld uit de afstemming: %s (%s).",
                 trade.broker_ticket, reden.reden, reden.bewijs,
+            )
+        if schrijven:
+            await self.hass.async_add_executor_job(self._schrijf_velden, schrijven)
+            _LOGGER.info(
+                "Afstemming: %d sluitreden(en) achteraf ingevuld uit de broker.",
+                ingevuld,
             )
         if ingevuld and self.run_id is not None:
             # Doel geraakt, stop geraakt en onbekend meteen bijwerken.

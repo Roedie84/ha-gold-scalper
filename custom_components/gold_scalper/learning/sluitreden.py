@@ -112,6 +112,69 @@ def looptijd_van(trade, gesloten=None) -> int | None:
     return int(round(s)) if s >= 0 else None
 
 
+#: 2.20.0: zoveel mag een stop ongunstig uitvoeren (slippage), als deel van
+#: de prijs. 0,025 % is ~1 USD op goud van 4.000: de grootste gemeten
+#: stopslippage bij Pepperstone (14-22/10, 503 door de broker gesloten
+#: trades) was 0,77.
+STOP_SLIP_DEEL = 0.00025
+#: ... of als deel van de ATR bij de instap, als dat ruimer is.
+STOP_SLIP_ATR = 0.25
+
+
+def _door_broker_gesloten(trade) -> bool:
+    """Sloot de broker de trade? Alleen dan is een prijs op de stop bewijs.
+    Een eigen sluiting heeft een eigen reden en wordt hier nooit herschreven;
+    zonder reden weten we niet wie sloot en blijft het onbekend."""
+    r = str(getattr(trade, "original_close_reason", None)
+            or getattr(trade, "close_reason", None) or "")
+    return r.startswith("broker_gesloten")
+
+
+def reden_uit_prijs(trade, uitstap: float | None) -> BrokerReden | None:
+    """2.20.0: sluitreden uit de uitstapprijs van de broker alleen.
+
+    Alleen voor trades die de broker sloot. Een doel is een limietorder: hij
+    vult op het doel of beter. Een stop is een stoporder: op de stop of
+    slechter, hooguit de slippagemarge (``STOP_SLIP_DEEL`` van de prijs of
+    ``STOP_SLIP_ATR`` x ATR). Een prijs aan de verkeerde kant of verder weg
+    is geen bewijs: dan blijft de reden onbekend (bijvoorbeeld een stop die
+    later verplaatst werd dan de database weet).
+    """
+    if uitstap is None or not _door_broker_gesloten(trade):
+        return None
+    zijde = getattr(trade, "side", None)
+    if zijde not in ("buy", "sell"):
+        return None
+    r = 1.0 if zijde == "buy" else -1.0
+    doel = getattr(trade, "take_profit", None)
+    stop = getattr(trade, "stop_loss", None)
+    if doel is not None:
+        beter = (uitstap - doel) * r            # >= 0: op of voorbij het doel
+        marge = _slip_marge(trade, doel)
+        if -PRIJS_BEWIJS - 1e-9 <= beter <= marge:
+            return BrokerReden(
+                "take_profit",
+                f"door de broker gesloten op {uitstap}: op of voorbij doel "
+                f"{doel} (limietorder) (achteraf uit de afstemming)",
+            )
+    if stop is not None:
+        slechter = (stop - uitstap) * r         # >= 0: op of voorbij de stop
+        marge = _slip_marge(trade, stop)
+        if -PRIJS_BEWIJS - 1e-9 <= slechter <= marge + 1e-9:
+            return BrokerReden(
+                "stop_loss",
+                f"door de broker gesloten op {uitstap}: stop {stop} met "
+                f"{max(0.0, slechter):.2f} slippage (marge {marge:.2f}) "
+                "(achteraf uit de afstemming)",
+            )
+    return None
+
+
+def _slip_marge(trade, niveau: float) -> float:
+    atr = getattr(trade, "entry_atr", None) or 0.0
+    return max(abs(niveau) * STOP_SLIP_DEEL, STOP_SLIP_ATR * float(atr), PRIJS_BEWIJS)
+
+
 def reden_uit_broker(
     trade,
     uitstap: float | None,
@@ -119,6 +182,7 @@ def reden_uit_broker(
     tijdstop_s: float | None,
     max_duur_s: float | None,
     gesloten=None,
+    uitstap_van_broker: bool = True,
 ) -> BrokerReden | None:
     """Sluitreden uit wat de broker weet, of None als dat niet volstaat.
 
@@ -134,8 +198,11 @@ def reden_uit_broker(
        ``tijdslimiet`` als de looptijd die grens haalde, anders ``eigen_exit``;
     5. met de hand gesloten (web, mobiel, dealer): ``handmatig``.
 
-    Zonder activiteit alleen regel 1: een prijs op de stop is zonder kanaal
-    geen bewijs (de stop kan verouderd zijn).
+    Zonder activiteit alleen regel 1, en (2.20.0) voor een trade die de
+    broker sloot :func:`reden_uit_prijs`: de uitstapprijs van de broker op het
+    doel (limiet: op of beter) of op de stop (op of slechter, binnen de
+    slippagemarge). Zonder brokersluiting is een prijs op de stop geen bewijs
+    (de stop kan verouderd zijn).
 
     ``gesloten`` is het sluitmoment van de broker (``dateUtc`` uit het
     transactieoverzicht) als dat er is; anders het moment van de activiteit,
@@ -150,7 +217,10 @@ def reden_uit_broker(
             "(achteraf uit de afstemming)",
         )
     if not activiteit:
-        return None
+        # 2.20.0: zonder activiteitenoverzicht (cTrader/Pepperstone) de
+        # uitstapprijs van de broker naast stop en doel leggen.
+        # Alleen met een prijs van de broker zelf, nooit met een schatting.
+        return reden_uit_prijs(trade, uitstap) if uitstap_van_broker else None
     kanaal = str(activiteit.get("channel") or "").upper()
     if not kanaal:
         return None
