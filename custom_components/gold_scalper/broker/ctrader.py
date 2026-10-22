@@ -170,6 +170,22 @@ def trendbars_naar_candles(bars: list[dict]) -> Candles:
     )
 
 
+#: 2.20.2: het dealoverzicht per dag opvragen, per positie per week.
+DEALS_VENSTER = timedelta(days=1)
+POSITIE_VENSTER = timedelta(days=7)
+
+
+def _vensters(van: datetime, tot: datetime, stap: timedelta) -> list[tuple[datetime, datetime]]:
+    """Opeenvolgende vensters van hooguit ``stap`` die samen van..tot dekken."""
+    uit = []
+    begin = van
+    while begin < tot:
+        eind = min(tot, begin + stap)
+        uit.append((begin, eind))
+        begin = eind
+    return uit or [(van, tot)]
+
+
 def deal_naar_transactie(deal: dict, opening: dict | None, valuta: str | None) -> dict | None:
     """Een sluitende deal in de vorm van een IG-transactie, zodat de bestaande
     afstemming (``ig_capital.match_transaction``, ``learning/afstemming``) er
@@ -912,16 +928,71 @@ class CTraderVenue(ExecutionVenue):
     # -- afstemming ---------------------------------------------------------- #
 
     async def _deals(self, van: datetime, tot: datetime) -> list[dict]:
+        """Deals in het venster, per dag opgevraagd (2.20.2).
+
+        Eerst één verzoek over het hele venster (tot tien dagen): de broker
+        gaf dan niet alles terug - op 22-10 ontbraken de sluitende deals van
+        positie 58312111 (14-10) en de rest van 58383755 (16-10), terwijl de
+        trades er wel waren. Per dag, en een dag met ``hasMore`` gesplitst,
+        is het overzicht volledig. Dubbele deals (op een venstergrens) eruit.
+        """
+        uit: dict = {}
+        for begin, eind in _vensters(van, tot, DEALS_VENSTER):
+            for d in await self._deals_venster(begin, eind, 0):
+                uit[str(d.get("dealId"))] = d
+        return [d for d in uit.values() if int(d.get("symbolId") or 0) == self.symbol_id]
+
+    async def _deals_venster(self, van: datetime, tot: datetime, diepte: int) -> list[dict]:
         antw = await self._verzoek(DEAL_LIST_REQ, {
             "ctidTraderAccountId": self.ctid, "fromTimestamp": _ms(van),
             "toTimestamp": _ms(tot), "maxRows": 5000}, DEAL_LIST_RES, timeout=20)
-        return [d for d in antw.get("deal") or [] if int(d.get("symbolId") or 0) == self.symbol_id]
+        deals = antw.get("deal") or []
+        if antw.get("hasMore") and diepte < 6 and (tot - van) > timedelta(minutes=10):
+            midden = van + (tot - van) / 2
+            return (await self._deals_venster(van, midden, diepte + 1)
+                    + await self._deals_venster(midden, tot, diepte + 1))
+        if antw.get("hasMore"):
+            _LOGGER.warning("cTrader: dealoverzicht %s-%s niet volledig (hasMore).",
+                            van.isoformat(), tot.isoformat())
+        return deals
 
     async def _deals_van_positie(self, positie_id: str, van: datetime, tot: datetime) -> list[dict]:
-        antw = await self._verzoek(DEALS_BY_POSITION_REQ, {
-            "ctidTraderAccountId": self.ctid, "positionId": int(positie_id),
-            "fromTimestamp": _ms(van), "toTimestamp": _ms(tot)}, DEALS_BY_POSITION_RES)
-        return antw.get("deal") or []
+        """2.20.2: ook per positie in vensters van hooguit een week."""
+        uit: dict = {}
+        for begin, eind in _vensters(van, tot, POSITIE_VENSTER):
+            antw = await self._verzoek(DEALS_BY_POSITION_REQ, {
+                "ctidTraderAccountId": self.ctid, "positionId": int(positie_id),
+                "fromTimestamp": _ms(begin), "toTimestamp": _ms(eind)},
+                DEALS_BY_POSITION_RES)
+            for d in antw.get("deal") or []:
+                uit[str(d.get("dealId"))] = d
+        return list(uit.values())
+
+    async def transacties_van_posities(self, posities: dict) -> tuple[list, set]:
+        """2.20.2: sluitende deals per positie, voor de afstemming.
+
+        ``posities``: ``{positie_id: (van, tot)}``. Geeft ``(transacties,
+        afwezig)``: de sluitende deals als IG-transacties, en de posities
+        waarvoor de broker antwoordde zonder één deal (bevestigd niet bij de
+        broker). Een fout bij een positie telt niet als afwezig.
+        """
+        await self._klaar()
+        uit: list = []
+        afwezig: set = set()
+        for positie_id, (van, tot) in posities.items():
+            try:
+                deals = await self._deals_van_positie(str(positie_id), van, tot)
+            except (VenueError, ValueError, TypeError):
+                continue
+            if not deals:
+                afwezig.add(str(positie_id))
+                continue
+            opening = next((d for d in deals if not d.get("closePositionDetail")), None)
+            for d in deals:
+                t = deal_naar_transactie(d, opening, self.valuta)
+                if t is not None:
+                    uit.append(t)
+        return uit, afwezig
 
     async def transactions(self, van: datetime, tot: datetime) -> list:
         """Alle sluitende deals in het venster als IG-transacties (zie
@@ -933,7 +1004,10 @@ class CTraderVenue(ExecutionVenue):
                      if d.get("closePositionDetail") and str(d.get("positionId")) not in openingen}
         for positie_id in list(ontbreekt)[:50]:
             try:
-                eigen = await self._deals_van_positie(positie_id, van - timedelta(days=7), tot)
+                # 2.20.2: de opening ligt vóór het venster (anders stond hij in
+                # de lijst): één weekvenster ervoor volstaat.
+                eigen = await self._deals_van_positie(
+                    positie_id, van - timedelta(days=7), van + timedelta(minutes=1))
             except VenueError:
                 continue
             for d in eigen:

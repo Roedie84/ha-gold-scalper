@@ -108,6 +108,8 @@ class Afstemming:
     #: brokerprijs en sluitreden kregen.
     voorlopig_bijgewerkt: int = 0
     afwijkingen: list = field(default_factory=list)
+    #: 2.20.2: trades die de broker per positie bevestigd niet heeft.
+    niet_bij_broker: list = field(default_factory=list)
     #: Trades waarvan bedrag, koers of omvang naar de broker is bijgewerkt:
     #: ``{"trade_id", "ticket", "velden": {...}}``. De coordinator legt ze vast.
     overnames: list = field(default_factory=list)
@@ -132,6 +134,8 @@ class Afstemming:
             tekst += (
                 f"; {len(self.overnames)} bijgewerkt naar het bedrag van de broker"
             )
+        if self.niet_bij_broker:
+            tekst += f"; {len(self.niet_bij_broker)} niet bij de broker"
         if self.afwijkingen:
             tekst += f". {len(self.afwijkingen)} afwijking(en)."
         else:
@@ -145,6 +149,7 @@ class Afstemming:
             "kloppend": self.kloppend,
             "nog_niet_verwerkt": self.nog_niet_verwerkt,
             "afwijkingen": [a.as_dict() for a in self.afwijkingen],
+            "niet_bij_broker": [a.as_dict() for a in self.niet_bij_broker],
             "bijgewerkt": len(self.overnames),
             "slippage_overgenomen": self.slippage_overgenomen,
             "eenduidig_overgenomen": self.eenduidig_overgenomen,
@@ -171,6 +176,7 @@ def stem_af(
     koers: float | None,
     now: datetime,
     contract_size: float = 100.0,
+    niet_bij_broker: set | None = None,
 ) -> Afstemming:
     """Leg de eigen trades naast het transactieoverzicht van de broker."""
     from ..broker.ig_capital import match_transaction
@@ -201,7 +207,17 @@ def stem_af(
         if match is None:
             gesloten = _moment(trade.close_time)
             leeftijd = (now - gesloten).total_seconds() / 86400 if gesloten else 0
-            if leeftijd > ONTBREKEND_NA_DAGEN:
+            pid = str(trade.broker_ticket).split("-")[0]
+            if leeftijd > ONTBREKEND_NA_DAGEN and niet_bij_broker and pid in niet_bij_broker:
+                # 2.20.2: de broker bevestigt per positie dat hij er geen
+                # enkele deal van heeft. Geen fout in de koppeling maar een gat
+                # in zijn administratie: apart zichtbaar, geen afwijking.
+                uitslag.niet_bij_broker.append(Afwijking(
+                    str(trade.broker_ticket), "niet_bij_broker",
+                    f"Trade met instap {trade.open_price} staat niet bij de "
+                    "broker (per positie nagevraagd: geen enkele deal).",
+                ))
+            elif leeftijd > ONTBREKEND_NA_DAGEN:
                 uitslag.afwijkingen.append(Afwijking(
                     str(trade.broker_ticket), "ontbreekt",
                     f"Trade met instap {trade.open_price} staat na "

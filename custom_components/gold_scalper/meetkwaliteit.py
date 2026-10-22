@@ -151,6 +151,12 @@ SPECS: tuple[dict, ...] = (
                 if isinstance(a, dict)
             ],
             "sluitreden_ingevuld": (d.get("reconciliation") or {}).get("sluitreden_ingevuld"),
+            # 2.20.2: bevestigd niet bij de broker (geen afwijking).
+            "niet_bij_broker": [
+                a.get("uitleg") for a in
+                ((d.get("reconciliation") or {}).get("niet_bij_broker") or [])[:5]
+                if isinstance(a, dict)
+            ],
             "laatste_fout": d.get("afstemming_fout"),
         },
     ),

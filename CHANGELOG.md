@@ -1,5 +1,19 @@
 # Changelog — Gold Scalper
 
+## 2.20.2 - 22-10-2026
+
+### Minder logruis na een herstart (L-GS-021)
+- Na elke herstart ~22 waarschuwingen: "Veldproefopzet vp:... uitgezet: n=..., netto ..., t=None" voor opzetten die al uit stonden (de lijst begon na een herstart leeg, dus alles leek nieuw), en per markt "Opgewarmd met N candles in plaats van 400".
+- Nu: de eerste lezing na het opstarten geeft één inforegel ("N veldproefopzet(ten) staan uit: ..."); alleen een opzet die daarna uitgaat (aan → uit) is een waarschuwing. Idem voor de scalpgroep. Het opwarmen staat in de bestaande inforegel ("Opgewarmd met N candles voor X op 1m (gewenst 400; ...)"), zonder aparte waarschuwing.
+- Alleen logging; welke opzetten uit staan verandert niet.
+
+### Pepperstone: dealoverzicht volledig, en "niet bij de broker" apart
+- Gemeten 22-10: de sluitende deals van positie 58312111 (instap 4093,48, 14-10: deel en rest "ontbreekt") en van de rest van 58383755 (instap 4174,32, 16-10) kwamen niet terug, waardoor de rest aan de deal van zijn deelsluiting koppelde (4181,94 tegen 4184,55). Het dealoverzicht werd met één verzoek over tot tien dagen opgevraagd (`maxRows` 5000, `hasMore` niet gelezen); de opening van posities van vóór het venster met één verzoek over 17 dagen.
+- Nu: het dealoverzicht per dag, en een dag waarop de broker `hasMore` meldt in tweeën gesplitst (blijft het onvolledig, dan een waarschuwing). Deals per positie in vensters van hooguit een week. Heeft een positie minder sluitende deals in het overzicht dan eigen trades (deelsluiting + rest), dan zoekt de afstemming die positie apart na (hooguit 20 per ronde) en vult de deals aan.
+- Antwoordt de broker per positie zonder één deal, dan ligt het aan de broker: zo'n trade van meer dan twee dagen oud heet dan **niet bij de broker** (`niet_bij_broker` in de afstemming en als attribuut van de sensor), niet meer "afwijking". Zonder die bevestiging blijft het "ontbreekt". Niets wordt overgenomen of gewijzigd aan zo'n trade.
+- IG verandert niet. Alleen lezen bij de broker; raakt geen strategie, instellingen (de nieuwe meetrun blijft), risico of orders.
+- Test: `test_v2202_logruis_dealoverzicht.py` (7).
+
 ## 2.20.1 - 22-10-2026
 
 ### Afstemming: omvang op honderdsten afgerond telt als gelijk

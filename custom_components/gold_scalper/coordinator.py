@@ -690,6 +690,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: 2.5.6: bewezen verliezende opzetten (n >= 100, t < -2) en wanneer
         #: die lijst weer uit de database gelezen wordt.
         self._vp_uitgezet: dict[str, dict] = {}
+        #: 2.20.2 (L-GS-021): is de lijst na het opstarten al eens gelezen?
+        self._vp_uitgezet_gelezen = False
+        self._scalp_uitgezet_gelezen = False
         #: 2.6.1: scalp (incl. turbo) als groep uitgezet; None = aan.
         self._scalp_uitgezet: dict | None = None
         #: 2.9.3: met de hand uitgezet (optie); geldt meteen, ook vóór de
@@ -1116,8 +1119,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             await self.hass.async_add_executor_job(self.state.warm_up, self._candles)
             self._last_bar_ts = self._candles.timestamp[-1]
             _LOGGER.info(
-                "Opgewarmd met %d candles voor %s op %s",
+                "Opgewarmd met %d candles voor %s op %s%s",
                 len(self._candles), self.symbol, self.timeframe,
+                "" if len(self._candles) >= WARMUP_CANDLES else
+                f" (gewenst {WARMUP_CANDLES}; langetermijnindicatoren minder betrouwbaar)",
             )
         except VenueError as err:
             raise UpdateFailed(f"Kon historie niet ophalen: {err}") from err
@@ -1209,7 +1214,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         if best is not None:
             if len(best) < WARMUP_CANDLES:
-                _LOGGER.warning(
+                # 2.20.2 (L-GS-021): geen waarschuwing per markt bij elke
+                # herstart meer; de regel "Opgewarmd met ..." (info) noemt het.
+                _LOGGER.debug(
                     "Opgewarmd met %d candles in plaats van %d. "
                     "Langetermijnindicatoren zijn met minder historie minder "
                     "betrouwbaar.", len(best), WARMUP_CANDLES,
@@ -1844,9 +1851,19 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         for naam, info in veldproef_mod.handmatig_uitgezet(
                 per_opzet, self.vp_tijdvakken_uit).items():
             nieuw.setdefault(naam, info)
-        for naam in sorted(set(nieuw) - set(self._vp_uitgezet)):
-            _LOGGER.warning("Veldproefopzet %s uitgezet: n=%s, netto %s, t=%s",
-                            naam, nieuw[naam]["n"], nieuw[naam]["netto"], nieuw[naam]["t"])
+        # 2.20.2 (L-GS-021): alleen de overgang aan -> uit is een waarschuwing.
+        # De eerste lezing na een herstart is de stand van zaken (die opzetten
+        # stonden al uit): één inforegel in plaats van ~20 waarschuwingen.
+        if not getattr(self, "_vp_uitgezet_gelezen", False):
+            self._vp_uitgezet_gelezen = True
+            if nieuw:
+                _LOGGER.info("%d veldproefopzet(ten) staan uit: %s",
+                             len(nieuw), ", ".join(sorted(nieuw)))
+        else:
+            for naam in sorted(set(nieuw) - set(self._vp_uitgezet)):
+                _LOGGER.warning("Veldproefopzet %s uitgezet: n=%s, netto %s, t=%s",
+                                naam, nieuw[naam]["n"], nieuw[naam]["netto"],
+                                nieuw[naam]["t"])
         self._vp_uitgezet = nieuw
         # 2.6.1: scalp en turbo als groep.
         try:
@@ -1860,8 +1877,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if groep is None and self.scalp_handmatig_uit:
             groep = scalp_handmatig(reeks)
         if groep and not self._scalp_uitgezet:
-            _LOGGER.warning("Scalp (incl. turbo) uitgezet: n=%s, netto %s, t=%s",
-                            groep["n"], groep["netto"], groep["t"])
+            # 2.20.2: bij de eerste lezing na een herstart stond hij al uit.
+            log = (_LOGGER.warning if getattr(self, "_scalp_uitgezet_gelezen", False)
+                   else _LOGGER.info)
+            log("Scalp (incl. turbo) uitgezet: n=%s, netto %s, t=%s",
+                groep["n"], groep["netto"], groep["t"])
+        self._scalp_uitgezet_gelezen = True
         self._scalp_uitgezet = groep
 
     def _beslisser(self, now: datetime, strategie: str | None = None):
@@ -4854,9 +4875,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             t for t in trades
             if t.close_time and _as_datetime(t.close_time, nu) >= grens
         ]
+        transacties, afwezig = await self._vul_transacties_aan(recent, transacties, nu)
         uitslag = await self.hass.async_add_executor_job(
             stem_af, recent, transacties, self.conversion.rate, nu,
-            CONTRACT_SIZE,
+            CONTRACT_SIZE, afwezig,
         )
         # Wat de broker exact noemt, overnemen: bedrag, koers, omvang. Daarna
         # klopt de administratie op de cent met zijn overzicht.
@@ -4941,6 +4963,60 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 _LOGGER.debug("Afstemming met de broker: %s (al gemeld) %s",
                               uitslag.samenvatting(), regels)
         return self.reconciliation
+
+    #: 2.20.2: hooguit zoveel posities per afstemming apart nazoeken.
+    POSITIES_NAZOEKEN_MAX = 20
+
+    async def _vul_transacties_aan(self, recent: list, transacties: list,
+                                   nu: datetime) -> tuple[list, set]:
+        """2.20.2: ontbrekende sluitende deals per positie opvragen (cTrader).
+
+        Een positie met meer eigen trades (deelsluiting + rest) dan sluitende
+        deals in het overzicht wordt apart bij de broker nagezocht. Wat dat
+        oplevert komt bij de transacties; posities waarvoor de broker zonder
+        één deal antwoordt, komen terug als ``afwezig`` (bevestigd niet bij de
+        broker). Alleen lezen; een fout laat alles zoals het was.
+        """
+        zoek = getattr(self.venue, "transacties_van_posities", None)
+        if zoek is None:
+            return transacties, set()
+        per_positie: dict = {}
+        for t in recent:
+            if not t.close_time or not t.broker_ticket:
+                continue
+            pid = str(t.broker_ticket).split("-")[0]
+            if not pid.isdigit():
+                continue
+            per_positie.setdefault(pid, []).append(t)
+        aantal_tx: dict = {}
+        for tx in transacties:
+            pid = str(tx.get("dealId") or "")
+            aantal_tx[pid] = aantal_tx.get(pid, 0) + 1
+        nodig: dict = {}
+        for pid, lijst in per_positie.items():
+            if aantal_tx.get(pid, 0) >= len(lijst):
+                continue
+            begin = min(_as_datetime(t.open_time, nu) for t in lijst) - timedelta(hours=1)
+            eind = min(nu, max(_as_datetime(t.close_time, nu) for t in lijst) + timedelta(hours=1))
+            nodig[pid] = (begin, eind)
+            if len(nodig) >= self.POSITIES_NAZOEKEN_MAX:
+                break
+        if not nodig:
+            return transacties, set()
+        try:
+            extra, afwezig = await zoek(nodig)
+        except Exception as err:  # noqa: BLE001 - alleen een aanvulling
+            _LOGGER.debug("Posities niet apart na te zoeken: %s", err)
+            return transacties, set()
+        bekend = {str(tx.get("reference")) for tx in transacties}
+        nieuw = [tx for tx in extra if str(tx.get("reference")) not in bekend]
+        if nieuw or afwezig:
+            _LOGGER.info(
+                "Afstemming: %d positie(s) apart nagezocht bij de broker: %d "
+                "sluitende deal(s) aangevuld, %d positie(s) niet bij de broker.",
+                len(nodig), len(nieuw), len(afwezig),
+            )
+        return transacties + nieuw, set(afwezig)
 
     def _schrijf_velden(self, lijst: list) -> None:
         """2.20.0: ``[(trade_id, velden), ...]`` in de executor wegschrijven."""
