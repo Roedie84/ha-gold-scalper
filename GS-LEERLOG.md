@@ -242,3 +242,15 @@ laatste ronde: 21-10 19:55
 - Let op: het herladen door de instelling (06:09 UTC) zette twee papiermarkten van 7.635/8.945 terug naar 10.000 (gezien in woning-analyse) → papiersaldo reset bij herladen = kandidaat-bug volgende ronde.
 
 laatste ronde: 22-10 06:25
+
+## 22-10 ~19:55 · ronde 15 (geplande controle; 2.20.3 actief sinds herstart 17:07 UTC)
+- Sinds ronde 14: 2.19.4-2.20.3 uit de chat (afstemming). Instellingen op 14:48 UTC gewijzigd (niet door deze ronde) → nieuwe runs IG 136 / Pepperstone 5 / mand.
+- **Pepperstone** totaal n=1.833: netto −10.034, bruto −2.550, kosten 7.483, t −3,9. Sinds 06:25 n=80 +148 (t 0,3); run 5 n=24 +615 (t 3,2, maar n klein en 15 posities). Per tijdvak sinds 19-10: 5m −1.660 (t −2,0), 3m −1.205, 30m −782, 15m −272 (bruto +111). Geen opzet overleeft Bonferroni.
+- **IG** totaal n=3.546 −67.470 (bruto +1.453 → kosten zijn het verlies). Sinds 06:25 n=68 −229 (bruto +171, kosten 400); run 136 n=19 +126.
+- **Daghandel** handelt sinds 2.19.0: Pep n=8 +8,7, IG n=8 −16; posities 0,01-0,03 oz (stop 4 ATR15), deelwinst + break-even na ~1,5 USD → duur minuten (zo bedoeld sinds 2.5.1/2.5.9, Ruud); n te klein.
+- **Bitvavo-mand** sinds 06:25 n=82 −785 EUR: bruto ≈ 0, kosten 781 (BILL spread 0,18 %). Alleen BILL/PUMP/PEPE handelen; rest weigert (spot short / kostenfilter).
+- **Gebouwd 2.20.4** (suite 1948 groen + 5 skip): Pepperstone-afstemming koppelt op positionId (58312111: deel/rest 9,5 oz vs hele oz bij broker → nooit gekoppeld; `nagezocht` leeg bewees dat de deals er al waren). **Push naar main geweigerd (403)** → staat op branch `claude/v2.20.4`, niet uitgebracht; Ruud: mergen of pushrecht.
+- Instellingen: niets (Bitvavo < 48 u sinds 06:09; IG/Pep net nieuwe run).
+- Meten: na 2.20.4 afstemming XAUUSD 0 afwijkingen; run 5/136 bij n ≥ 100; mand kosten/bruto per markt.
+
+laatste ronde: 22-10 19:55
