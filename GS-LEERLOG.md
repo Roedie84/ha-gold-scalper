@@ -239,5 +239,6 @@ laatste ronde: 21-10 19:55
 - **Bitvavo-mand: weer noodstop** (BILL-EUR 10,03 %, PUMP-EUR 10,06 % dagverlies; blijft na herstart actief) → hervatten = knop Ruud. Mand n=311 −3.992 EUR (≈ −40 % papier): PUMP n=184 −2.365, BILL n=37 −1.055, PEPE n=90 −573; alle andere markten 0 trades.
 - **Instelling Bitvavo-mand** (papier): risk_per_trade_pct 0,5 → 0,25. Waarom: n=311, alle drie gehandelde markten negatief, 10 %-dagverlies stopt de hele mand → halve grootte = minder noodstops, aantal trades (leren) blijft. Meten: noodstops per dag, netto per trade in R.
 - Meten: daghandeltrades vanaf 07:00 UTC; mand per markt via export (na herstart 2.19.3); volgende stap marktkeuze (alleen memecoins halen het kostenfilter?).
+- Let op: het herladen door de instelling (06:09 UTC) zette twee papiermarkten van 7.635/8.945 terug naar 10.000 (gezien in woning-analyse) → papiersaldo reset bij herladen = kandidaat-bug volgende ronde.
 
-laatste ronde: 22-10 06:20
+laatste ronde: 22-10 06:25
