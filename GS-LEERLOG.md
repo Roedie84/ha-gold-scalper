@@ -230,3 +230,14 @@ laatste ronde: 13-10 20:15
 - Meten: na herstart IG drawdown ≈ 0 %; daghandeltrades per dag; mand per markt na hervatten.
 
 laatste ronde: 21-10 19:55
+
+## 22-10 ~06:20 · ronde 14 (geplande controle; 2.19.2 actief na herstart 21-10 ~20:30 UTC)
+- **Gebouwd 2.19.3** (suite 1899 groen + 5 skip, release via workflow, in HACS gedownload, herstart = Ruud): export_data leest bij de Bitvavo-mand alle leden (gaf total 0 bij 311 trades), kolom `markt` + filter `markt`. Geen strategie/vingerafdruk geraakt.
+- **Uitstapanalyse Pepperstone** (volledige export, 1752 rijen = 1466 posities met deelsluitingen samengevoegd): netto −10.154, bruto −3.050, kosten 7.104, t −3,6. Win 48 %, gem. winst +52 vs verlies −61. Posities met deelsluiting (n=286) +29.359; zonder (stop/broker/omkeer, n≈1.170) −40.100. Grote verliezers (≤ −60, n=413): mediaan MFE 5,7 USD, 49 % had MFE < 5 → verlies zit in de instap (meteen tegen), niet in de uitstap. Herinstap ≤ 15 min na groot verlies: geen verschil (−7,9 vs −6,9/positie).
+- Per opzet (46): beste vp:inside:1m t 1,85, structuur_hl:3m 1,20 → niets overleeft Bonferroni (|t| ≳ 3,3). Families inside/bb_fade bruto +, netto ≈ 0. Sessie: Azië −4.263 (t −2,6), NY 17-24 −3.031 (t −2,2). Sinds vorige ronde n=41 +490.
+- **IG** run: n=195, netto −426, PF 0,89, t −0,49. **Daghandel**: uitbraaksignalen (short, 1,8 ATR) maar 05:50 UTC buiten 07-17 → nog 0 trades.
+- **Bitvavo-mand: weer noodstop** (BILL-EUR 10,03 %, PUMP-EUR 10,06 % dagverlies; blijft na herstart actief) → hervatten = knop Ruud. Mand n=311 −3.992 EUR (≈ −40 % papier): PUMP n=184 −2.365, BILL n=37 −1.055, PEPE n=90 −573; alle andere markten 0 trades.
+- **Instelling Bitvavo-mand** (papier): risk_per_trade_pct 0,5 → 0,25. Waarom: n=311, alle drie gehandelde markten negatief, 10 %-dagverlies stopt de hele mand → halve grootte = minder noodstops, aantal trades (leren) blijft. Meten: noodstops per dag, netto per trade in R.
+- Meten: daghandeltrades vanaf 07:00 UTC; mand per markt via export (na herstart 2.19.3); volgende stap marktkeuze (alleen memecoins halen het kostenfilter?).
+
+laatste ronde: 22-10 06:20
