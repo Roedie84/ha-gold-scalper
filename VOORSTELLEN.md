@@ -122,3 +122,9 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Oorzaak: `IGVenue.account()` vult een ontbrekend saldo in met 0 (`balance.get("balance", 0)`), zonder `VenueError`; de 2.4.4-afvang (geen saldo = geen risicotoets) grijpt dan niet, en `account_drawdown` filtert alleen terugvalpunten op de startbalans (1.10.1), niet 0/0. De saldosprongbewaker zag het als verklaard (positie open).
 - Fix (raakt geen strategie, risicogrenzen of ordergrootte): (1) `ig_capital.account()`: geen saldo in het antwoord → `VenueError`; (2) coordinator: saldo én equity precies 0 na een eerder gemeten equity > 0 → behandelen als `saldo_onbekend` (2.4.4-pad: geen risicotoets, geen instap, geen equitypunt); (3) `account_drawdown`: punten met equity = saldo = 0 bij een run met positieve opening overslaan (herstelt de 100 % van de lopende run). Tests: een `account()` met lege balance → VenueError; cyclus met 0/0 → niet HALTED, geen order; drawdown met een 0/0-punt < 1 %.
 - Effect meten: IG *Max. drawdown* weer ≈ 0,0x %, geen noodstop met "equity 0.00 onder de ondergrens" meer.
+
+## L-GS-021 · veldproef: "uitgezet" alleen melden als het nieuw is (logging/meetbaarheid)
+- Status: **gepland** (zelf bouwen: logging; strategie, risico en handelslogica ongewijzigd). Bouwen in de eerste dagafsluiting nadat 2.19.2 geïnstalleerd is.
+- Onderbouwing: na elke herstart worden alle eerder uitgezette veldproefopzetten opnieuw als WARNING "Veldproefopzet … uitgezet" gemeld (21× na de herstart van 21-10 20:58; lijst `_vp_uitgezet` start leeg). Dat vervuilt het systeemlog en maakt "nieuw uitgezet" onmeetbaar.
+- Bouw: uitgezette opzetten over herstarts onthouden (of bij opstart stil vullen), alleen een echte nieuwe uitzetting als WARNING. Test: herstart met bestaande uitgezette opzetten → 0 WARNINGs.
+- Effect meten: aantal "uitgezet"-WARNINGs na een herstart = 0.

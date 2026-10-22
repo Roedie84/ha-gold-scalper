@@ -2,35 +2,10 @@
 
 Onderzoeksproject op IG-demo: edge van ruis onderscheiden. Alleen gemeten getallen; KPI's in KPI.csv.
 
-## 07-10 23:15 · tussenronde (eerste ronde, baseline)
-- Gemeten: 56 trades in 7 clusters (06-10 06:30 - 07-10 19:03 UTC). Netto −120,53 USD = bruto −18,65 − kosten 101,88 (1,82 USD/trade, 100% gemeten). PF 0,651, winst 44,6%.
-- t netto over clusters −2,05; t bruto (zelf berekend) −0,24 → bruto niet van nul te onderscheiden, netto verlies komt uit de kosten (kosten/bruto-verhouding 5,5).
-- Eerlijk over n: 7 clusters. Om een bruto-edge ter grootte van de kosten (14,6 USD/cluster bij sd 29,6) met t=2 te zien zijn ~17 clusters nodig; voor een netto-oordeel meer. Geen conclusie over de strategie.
-- Regime: range 16 trades t −2,91 (netto −97,82), trend 40 trades t −0,29 — trades niet onafhankelijk, n te klein; alleen volgen.
-- Uitvoering: slippage 3× de aanname (0,06 vs 0,02); latency p90 207 ms, max 786 ms (exits→signal).
-- Meetfout gevonden: `learning/analysis.py` telt doel/stop uit de ruwe `close_reason` (na afstemming overschreven met `broker_gesloten_gecorrigeerd`, 24/56). Gevolg: "geleerd" meldt doel 14% en "ATR mogelijk overschat", terwijl de sensor Doel geraakt (op bewijs, 0% onbekend) 19,6% geeft. → L-GS-001 (zelf bouwen, meetfout; bij de dagafsluiting).
-- Hypothese H-GS-1: doeltreffers liggen onder de verwachte 40% (19,6%, n=56). Pas toetsen na fix en ≥100 trades.
-- Afstemming met broker: "nog_niet" (wel 24 trades gecorrigeerd via transacties).
-- Geen release (tussenronde; 1.7.0 vandaag al uitgebracht en geïnstalleerd).
-
-laatste ronde: 07-10 23:15, gemeten t/m 07-10 23:15
-
-## 07-10 23:40 · tussenronde (handmatig gestart)
-- Correctie: de vorige ronde was om 23:15, niet 23:30 (tijdstempels aangepast).
-- Gebouwd: **v1.7.1** = L-GS-001 (geleerd telt doel/stop op de effectieve sluitreden; 2 nieuwe tests). Gereleased in een tussenronde omdat "geleerd" nu foute data gaf (doel 14% i.p.v. 19,6% en een onterechte ATR-notitie). Workflow groen; HACS ververst.
-- Testsuite: 1707 groen, 5 overgeslagen, met de klok vast op 10:00 UTC. Zonder vaste klok falen 4 tests in `test_unconfirmed_orders.py` tijdens de dagpauze (ook op main zonder wijziging) → L-GS-002.
-- Geen nieuwe trades sinds 19:03 UTC (markt in dagpauze).
-
-laatste ronde: 07-10 23:40, gemeten t/m 07-10 23:40
-
-## 07-10 23:45 · tussenronde
-- Geen nieuwe trades (56; status markt_gesloten, dagpauze). Open posities 0. Equity 7169,85; max drawdown 1,89%.
-- Nieuw vastgelegd: latency p99 252,7 ms (n=56) naast p90 207 ms.
-- v1.7.1 (L-GS-001) nog niet geïnstalleerd (HA draait 1.7.0) → verificatie wacht op installatie.
-- Hypotheses ongewijzigd (H-GS-1 pas toetsen na fix en ≥100 trades; bruto-edge-toets pas bij ~17 clusters, nu 7).
-- Geen release.
-
-laatste ronde: 07-10 23:45, gemeten t/m 07-10 23:44
+## 07-10 · samenvatting dag (3 tussenronden 23:15-23:45, eerste baseline)
+- Baseline 06/07-10: 56 trades / 7 clusters, netto −120,53 USD (bruto −18,65, kosten 101,88 = 1,82/trade), PF 0,651, winst 44,6 %; t netto −2,05, t bruto −0,24 → verlies uit de kosten; ~17 clusters nodig voor een bruto-toets.
+- Slippage 3× de aanname (0,06 vs 0,02); latency p90 207 ms, p99 253 ms.
+- Meetfout "geleerd" telde doel/stop op ruwe sluitreden → L-GS-001 gebouwd v1.7.1 (tussenronde, foute data). Klokafhankelijke tests → L-GS-002. H-GS-1 (doeltreffers 19,6 % < 40 %) gestart.
 
 ## 08-10 03:40 · dagafsluiting 07-10
 - Dag 07-10: 40 trades, 4 clusters, winst 47,5%; netto −64,41 = bruto +13,69 − kosten 78,11 (1,95/trade). t netto −1,19, t bruto +0,18 (n=4, geen conclusie).
@@ -397,3 +372,16 @@ laatste ronde: 21-10 19:40, gemeten t/m 21-10 19:45
 - Geen release; geen knoppen, geen instellingen.
 
 laatste ronde: 21-10 23:40, gemeten t/m 21-10 23:43
+
+## 22-10 03:40 · dagafsluiting 21-10
+- Actief **2.19.1**; 2.19.2 staat klaar, niet geïnstalleerd → geen release (niet stapelen). Demo, 0 noodstops, IG drawdown 0,01 %. Geen knoppen, geen instellingen.
+- **Dag 21-10:** IG 72 trades netto **+281** (bruto +658, kosten 377 = 5,24/trade); Pepperstone 187 trades netto **−2.413** (bruto −1.902, kosten 511). Eén dag, geen conclusie.
+- **IG run** (sinds 19-10): 182 trades / 12 clusters, netto −205 (bruto +960, kosten 1.165), PF 0,94, t_cluster −0,25. Uurblokken 52: t_bruto 1,13, t_netto −0,24 → bruto mogelijk iets, netto niets. Bij bruto ~18 USD/blok en deze spreiding zijn ~165 blokken nodig voor t_bruto 2; netto geen edge in zicht zolang kosten ≈ bruto.
+- **Pepperstone run:** 1.606 trades, netto −9.175, bruto −2.857; t_netto −2,18 over 118 blokken → blijft aantoonbaar verliesgevend, ook bruto negatief.
+- **H-GS-13** (IG New York positief): t_netto 2,35 → **1,93** (22 blokken; +1 blok). Pepperstone NY −0,37 (45 blokken). Verzwakt; eis blijft ≥ 30 nieuwe blokken (nu 6) en replicatie.
+- **H-GS-12** (latency): p99 IG 33,0 s, Pepperstone 13,1 s (beide `candles->exits`), Bitvavo 4,3 s (was 6,7). Geen nieuwe oorzaakinformatie.
+- Logruis "veldproefopzet uitgezet" na elke herstart (21× bij 20:58) → **L-GS-021** gepland (zelf bouwen: logging). Afstemming IG 2.237/2.239, Pepperstone 1.715/1.720.
+- Niet meetbaar: slippage verwacht/gerealiseerd per trade (geen attribuut), IG-dagen vóór 19-10.
+- Hypotheses: H-GS-11 (daghandelkosten; geen nieuwe daghandeltrades gemeten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
+
+laatste ronde: 22-10 03:40, gemeten t/m 22-10 03:45

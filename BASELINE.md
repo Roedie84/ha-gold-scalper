@@ -30,3 +30,5 @@
 | Pepperstone XAUUSD (start 14-10) | 1.571 trades / 6 clusters: netto −8.739 · bruto −2.477 · kosten 6.262 (3,99/trade); PF 0,79; uurblokken t_netto −2,09 (111), t_bruto −0,60 | 14-10..21-10 | 21-10 19:45 |
 | Latency p99 (cycli) | IG 35,2 s · Pepperstone 15,1 s (p50 445 / 355 ms); Pepperstone dagmiddel 5,0 s (14..16-10, 19-10) → 9,3 s (20-10) → 13,9 s (21-10) | n=2000 | 21-10 19:45 |
 | Sluitreden onbekend Pepperstone | 26,1 % (410/1.571) | 14..21-10 | 21-10 19:45 |
+| IG daghandel/veldproef run 19-10 | 182 trades / 12 clusters: netto −205 · bruto +960 · kosten 1.165; uurblokken t_bruto 1,13 / t_netto −0,24 (52) | 19..22-10 | 22-10 03:40 |
+| Pepperstone XAUUSD | 1.606 trades: netto −9.175 · bruto −2.857; t_netto −2,18 (118 blokken) | 14..22-10 | 22-10 03:40 |
