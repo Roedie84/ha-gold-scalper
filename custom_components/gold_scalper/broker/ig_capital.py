@@ -179,6 +179,77 @@ def broker_loopt_achter(transacties: list, moment: datetime) -> bool:
     return nieuwste < moment
 
 
+def _match_uitkomst(tx: dict, niveau, hoe: str, aantal: int) -> dict:
+    """De koppeling als dict (gedeeld door prijs- en positiekoppeling)."""
+    return {
+        "exit_price": float(niveau),
+        "matched_on": hoe,
+        "candidates": aantal,
+        # De koers waartegen de broker dit resultaat omrekende, uit de
+        # omschrijving ("... converted at 0.8866"). Bij verlies ligt die boven
+        # de middenkoers: de basis voor een voorzichtige positiegrootte.
+        "conversion_rate": _conversie_uit(tx.get("instrumentName")),
+        "profit_account": next(
+            (
+                _als_getal(tx.get(k)) for k in
+                ("profitAndLoss", "profit_and_loss", "profit", "pnl")
+                if tx.get(k) is not None
+            ),
+            None,
+        ),
+        "currency": tx.get("currency"),
+        "size": _als_getal(tx.get("size")),
+        "open_price": next(
+            (
+                _als_getal(tx.get(k)) for k in
+                ("openLevel", "open_level", "openingLevel")
+                if _als_getal(tx.get(k))
+            ),
+            None,
+        ),
+        # dateUtc eerst: die bevat het tijdstip. Het veld ``date``
+        # heeft alleen de dag, en dat is als sluitmoment onbruikbaar.
+        "closed_at": tx.get("dateUtc") or tx.get("date"),
+        "opened_at": tx.get("openDateUtc"),
+        "reference": tx.get("reference"),
+        # 2.20.0: het positienummer (cTrader: gelijk aan het eigen ticket)
+        # en een sleutel van deze ene transactie, zodat de afstemming kan
+        # zien of twee eigen trades dezelfde brokertransactie claimen.
+        "deal_id": tx.get("dealId"),
+        "tx_sleutel": "|".join(str(tx.get(k) or "") for k in (
+            "reference", "dealId", "dateUtc", "closeLevel", "size", "openLevel")),
+    }
+
+
+def _match_op_positie(deals: list, units: float | None, close_time) -> dict | None:
+    """2.20.4: koppelen binnen de deals van de eigen positie (cTrader).
+
+    Live (22-10): positie 58312111 had twee sluitende deals in het overzicht,
+    maar geen van beide eigen trades (deel en rest, elk 9,5 oz) koppelde: de
+    broker sloot hele hoeveelheden, zodat de omvang meer dan 0,25 oz afweek
+    en de ruime omvangregel (instap op de halve cent, opening binnen 5 s) niet
+    gold. Het positienummer is exact; daarbinnen beslist de omvang (zoals
+    bij de prijskoppeling) en bij gelijke afstand het sluitmoment: 9 en 10 oz
+    tegen twee keer 9,5 oz verdelen zich zo op het moment van sluiten."""
+    eigen_sluit = _utc(close_time)
+    kandidaten = []
+    for tx in deals:
+        niveau = _als_getal(tx.get("closeLevel"))
+        if niveau is None:
+            continue
+        b = _utc(tx.get("dateUtc"))
+        sluit = abs((b - eigen_sluit).total_seconds()) if (b and eigen_sluit) else 1e12
+        omvang = _als_getal(tx.get("size"))
+        omvang_afstand = (abs(abs(omvang) - abs(units))
+                          if omvang is not None and units else 0.0)
+        kandidaten.append((sluit, omvang_afstand, niveau, tx))
+    if not kandidaten:
+        return None
+    kandidaten.sort(key=lambda k: (round(k[1], 6), k[0]))
+    _, _, niveau, tx = kandidaten[0]
+    return _match_uitkomst(tx, niveau, "positienummer", len(kandidaten))
+
+
 def match_transaction(
     transacties: list, ticket, open_price: float | None,
     side: str | None, units: float | None,
@@ -193,7 +264,20 @@ def match_transaction(
     Koppelen op instapprijs, richting en omvang: het ticketnummer komt niet
     overeen met de verwijzing in dit overzicht, twee trades kunnen een cent
     van elkaar af liggen, en alleen de omvang scheidt ze dan.
+
+    2.20.4: draagt een transactie het positienummer (cTrader, ``positionId``)
+    en is dat het eigen ticket, dan is dat de sleutel: alleen de deals van die
+    positie tellen, zonder toleranties op prijs, opentijd of omvang; de
+    omvang en dan het sluitmoment kiezen tussen deelsluiting en rest. Zonder
+    zo'n deal verandert er niets.
     """
+    positie = str(ticket or "").split("-")[0]
+    eigen_positie = [
+        tx for tx in transacties
+        if positie.isdigit() and str(tx.get("positionId") or "") == positie
+    ] if positie else []
+    if eigen_positie:
+        return _match_op_positie(eigen_positie, units, close_time)
     kandidaten = []
     for tx in transacties:
         openings = None
@@ -300,44 +384,7 @@ def match_transaction(
 
         kandidaten.sort(key=lambda k: (round(k[0], 6), sluit_afstand(k[3])))
         _, hoe, niveau, tx = kandidaten[0]
-        return {
-            "exit_price": float(niveau),
-            "matched_on": hoe,
-            "candidates": len(kandidaten),
-            # De koers waartegen de broker dit resultaat omrekende, uit de
-            # omschrijving ("... converted at 0.8866"). Bij verlies ligt die boven
-            # de middenkoers: de basis voor een voorzichtige positiegrootte.
-            "conversion_rate": _conversie_uit(tx.get("instrumentName")),
-            "profit_account": next(
-                (
-                    _als_getal(tx.get(k)) for k in
-                    ("profitAndLoss", "profit_and_loss", "profit", "pnl")
-                    if tx.get(k) is not None
-                ),
-                None,
-            ),
-            "currency": tx.get("currency"),
-            "size": _als_getal(tx.get("size")),
-            "open_price": next(
-                (
-                    _als_getal(tx.get(k)) for k in
-                    ("openLevel", "open_level", "openingLevel")
-                    if _als_getal(tx.get(k))
-                ),
-                None,
-            ),
-            # dateUtc eerst: die bevat het tijdstip. Het veld ``date``
-            # heeft alleen de dag, en dat is als sluitmoment onbruikbaar.
-            "closed_at": tx.get("dateUtc") or tx.get("date"),
-            "opened_at": tx.get("openDateUtc"),
-            "reference": tx.get("reference"),
-            # 2.20.0: het positienummer (cTrader: gelijk aan het eigen ticket)
-            # en een sleutel van deze ene transactie, zodat de afstemming kan
-            # zien of twee eigen trades dezelfde brokertransactie claimen.
-            "deal_id": tx.get("dealId"),
-            "tx_sleutel": "|".join(str(tx.get(k) or "") for k in (
-                "reference", "dealId", "dateUtc", "closeLevel", "size", "openLevel")),
-        }
+        return _match_uitkomst(tx, niveau, hoe, len(kandidaten))
 
     # Niets gevonden: laat zien wat er gezocht werd en wat er lag.
     #

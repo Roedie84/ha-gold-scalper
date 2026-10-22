@@ -1,5 +1,15 @@
 # Changelog — Gold Scalper
 
+## 2.20.4 - 22-10-2026
+
+### Pepperstone: afstemming koppelt op het positienummer
+- Live na de herstart van 17:07 UTC (2.20.3): nog steeds "Trade met instap 4093.48 staat na 7.9 dagen niet in het overzicht" (deel en rest van positie 58312111) en "Instap 4174.32: uitstap 4181.94 tegen 4184.55", terwijl `nagezocht` leeg was. Leeg betekent: het dealoverzicht had per positie al evenveel sluitende deals als eigen trades (2.20.2 per dag werkt) - het gat zat in de koppeling, niet in het overzicht.
+- Oorzaak (afgeleid; de deals zelf zijn van hieruit niet in te zien): de koppeling ging op instapprijs, opentijd en omvang met toleranties (prijs < 0,05, omvang ≤ 0,25 oz). Deel en rest van 58312111 stonden elk als 0,095 lot (9,5 oz) in de administratie; de broker sluit hele hoeveelheden (bijv. 9 en 10 oz), dus beide deals vielen af. Het positienummer, dat bij cTrader exact het eigen ticket is, werd pas gebruikt als er geen instapprijs was.
+- Nu: staat de eigen positie (`positionId`) in het overzicht, dan tellen alleen haar deals, zonder toleranties; de omvang en daarna het sluitmoment kiezen tussen deelsluiting en rest. Een deal van een andere positie met dezelfde instap koppelt dan niet meer. Staat de positie er niet in, of heeft de transactie geen positienummer (IG), dan verandert er niets.
+- Een koppeling op positienummer met instap op de cent en dezelfde omvang telt als sterk (zoals instap + opentijd), zodat bedrag en kosten van de broker overgenomen blijven worden.
+- Raakt geen strategie, vingerafdruk, instellingen, risico of orders; alleen de administratie. Geen nieuwe run.
+- Test: `test_v2204_koppelen_op_positie.py` (6; 3 faalden vóór de fix).
+
 ## 2.20.3 - 22-10-2026
 
 ### Pepperstone: nazoeken per positie werkt nu ook live

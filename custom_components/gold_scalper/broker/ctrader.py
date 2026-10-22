@@ -210,6 +210,8 @@ def deal_naar_transactie(deal: dict, opening: dict | None, valuta: str | None) -
     return {
         "reference": str(deal.get("dealId")),
         "dealId": str(deal.get("positionId")),
+        # 2.20.4: expliciet het positienummer, de sleutel voor de koppeling.
+        "positionId": str(deal.get("positionId")),
         "openLevel": detail.get("entryPrice"),
         "closeLevel": deal.get("executionPrice"),
         "size": f"{'+' if positie_long else '-'}{gesloten_oz:g}",

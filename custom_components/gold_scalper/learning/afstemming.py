@@ -439,8 +439,12 @@ def _reden_velden(trade: Trade, broker_uit: float, now: datetime) -> dict:
 
 
 def _sterk(trade: Trade, match: dict, units: float) -> bool:
-    """Zeker dezelfde trade: instap op de cent, omvang en openingsmoment."""
-    if match.get("matched_on") != "instapprijs+opentijd":
+    """Zeker dezelfde trade: instap op de cent, omvang en openingsmoment.
+
+    2.20.4: of het positienummer van de broker (cTrader), met instap op de
+    cent en dezelfde omvang - het positienummer is minstens zo specifiek als
+    het openingsmoment."""
+    if match.get("matched_on") not in ("instapprijs+opentijd", "positienummer"):
         return False
     instap = match.get("open_price")
     if instap is None or trade.open_price is None:

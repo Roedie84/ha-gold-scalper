@@ -49,7 +49,8 @@ def test_deal_als_ig_transactie_en_koppeling():
     m = match_transaction([tx], "7", 4095.0, "buy", 3.0, tx["openDateUtc"] + "+00:00",
                           tx["dateUtc"] + "+00:00")
     assert m["exit_price"] == 4100.5 and m["conversion_rate"] == 1.0
-    assert m["matched_on"] == "instapprijs+opentijd"
+    # 2.20.4: het positienummer is de sleutel bij cTrader.
+    assert m["matched_on"] == "positienummer"
     assert ct.deal_naar_transactie({"dealId": 1}, None, "USD") is None
 
 
