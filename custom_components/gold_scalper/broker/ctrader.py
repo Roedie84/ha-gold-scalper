@@ -968,31 +968,33 @@ class CTraderVenue(ExecutionVenue):
                 uit[str(d.get("dealId"))] = d
         return list(uit.values())
 
-    async def transacties_van_posities(self, posities: dict) -> tuple[list, set]:
-        """2.20.2: sluitende deals per positie, voor de afstemming.
+    async def transacties_van_posities(self, posities: dict) -> tuple[list, dict]:
+        """Sluitende deals per positie, voor de afstemming (2.20.2/2.20.3).
 
         ``posities``: ``{positie_id: (van, tot)}``. Geeft ``(transacties,
-        afwezig)``: de sluitende deals als IG-transacties, en de posities
-        waarvoor de broker antwoordde zonder één deal (bevestigd niet bij de
-        broker). Een fout bij een positie telt niet als afwezig.
+        status)``: de sluitende deals als IG-transacties, en per positie wat
+        de broker antwoordde: ``{"deals": n, "sluitend": m}`` of
+        ``{"fout": tekst}``. Alleen een positie zonder fout telt als
+        beantwoord; de coordinator beslist wat er ontbreekt.
         """
         await self._klaar()
         uit: list = []
-        afwezig: set = set()
+        status: dict = {}
         for positie_id, (van, tot) in posities.items():
             try:
                 deals = await self._deals_van_positie(str(positie_id), van, tot)
-            except (VenueError, ValueError, TypeError):
-                continue
-            if not deals:
-                afwezig.add(str(positie_id))
+            except (VenueError, ValueError, TypeError) as err:
+                status[str(positie_id)] = {"fout": str(err)[:120]}
                 continue
             opening = next((d for d in deals if not d.get("closePositionDetail")), None)
+            sluitend = 0
             for d in deals:
                 t = deal_naar_transactie(d, opening, self.valuta)
                 if t is not None:
                     uit.append(t)
-        return uit, afwezig
+                    sluitend += 1
+            status[str(positie_id)] = {"deals": len(deals), "sluitend": sluitend}
+        return uit, status
 
     async def transactions(self, van: datetime, tot: datetime) -> list:
         """Alle sluitende deals in het venster als IG-transacties (zie

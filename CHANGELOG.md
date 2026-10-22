@@ -1,5 +1,17 @@
 # Changelog — Gold Scalper
 
+## 2.20.3 - 22-10-2026
+
+### Pepperstone: nazoeken per positie werkt nu ook live
+- Live na de herstart van 18:21 (2.20.2): nog steeds 3 afwijkingen en `niet_bij_broker` leeg. Oorzaak: 2.20.2 noemde een positie alleen "niet bij de broker" als de broker per positie **geen enkele** deal teruggaf. Voor 58312111 gaf hij wel de opening, alleen geen sluitende deal; voor 58383755 alleen de deelsluiting - dan claimden deel en rest dezelfde deal (4181,94 tegen 4184,55). Het venster per positie liep bovendien maar tot een uur na het eigen sluitmoment.
+- Nu: het telt per **sluitende** deal. Heeft de broker (zonder fout geantwoord) voor een positie ook na het nazoeken minder sluitende deals dan eigen trades, dan zijn de trades zonder eigen deal "niet bij de broker". Claimen deel en rest dezelfde deal, dan houdt de trade met het dichtstbijzijnde sluitmoment hem. Venster per positie van de opening tot nu (in stukken van een week).
+- Een fout of time-out bij een positie telt nooit als "niet bij de broker". Wat de broker per positie antwoordde staat als `nagezocht` in de afstemming en als attribuut van de sensor (eigen trades, sluitende deals, of de fout).
+- IG verandert niet. Alleen lezen; geen strategie, instellingen, risico of orders.
+
+### Geen onterechte waarschuwing "Positie ... heeft geen doel bij de broker"
+- 22-10 18:46 (58727864): daghandel opent bewust zonder doel (volgstop en 20:45 UTC beslissen). De controle waarschuwt nu alleen als de eigen trade wel een doel heeft dat bij de broker ontbreekt.
+- Test: `test_v2203_nazoeken_per_positie.py` (8).
+
 ## 2.20.2 - 22-10-2026
 
 ### Minder logruis na een herstart (L-GS-021)

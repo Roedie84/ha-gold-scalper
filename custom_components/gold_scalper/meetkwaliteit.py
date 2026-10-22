@@ -157,6 +157,11 @@ SPECS: tuple[dict, ...] = (
                 ((d.get("reconciliation") or {}).get("niet_bij_broker") or [])[:5]
                 if isinstance(a, dict)
             ],
+            # 2.20.3: per positie apart bij de broker nagezocht.
+            "nagezocht": [
+                a for a in ((d.get("reconciliation") or {}).get("nagezocht") or [])[:5]
+                if isinstance(a, dict)
+            ],
             "laatste_fout": d.get("afstemming_fout"),
         },
     ),

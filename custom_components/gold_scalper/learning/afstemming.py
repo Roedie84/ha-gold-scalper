@@ -199,6 +199,31 @@ def stem_af(
         if sleutel:
             claims[sleutel] = claims.get(sleutel, 0) + 1
 
+    # 2.20.3: bij een positie waarvan de broker (nagezocht) minder sluitende
+    # deals heeft dan eigen trades, claimen deel en rest dezelfde deal. Die
+    # hoort bij de trade met het dichtstbijzijnde sluitmoment; de andere heeft
+    # bij de broker geen sluitende deal (niet_bij_broker, geen afwijking).
+    if niet_bij_broker:
+        per_sleutel: dict = {}
+        for i, (trade, _units, match) in enumerate(koppelingen):
+            sleutel = (match or {}).get("tx_sleutel")
+            pid = str(trade.broker_ticket).split("-")[0]
+            if sleutel and claims.get(sleutel, 0) > 1 and pid in niet_bij_broker:
+                per_sleutel.setdefault(sleutel, []).append(i)
+        for sleutel, indices in per_sleutel.items():
+            def afstand(i: int) -> float:
+                eigen = _moment(koppelingen[i][0].close_time)
+                broker = _moment(koppelingen[i][2].get("closed_at"))
+                if eigen is None or broker is None:
+                    return 1e12
+                return abs((broker - eigen).total_seconds())
+            houden = min(indices, key=afstand)
+            for i in indices:
+                if i != houden:
+                    trade, units, _ = koppelingen[i]
+                    koppelingen[i] = (trade, units, None)
+                    claims[sleutel] -= 1
+
     for trade, units, match in koppelingen:
         # Stops en doelen die de lus zelf afwikkelde staan ook in het
         # overzicht; alles wat bij de broker liep, wordt gecontroleerd.
@@ -215,7 +240,8 @@ def stem_af(
                 uitslag.niet_bij_broker.append(Afwijking(
                     str(trade.broker_ticket), "niet_bij_broker",
                     f"Trade met instap {trade.open_price} staat niet bij de "
-                    "broker (per positie nagevraagd: geen enkele deal).",
+                    "broker (per positie nagevraagd: geen sluitende deal voor "
+                    "deze trade).",
                 ))
             elif leeftijd > ONTBREKEND_NA_DAGEN:
                 uitslag.afwijkingen.append(Afwijking(

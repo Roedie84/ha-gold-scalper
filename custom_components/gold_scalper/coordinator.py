@@ -4935,6 +4935,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self.reconciliation = {
             **uitslag.as_dict(), "moment": nu.isoformat(),
             "sluitreden_ingevuld": ingevuld,
+            # 2.20.3: wat de broker per nagezochte positie antwoordde.
+            "nagezocht": list(getattr(self, "_nagezocht", None) or [])[:20],
         }
         await self._bewaar_resultaten(direct=True)
         if uitslag.afwijkingen:
@@ -4973,10 +4975,19 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         Een positie met meer eigen trades (deelsluiting + rest) dan sluitende
         deals in het overzicht wordt apart bij de broker nagezocht. Wat dat
-        oplevert komt bij de transacties; posities waarvoor de broker zonder
-        één deal antwoordt, komen terug als ``afwezig`` (bevestigd niet bij de
-        broker). Alleen lezen; een fout laat alles zoals het was.
+        oplevert komt bij de transacties. Geeft ``(transacties, afwezig)``:
+        ``afwezig`` zijn de posities waarvoor de broker zonder fout antwoordde
+        en ook dan minder sluitende deals heeft dan eigen trades.
+
+        2.20.3: live (22-10) gaf de broker voor 58312111 wel de opening maar
+        geen sluitende deal, en voor 58383755 alleen de deelsluiting. "Geen
+        enkele deal" als voorwaarde kwam dus nooit uit; het telt nu per
+        sluitende deal. Het venster loopt van de opening tot nu (de broker
+        kan later gesloten hebben dan de eigen administratie zegt). Wat er
+        per positie terugkwam staat in ``self._nagezocht`` (attribuut).
+        Alleen lezen; een fout laat alles zoals het was.
         """
+        self._nagezocht = []
         zoek = getattr(self.venue, "transacties_van_posities", None)
         if zoek is None:
             return transacties, set()
@@ -4988,35 +4999,61 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if not pid.isdigit():
                 continue
             per_positie.setdefault(pid, []).append(t)
-        aantal_tx: dict = {}
-        for tx in transacties:
-            pid = str(tx.get("dealId") or "")
-            aantal_tx[pid] = aantal_tx.get(pid, 0) + 1
+
+        def tel(lijst: list) -> dict:
+            aantal: dict = {}
+            for tx in lijst:
+                pid = str(tx.get("dealId") or "")
+                aantal[pid] = aantal.get(pid, 0) + 1
+            return aantal
+
+        aantal_tx = tel(transacties)
         nodig: dict = {}
         for pid, lijst in per_positie.items():
             if aantal_tx.get(pid, 0) >= len(lijst):
                 continue
             begin = min(_as_datetime(t.open_time, nu) for t in lijst) - timedelta(hours=1)
-            eind = min(nu, max(_as_datetime(t.close_time, nu) for t in lijst) + timedelta(hours=1))
-            nodig[pid] = (begin, eind)
+            nodig[pid] = (begin, nu)
             if len(nodig) >= self.POSITIES_NAZOEKEN_MAX:
                 break
         if not nodig:
             return transacties, set()
         try:
-            extra, afwezig = await zoek(nodig)
+            extra, status = await zoek(nodig)
         except Exception as err:  # noqa: BLE001 - alleen een aanvulling
             _LOGGER.debug("Posities niet apart na te zoeken: %s", err)
+            self._nagezocht = [{"positie": pid, "fout": str(err)[:120]} for pid in nodig]
             return transacties, set()
         bekend = {str(tx.get("reference")) for tx in transacties}
-        nieuw = [tx for tx in extra if str(tx.get("reference")) not in bekend]
-        if nieuw or afwezig:
-            _LOGGER.info(
-                "Afstemming: %d positie(s) apart nagezocht bij de broker: %d "
-                "sluitende deal(s) aangevuld, %d positie(s) niet bij de broker.",
-                len(nodig), len(nieuw), len(afwezig),
-            )
-        return transacties + nieuw, set(afwezig)
+        nieuw = []
+        for tx in extra:
+            ref = str(tx.get("reference"))
+            if ref not in bekend:
+                bekend.add(ref)
+                nieuw.append(tx)
+        samen = transacties + nieuw
+        aantal_na = tel(samen)
+        afwezig: set = set()
+        for pid in nodig:
+            info = (status or {}).get(pid) if isinstance(status, dict) else None
+            regel = {"positie": pid, "eigen": len(per_positie[pid]),
+                     "sluitend": aantal_na.get(pid, 0)}
+            if not isinstance(info, dict):
+                regel["fout"] = "geen antwoord"
+            elif info.get("fout"):
+                regel["fout"] = info["fout"]
+            else:
+                regel["deals_broker"] = info.get("deals")
+                if aantal_na.get(pid, 0) < len(per_positie[pid]):
+                    afwezig.add(pid)
+            self._nagezocht.append(regel)
+        fouten = sum(1 for r in self._nagezocht if r.get("fout"))
+        _LOGGER.debug(
+            "Afstemming: %d positie(s) apart nagezocht: %d sluitende deal(s) "
+            "aangevuld, %d met minder sluitende deals dan eigen trades, %d fout.",
+            len(nodig), len(nieuw), len(afwezig), fouten,
+        )
+        return samen, afwezig
 
     def _schrijf_velden(self, lijst: list) -> None:
         """2.20.0: ``[(trade_id, velden), ...]`` in de executor wegschrijven."""

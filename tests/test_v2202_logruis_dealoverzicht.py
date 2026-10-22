@@ -153,12 +153,14 @@ def test_per_positie_nazoeken_vindt_deals_en_bevestigt_afwezigheid():
         return {"deal": []}
 
     v = _venue(broker)
-    tx, afwezig = asyncio.run(v.transacties_van_posities({
+    tx, status = asyncio.run(v.transacties_van_posities({
         "58383755": (NU - timedelta(days=7), NU - timedelta(days=6)),
         "58312111": (NU - timedelta(days=8), NU - timedelta(days=7)),
     }))
     assert [t["closeLevel"] for t in tx] == [4181.94]
-    assert afwezig == {"58312111"}
+    # 2.20.3: de status per positie; de coordinator beslist wat ontbreekt.
+    assert status == {"58383755": {"deals": 2, "sluitend": 1},
+                      "58312111": {"deals": 0, "sluitend": 0}}
 
 
 def _trade(i, ticket, **kw):
@@ -193,7 +195,9 @@ def test_coordinator_zoekt_alleen_onvolledige_posities_na():
 
     async def zoek(posities):
         gevraagd.update(posities)
-        return [{"reference": "nieuw", "dealId": "58383755"}], {"58312111"}
+        return [{"reference": "nieuw", "dealId": "58383755"}], {
+            "58383755": {"deals": 2, "sluitend": 1},
+            "58312111": {"deals": 0, "sluitend": 0}}
 
     c = SimpleNamespace(venue=SimpleNamespace(transacties_van_posities=zoek),
                         POSITIES_NAZOEKEN_MAX=20)

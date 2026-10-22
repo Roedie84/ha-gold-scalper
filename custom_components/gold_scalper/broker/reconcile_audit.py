@@ -153,7 +153,11 @@ def compare_positions(
                 ticket,
             ))
 
-        if not position.take_profit:
+        # 2.20.3: alleen als wij zelf een doel hebben. Daghandel opent bewust
+        # zonder doel (volgstop en 20:45 UTC beslissen); 22-10 18:46 gaf dat
+        # voor 58727864 een onterechte waarschuwing.
+        eigen = by_ticket.get(ticket)
+        if not position.take_profit and (eigen is None or eigen.take_profit):
             audit.findings.append(Finding(
                 "waarschuwing", "geen_doel",
                 f"Positie {ticket} heeft geen doel bij de broker. De bot sluit "
