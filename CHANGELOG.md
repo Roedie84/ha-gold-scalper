@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.19.3 - 22-10-2026
+
+### export_data: de Bitvavo-mand geeft de trades van alle markten
+- Gemeten 22-10 05:55: de mand had 311 gesloten trades (PUMP-EUR 184, PEPE-EUR 90, BILL-EUR 37; samen −3.992 EUR op papier), maar `export_data` gaf *total 0*: alleen de database van de hoofdlus (BTC-EUR) werd gelezen, terwijl elk lid een eigen database heeft. Zo was de mand niet te onderzoeken.
+- Nu leest de dienst bij een mand alle leden, op sluitmoment gesorteerd, met de markt als laatste kolom (`markt`, ook bij IG en Pepperstone). Nieuw veld `markt` om op één markt te filteren. Bij één markt blijft de volgorde zoals hij was.
+- Alleen lezen; raakt geen strategie, risico of orders; geen nieuwe run.
+- Test: `test_v2193_export_mand.py` (4).
+
 ## 2.19.2 - 21-10-2026
 
 ### Database: geen transactiefout meer bij gelijktijdige aanroepen

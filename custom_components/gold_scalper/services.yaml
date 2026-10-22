@@ -149,6 +149,11 @@ export_data:
           min: 1
           max: 100000
           mode: box
+    markt:
+      name: Markt
+      description: Bitvavo-mand - alleen de trades van deze markt (bijv. PUMP-EUR). Leeg = alle markten.
+      selector:
+        text: null
     offset:
       name: Vanaf
       selector:

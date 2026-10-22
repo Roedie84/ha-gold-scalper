@@ -534,18 +534,25 @@ def _register_services(hass: HomeAssistant) -> None:
                 }
             if soort == "trades":
                 run = call.data.get("run_id")
-                trades = await hass.async_add_executor_job(
-                    coordinator.db.closed_trades, int(run) if run is not None else None)
+                run = int(run) if run is not None else None
+                # 2.19.3: bij de Bitvavo-mand ook de trades van alle leden
+                # (die hebben elk een eigen database; de hoofdlus had er 0).
+                mand = hass.data.get(f"{DOMAIN}_mand", {}).get(coordinator.entry.entry_id)
+                lussen = [coordinator, *(list(mand.leden.values()) if mand else [])]
+                bronnen = []
+                for lus in lussen:
+                    bronnen.append((getattr(lus, "symbol", ""),
+                                    await hass.async_add_executor_job(lus.db.closed_trades, run)))
                 velden = ("run_id", "side", "volume", "open_time", "open_price",
                           "open_mid", "open_spread", "close_time", "close_price",
                           "close_mid", "close_reason", "stop_loss", "take_profit",
                           "total_cost", "gross_pnl", "net_pnl", "mae", "mfe",
                           "duration_seconds", "signal_score", "entry_atr",
                           "exit_regime", "strategie", "mode", "id", "broker_ticket")
-                rijen = [[getattr(t, v, None) for v in velden]
-                         for t in trades[offset:offset + limit]]
-                return {"total": len(trades), "offset": offset, "entry_id": coordinator.entry.entry_id,
-                        "columns": list(velden), "rows": rijen}
+                from .export import trades_tabel
+
+                uit = trades_tabel(bronnen, velden, offset, limit, call.data.get("markt"))
+                return {"entry_id": coordinator.entry.entry_id, **uit}
         raise HomeAssistantError(f"Onbekende soort of geen Gold Scalper: {soort}")
 
     hass.services.async_register(
@@ -555,6 +562,7 @@ def _register_services(hass: HomeAssistant) -> None:
             vol.Optional("entry_id"): str,
             vol.Optional("timeframe"): str,
             vol.Optional("run_id"): vol.Coerce(int),
+            vol.Optional("markt"): str,
             vol.Optional("offset", default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),
             vol.Optional("limit", default=2000): vol.All(vol.Coerce(int), vol.Range(1, 5000)),
         }),
