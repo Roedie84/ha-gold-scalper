@@ -385,3 +385,13 @@ laatste ronde: 21-10 23:40, gemeten t/m 21-10 23:43
 - Hypotheses: H-GS-11 (daghandelkosten; geen nieuwe daghandeltrades gemeten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
 
 laatste ronde: 22-10 03:40, gemeten t/m 22-10 03:45
+
+## 22-10 07:40 · tussenronde
+- Actief **2.19.2** (geïnstalleerd, herstart 07:07-07:09). Demo/papier; noodstop-sensoren alle uit. Bij de herstart 2 WARNINGs "Noodstop uit een eerdere sessie blijft actief" zonder marktnaam: al gemeld door de meldronde (05:51), niet dubbel opgenomen. Geen knoppen, geen instellingen.
+- **IG** sinds 03:45: 12 trades, netto −215 (run 194 trades, −420, PF 0,89, t −0,49). **Pepperstone**: 25 trades, netto +477 (run 1.631, −8.698, PF 0,80, t −1,41 over 9 clusters). Eén ochtend, geen conclusie; uurblokken-t in de dagafsluiting.
+- Latency p99: IG 33,1 s, Pepperstone 13,8 s, Bitvavo 5,5 s → H-GS-12 ongewijzigd.
+- Afstemming: IG 2.236/2.238 (2 uitstapverschillen ~3 USD), Pepperstone 1.735/1.740 (7, waarvan 1 trade na 7,4 dagen niet bij de broker).
+- **L-GS-021 bevestigd op 2.19.2:** bij de herstart weer 22× "Veldproefopzet … uitgezet" (zelfde opzetten, oude n). 2.19.2 is geïnstalleerd → bouwen in de dagafsluiting 23-10 (alleen logging).
+- Hypotheses: H-GS-11, H-GS-12, H-GS-13 (IG NY; vandaag nog geen NY-sessie). Geen release.
+
+laatste ronde: 22-10 07:40, gemeten t/m 22-10 07:45
