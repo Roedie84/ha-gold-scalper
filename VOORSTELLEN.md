@@ -114,7 +114,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - 12-10 23:40: 7 open, 0 gesloten; 41 afwijzingen 22:40-22:50 (vóór 2.4.1).
 
 ## L-GS-019 · open posities: opzet/strategie per positie als attribuut
-- Status: **gepland (zelf bouwen: meetbaarheid/diagnose)** — 21-10: attribuut `positions` op *Open posities* (XAUUSD, IG) heeft nog steeds alleen ticket/side/units/prijzen, geen opzet. Meebouwen met L-GS-020.
+- Status: **gebouwd 2.21.2** (23-10 ~20:00, geplande controle; in HACS gedownload, wacht op herstart Ruud): `positions[].strategie` op *Open posities*. Eerder: gepland — 21-10: attribuut `positions` op *Open posities* (XAUUSD, IG) heeft nog steeds alleen ticket/side/units/prijzen, geen opzet. Meebouwen met L-GS-020.
 
 ## L-GS-020 · leeg accountantwoord (saldo en equity 0) geen meting: geen noodstop, geen 100 % drawdown
 - Status: **geverifieerd 21-10 23:40** — 2.19.1 (gereleased 21-10 19:56, geïnstalleerd vóór 20:58): IG *Max. drawdown* 0,01 % (was 100,0 %), 0 noodstops 19:45-23:40. Eerder: **open (Ruud beslist)** — 21-10 ~19:55: tweede poging tot bouwen geweigerd omdat de fix het noodstoppad raakt; daarom naar Ruud. Gevonden 21-10 19:45. Bouwen in deze ronde lukte niet: lokaal wijzigen van de code werd door de toestemmingscontrole van deze sessie geweigerd → niets gebouwd, niets gereleased.

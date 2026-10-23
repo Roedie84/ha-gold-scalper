@@ -266,3 +266,15 @@ laatste ronde: 22-10 19:55
 - Volgende ronde (na 24-10 06:09): mand marktkeuze/kosten (−11 EUR/trade, kosten ≈ verlies); Pep afstemming 0; aantal gelijktijdige posities na 2.21.0.
 
 laatste ronde: 23-10 06:05
+
+## 23-10 ~20:00 · ronde 17 (geplande controle; 2.21.1 actief)
+- **Gebouwd 2.21.2** (L-GS-019, suite 1972 groen + 7 skip, release via workflow, in HACS gedownload; herstart = Ruud): `strategie` per positie op *Open posities*. Alleen weergave. L-GS-022/023 blijven voor de dagafsluiting (niet dubbel gebouwd).
+- **Pepperstone** run 5: n=133 netto +23 (PF 1,007), kosten 279 (2,1/trade). Per tijdvak: 3m n=56 −619 (bruto −453, kosten 166); 15m n=43 +283; 30m n=26 +356; 5m n=5 −10. 3m ook eerder steeds negatief (ronde 13/15), maar n < 200 en niets overleeft Bonferroni.
+- **IG** run 136: n=78 +123 (PF 1,09, t 0,59); kosten 421 = 77 % van bruto. rsi_rev:15m n=29 bruto +155, kosten 204 (7,0/trade) → kostregel grijpt bij n ≥ 40 als het zo blijft.
+- **Daghandel**: Pep 3 (+12,6), IG 2 (+0,4). Gelijktijdig tegengesteld (14:30: daghandel short + bb_fade:15m long) = dubbele spread zonder netto blootstelling; n=1, alleen noteren.
+- **Bitvavo-mand**: noodstop sinds 16:30 (bij PEPE-EUR), alle markten geblokkeerd → hervatten = knop Ruud. Alleen PUMP (n=172 −2.390) en PEPE (n=163 −1.243) handelen; BILL weg; 18 markten weigeren (spot short/kosten).
+- Negatieve kosten in export = gunstige slip t.o.v. het beslismidden (zo bedoeld, `learning/kosten.py`); geen bug.
+- Instellingen: niets (Pep/IG gewijzigd 22-10 14:48, mand 22-10 06:09 → < 48 u).
+- Volgende ronde (na 24-10 14:48): Pep `vp_tijdvakken_uit` + 3m overwegen als 3m bij n ≥ 100 nog bruto < 0; mand: marktkeuze (alleen memecoins halen het filter, kosten ≈ verlies); risk_per_trade_pct 3 bij Pep = groot (gezet 22-10, niet door deze ronde).
+
+laatste ronde: 23-10 20:00
