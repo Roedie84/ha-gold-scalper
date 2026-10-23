@@ -478,3 +478,14 @@ laatste ronde: 23-10 07:40, gemeten t/m 23-10 07:45
 - Hypotheses: H-GS-11 (kosten IG), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
 
 laatste ronde: 23-10 11:40, gemeten t/m 23-10 11:45
+
+## 23-10 15:40 · tussenronde
+- Actief **2.21.1**. Demo/papier; noodstops IG/Pepperstone/BTC uit; geen knoppen, geen instellingen. Herstarts 11:51/14:54/15:17 (EMS-installaties); "HA sluit af" 1× per stop (2.21.1 houdt).
+- **IG**: +6 trades → 65 / **7 clusters**, netto 88,4 → **127,9**, PF 1,12, **t 3,48** (df 6, 5 %-grens 2,45); 6 van 7 clusters positief. Toch geen conclusie: alle clusters binnen 25 u (één regime), cluster 1 = 46 % van de trades met netto 9; kosten 75 % van bruto (8,5/trade deze ronde). Nodig: ≥ 30 clusters over ≥ 5 handelsdagen.
+- **Pepperstone**: +9 trades → 115 / 7 clusters, netto 680 → **239** (−441); clusters 3-7 (heel 23-10) alle negatief, −1.100; t 0,21, oordeel failed. Zelfde goud, zelfde uren als IG (+) → verschil zit in de opzetten per broker, niet in de markt (n=7, observatie).
+- 2.21.0: max 2 open Pepperstone 14:27 (11 s); IG 2 bij 13:15/13:30/15:15 (20-30 s, op de kwartierwissel) → richting niet leesbaar (L-GS-019).
+- **H-GS-12:** p99 Pepperstone 1,5 → 3,0 s in de middag, IG 2,7, Bitvavo ≤ 2,1; geen pieken als 22-10 (32 s).
+- **Nieuw (meetbaarheid):** 15:18 "Noodstop uit een eerdere sessie blijft actief: dagverlies 10,11 %" zonder markt/entry; mand PUMP equity 7.771 (−22 %), PEPE 9.111; mand-attribuut toont geen noodstop per markt → kandidaat L-GS-022.
+- Hypotheses: H-GS-11 (kosten IG 75 % van bruto), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
+
+laatste ronde: 23-10 15:40, gemeten t/m 23-10 15:45

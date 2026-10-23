@@ -128,3 +128,9 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Onderbouwing: na elke herstart worden alle eerder uitgezette veldproefopzetten opnieuw als WARNING "Veldproefopzet … uitgezet" gemeld (21× na de herstart van 21-10 20:58; lijst `_vp_uitgezet` start leeg). Dat vervuilt het systeemlog en maakt "nieuw uitgezet" onmeetbaar.
 - Bouw: uitgezette opzetten over herstarts onthouden (of bij opstart stil vullen), alleen een echte nieuwe uitzetting als WARNING. Test: herstart met bestaande uitgezette opzetten → 0 WARNINGs.
 - Effect meten: aantal "uitgezet"-WARNINGs na een herstart = 0.
+
+## L-GS-022 · noodstop-waarschuwing en mand: welke markt staat stil (logging/meetbaarheid)
+- Status: **gepland** (zelf bouwen: logtekst en diagnose-attribuut; noodstop, risico en handelslogica ongewijzigd). Dagafsluiting.
+- Onderbouwing: 23-10 15:18 bij de herstart "Noodstop uit een eerdere sessie blijft actief: dagverlies 10.11 % … (waarvan −39.12 nog niet gerealiseerd)" zonder entry of markt (`storage/state.py` logt alleen `halt_reason`). De mand heeft per markt een eigen toestand (`<entry_id>_<markt>`), maar `sensor.gold_scalper_btc_eur_mand` → `per_markt` toont geen noodstop; binary *Noodstop* BTC-EUR staat uit. Kandidaten: PUMP-EUR (equity 7.771) of PEPE-EUR (9.111). Eerder 21/22-10 al mand-noodstops (PUMP, BILL) die alleen uit de logtekst te halen waren.
+- Bouw: markt/entry in de waarschuwing; `per_markt[].noodstop` (true/false + reden) in het mand-attribuut. Test: geladen toestand met halted → logregel noemt de markt; mand-attribuut toont de vlag.
+- Effect meten: noodstops per markt per dag direct leesbaar uit de sensor, zonder logtekst.
