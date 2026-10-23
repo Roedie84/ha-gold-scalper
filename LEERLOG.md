@@ -466,3 +466,15 @@ laatste ronde: 23-10 03:40, gemeten t/m 23-10 03:50
 - Hypotheses: H-GS-11 (daghandelkosten IG: nu 84 % van bruto), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
 
 laatste ronde: 23-10 07:40, gemeten t/m 23-10 07:45
+
+## 23-10 11:40 · tussenronde
+- Actief **2.21.1** (06:26, andere sessie; 2.21.0 07:35). Demo/papier; noodstops uit; geen knoppen, geen instellingen. 10:03 "Veldproefopzet vp:momentum:5m uitgezet" (n=40, netto −608) = echte uitschakeling.
+- **IG**: +5 trades → 59 trades / **7 clusters**, netto 56,7 → **88,4**, kosten 7,40/trade in deze ronde (run 326,9 = 79 % van bruto), PF 1,09, t 1,84 (df 6; 5 %-grens 2,45; grootste cluster 51 % van de trades) → geen conclusie.
+- **Pepperstone**: +8 trades → 106 / 5 clusters, netto 1058 → **680** (−378 in 8 trades; clusters 3-5 samen −659), PF 1,32, t 0,62; zonder de grootste cluster −44 → de run steunt op één nachtcluster. Oordeel `failed`.
+- **2.21.0 effect (limiet per richting):** max open posities na 07:39 = 1, op één moment 2 (08:24:19-08:24:40, 21 s; richting niet terug te lezen). Was 11 om 04:00 → werkt; het 21-s-geval in de dagafsluiting nalezen in de tradelijst.
+- **Afstemming:** IG 0 afwijkingen, **Pepperstone 0** (was 1); "261 bijgewerkt naar het bedrag van de broker". Mogelijke verklaring voor de negatieve kosten (netto > bruto, opnieuw in cluster 5: −276,87 tegen −277,51): bruto op eigen koersen, netto op het brokerbedrag. Toetsen in de dagafsluiting (per trade bruto vs brokerbedrag).
+- **H-GS-12:** handelsochtend p99 IG 1,37 s, Pepperstone 1,69, Bitvavo 1,37 (22-10 overdag 32 s) → vandaag tot nu normaal.
+- **2.21.1 effect:** "HA sluit af" 07:39 en 08:40 elk 1× (was ~8 per stop) → werkt (n=2).
+- Hypotheses: H-GS-11 (kosten IG), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
+
+laatste ronde: 23-10 11:40, gemeten t/m 23-10 11:45
