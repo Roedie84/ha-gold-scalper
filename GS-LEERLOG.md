@@ -254,3 +254,15 @@ laatste ronde: 22-10 06:25
 - Meten: na 2.20.4 afstemming XAUUSD 0 afwijkingen; run 5/136 bij n ≥ 100; mand kosten/bruto per markt.
 
 laatste ronde: 22-10 19:55
+
+## 23-10 ~06:05 · ronde 16 (geplande controle; 2.21.0 actief sinds herstart 05:39 UTC)
+- Sinds ronde 15: 2.21.0 uit de chat (limiet per richting over alle strategieën, afstemming één deal per trade, saldosprong papier, cTrader-tempo). Geen dubbel werk; deze ronde geen code.
+- **Pepperstone** run 5 (sinds 22-10 14:48): n=99 netto +957, bruto +1.160, kosten 203; win 71 %; t 0,95 over 4 clusters (per trade 1,68) → niet significant. Gedragen door de daling 4061→3990 (bijna alles short). Veel dubbele instappen op één prijs/moment (donchian:30m + structuur_trend:30m e.d.) blazen n op; 2.21.0 stopt dat. Afstemming 1906/1907: rest 4174,32 bedrag eenmalig overgenomen (+37,75 → +22,65) bij de eerste ronde na 2.21.0 → volgende ronde 0 verwacht.
+- **IG** run 136: n=54 +57, PF 1,06; rsi_rev:15m n=18 −136 (bruto −9, kosten 127). Afstemming in orde.
+- **Daghandel**: Pep 2 (+10,7), IG 1 (+0,8). n te klein.
+- **Bitvavo-mand** run 5: n=324, netto ≈ −3.520 EUR (PUMP n=122 −1.749, BILL n=119 −1.393, PEPE n=83 −378); 17 markten weigeren (kostenfilter/spot short). Geen noodstop nu, 9 open (limiet 3/richting/markt).
+- Logs schoon; ruis: "HA sluit af" ~22× per herstart (één per mandlid) → kandidaat kleine fix (één keer warning, rest debug).
+- Instellingen: niets (mand < 48 u sinds 22-10 06:09; IG/Pep gewijzigd 22-10 14:48).
+- Volgende ronde (na 24-10 06:09): mand marktkeuze/kosten (−11 EUR/trade, kosten ≈ verlies); Pep afstemming 0; aantal gelijktijdige posities na 2.21.0.
+
+laatste ronde: 23-10 06:05
