@@ -501,3 +501,13 @@ laatste ronde: 23-10 15:40, gemeten t/m 23-10 15:45
 - Hypotheses: H-GS-11 (kosten IG 77 % / PP 92 % van bruto), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
 
 laatste ronde: 23-10 19:40, gemeten t/m 23-10 19:45
+
+## 23-10 23:40 · tussenronde
+- Actief **2.21.1**; 2.21.2 (L-GS-019) staat gedownload in HACS maar is pas actief na een HA-herstart. Demo/papier; geen knoppen, geen instellingen. Goud dicht sinds 22:55 (weekend).
+- **IG:** +2 trades (20:00 +27,5; 22:46 +31,5) → 80 trades, netto **181,65**, PF 1,13, kosten 71 % van bruto. t per trade 0,81; per cluster nog steeds te weinig clusters (9-11) voor een toets (~18-30 nodig).
+- **Pepperstone:** +5 trades, avondcluster 19:50-20:30 −171 (3 trades) → 138 trades, netto **−137,03**, PF 0,96, kosten 187 % van bruto; oordeel `failed`. Kosten daalden 300,88 → 294,16 zonder nieuwe trade (afstemming met broker).
+- **Nieuw (meting):** Pepperstone houdt **1 short open over het weekend** (13 units, open 3999,48 om 21:57, stop 3999,16 = in winst, doel 3984,94); vorige weekenden 0 open. Er is geen weekendregel in de code (`enforce_trading_hours` uit, `trading_end_hour` 23) → geen bug; gaprisico is een strategiekeuze voor Ruud. Uitkomst maandag meten.
+- Veldproef vp:structuur_trend:3m 20:31 uitgezet (n=42, netto −118,75, `t=None`). Mand: "HA sluit af" 20:18/21:18/22:18 (L-GS-023 gepland). Latency p99 Pepperstone 1,82 → 1,24 s.
+- Hypotheses: H-GS-11 (kosten IG 71 % / PP 187 % van bruto), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
+
+laatste ronde: 23-10 23:40, gemeten t/m 23-10 23:45
