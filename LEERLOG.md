@@ -455,3 +455,14 @@ laatste ronde: 22-10 23:40, gemeten t/m 22-10 23:45
 - Hypotheses: H-GS-11 (daghandelkosten IG), H-GS-12 (latency), H-GS-13 (IG NY; nu niet meetbaar). Geen release.
 
 laatste ronde: 23-10 03:40, gemeten t/m 23-10 03:50
+
+## 23-10 07:40 · tussenronde
+- Actief **2.21.0** (andere sessie 07:35, vijf punten met akkoord Ruud; actief na de herstart van 07:39). Demo/papier; geen knoppen, geen instellingen.
+- **IG**: +15 trades sinds 03:45 → 54 trades / 5 clusters, netto −214,7 → **+56,7**, kosten 289,9 (5,37/trade, 84 % van bruto), PF 1,06. t = 2,32 maar bij 5 clusters (df 4; 5 %-grens 2,78) en cluster 1 = 56 % van de trades → geen conclusie. De sensortekst "onder 2,0 is toeval" suggereert bij n=5 meer dan er is (meetbaarheid).
+- **Pepperstone**: +36 trades → 98 trades / 4 clusters, netto 395 → **1058** (top 1530 om 04:02), PF 1,61, t 1,13; kosten 2,05/trade (16 %). 03:52-04:01 tot **11 open posities** tegelijk (vóór 2.21.0; limiet per richting 1) en 20 sluitingen in 6 min → precies het patroon dat 2.21.0 dicht. Na 07:39 max 1 → effect meten over de handelsdag.
+- Afstemming Pepperstone 1906/1907: nog 1 afwijking, nu als bedrag (+37,75 tegen +22,65, overgenomen) i.p.v. uitstapprijs; `hersteld` false. Volgende afstemming na 2.21.0 afwachten.
+- **H-GS-12:** p99 Pepperstone 1,3 → 3,0 s bij de opening, IG 1,5 s; volle handelsdag in de dagafsluiting.
+- Logruis: "HA sluit af" 169× sinds 22-10 17:22 bij ~21 herstarts (~8 per herstart, één per coördinator per stop). Klein; noteren.
+- Hypotheses: H-GS-11 (daghandelkosten IG: nu 84 % van bruto), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
+
+laatste ronde: 23-10 07:40, gemeten t/m 23-10 07:45

@@ -383,3 +383,9 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-23 03:40,DAG,gs_latency_p99_s,1.32,3,"nachtsessie: IG 1.25, Pepperstone 1.32, Bitvavo 0.95 (22-10 overdag 32 s)"
 2026-10-23 03:40,DAG,gs_afstemming_afwijkingen,1,2,"IG 2225/2225 (0; 6 nog niet bij broker), Pepperstone 1871/1872 (1, dezelfde uitstap 4181.94/4184.55)"
 2026-10-23 03:40,DAG,gs_saldosprong_zonder_trade,1,1,"23:47 equity 10000.00 -> 8994.99 (-10.1 %) zonder positie of trade; dagstart op referentie 7634.71 gehouden (zelf gedetecteerd)"
+2026-10-23 07:40,TUSSEN,gs_ig_run_trades,54,5,"+15 sinds 03:45; netto -214.66 -> 56.69; kosten 289.88 (5.37/trade, 84 % bruto); PF 1.056; t 2.32 bij 5 clusters (df 4)"
+2026-10-23 07:40,TUSSEN,gs_pp_run_trades,98,4,"+36 sinds 03:45; netto 395.06 -> 1058.20 (top 1530.26 om 04:02); kosten 200.78 (2.05/trade, 16 %); PF 1.605; t 1.13"
+2026-10-23 07:40,TUSSEN,gs_pp_max_open_posities,11,1,"04:00 (voor 2.21.0, limiet_per_richting 1); 06:18/06:45 4; na 07:39 (2.21.0) 1"
+2026-10-23 07:40,TUSSEN,gs_latency_p99_s,3.01,2,Pepperstone 1.32 (03:45) -> 3.01 (07:39) bij opening; IG 1.47
+2026-10-23 07:40,TUSSEN,gs_afstemming_afwijkingen,1,1,"Pepperstone 1906/1907: instap 4174.32 bedrag +37.75 tegen +22.65 (overgenomen), hersteld false (na 2.21.0)"
+2026-10-23 07:40,TUSSEN,gs_log_ha_sluit_af,169,21,WARNING 'HA sluit af' sinds 22-10 17:22 bij ~21 herstarts (~8 per herstart)
