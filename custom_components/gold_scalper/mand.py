@@ -516,10 +516,26 @@ class BitvavoMand:
                 "netto": (data.get("stats") or {}).get("net_pnl"),
                 "trades": (data.get("stats") or {}).get("trades"),
                 "weigering": getattr(c, "_laatste_weigering", None),
+                # 2.21.0: equity en een actieve saldosprong per markt. De leden
+                # hebben geen eigen sensoren; zonder dit was een sprong bij
+                # een lid nergens te zien (22-10 23:47).
+                "equity": data.get("equity"),
+                "saldosprong": (data.get("saldosprong") or {}).get("reden")
+                if (data.get("saldosprong") or {}).get("actief") else None,
             })
         return {
             "markten": len(rijen), "open_posities": self.aantal_open(),
             "max_posities": self.max_posities, "doel_aantal": self.aantal,
             "min_volume": self.min_volume, "herzien_om": self.herzien_om,
             "fout": self.laatste_fout, "per_markt": rijen,
+            "saldosprong": [r["markt"] for r in rijen if r.get("saldosprong")],
         }
+
+    def saldosprongen(self) -> list[str]:
+        """2.21.0: redenen van een actieve saldosprong bij de leden."""
+        uit = []
+        for c in self.leden.values():
+            sprong = getattr(c, "saldosprong", None)
+            if sprong is not None and getattr(sprong, "actief", False):
+                uit.append(sprong.reden or c.symbol)
+        return uit

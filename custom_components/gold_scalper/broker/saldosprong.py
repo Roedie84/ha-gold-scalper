@@ -31,6 +31,16 @@ Eerste meting zonder referentie (na installatie, of als er nog niets bewaard
 is): die wordt zonder vergelijking de referentie. Er is dan niets om een
 sprong tegen af te zetten, en een account dat al op tien miljoen staat mag
 niet bij de eerste start als sprong worden gezien.
+
+**Papier (2.21.0).** Het papiersaldo is de som van de eigen trades van de
+lopende run; het kan niet springen zonder trade. Wel springt het bij een
+nieuwe run terug naar de startbalans - en dat zag de bewaker als "saldosprong
+zonder trade" (Bitvavo-mand 22-10: referentie 7634,71 uit de vorige run, nieuw
+saldo 10000). Daarna sprong het "opnieuw" (10000 -> 8994,99) door gewone
+trades, want tijdens een actieve sprong telde een open positie of sluiting
+niet als verklaring. Nu: op papier volgt de referentie elke meting en staat
+er nooit een sprong; tijdens een sprong schuift een verklaarde verandering de
+sprongwaarde mee in plaats van een nieuwe gebeurtenis te beginnen.
 """
 
 from __future__ import annotations
@@ -61,7 +71,9 @@ def _relatief(nieuw: float, oud: float) -> float:
 class SaldoSprongBewaker:
     """Houdt de betrouwbare saldoreferentie bij en herkent onverklaarde sprongen."""
 
-    def __init__(self) -> None:
+    def __init__(self, naam: str | None = None) -> None:
+        #: 2.21.0: markt in de logregels (de Bitvavo-mand heeft er twintig).
+        self.naam = naam
         #: Laatste betrouwbare meting.
         self.referentie: float | None = None
         #: Actieve sprong: de gemeten waarde en sinds wanneer die geldt.
@@ -85,14 +97,19 @@ class SaldoSprongBewaker:
 
     # -- meten -------------------------------------------------------------- #
 
+    def _voorvoegsel(self) -> str:
+        return f"{self.naam}: " if self.naam else ""
+
     def meet(
         self, now: datetime, waarde: float | None, positie_open: bool,
-        sluitingen: int,
+        sluitingen: int, papier: bool = False,
     ) -> None:
         """Verwerk één meting van de equity.
 
         ``positie_open``: staat er nu een positie of onbevestigde order open.
         ``sluitingen``: oplopende teller van gesloten trades (ook deelsluitingen).
+        ``papier``: 2.21.0 - het saldo komt uit de eigen papieradministratie;
+        dan is elke verandering verklaard (zie de moduletekst).
         """
         if self._sluitingen is not None and sluitingen != self._sluitingen:
             self._verklaard_om = now
@@ -104,16 +121,19 @@ class SaldoSprongBewaker:
             return
         waarde = float(waarde)
 
-        if self.referentie is None or self.referentie <= 0:
-            # Eerste meting: zonder referentie valt er niets te vergelijken.
+        if papier:
+            if self.actief:
+                _LOGGER.info(
+                    "%sSaldosprong vervalt: papiersaldo %.2f volgt uit de eigen "
+                    "trades (was referentie %.2f).", self._voorvoegsel(), waarde,
+                    self.referentie or 0.0,
+                )
+                self._wis()
             self.referentie = waarde
             return
 
-        if self.actief:
-            self._tijdens_sprong(now, waarde)
-            return
-
-        if _relatief(waarde, self.referentie) <= DREMPEL:
+        if self.referentie is None or self.referentie <= 0:
+            # Eerste meting: zonder referentie valt er niets te vergelijken.
             self.referentie = waarde
             return
 
@@ -121,6 +141,15 @@ class SaldoSprongBewaker:
             self._verklaard_om is not None
             and now - self._verklaard_om <= VERKLARING_GELDIG
         )
+
+        if self.actief:
+            self._tijdens_sprong(now, waarde, verklaard)
+            return
+
+        if _relatief(waarde, self.referentie) <= DREMPEL:
+            self.referentie = waarde
+            return
+
         if verklaard:
             self.referentie = waarde
             return
@@ -131,7 +160,7 @@ class SaldoSprongBewaker:
         self.sprong_waarde = waarde
         self.sprong_sinds = now
         self.reden = (
-            f"saldosprong zonder trade: equity van {vanaf:.2f} naar {waarde:.2f} "
+            f"{self._voorvoegsel()}saldosprong zonder trade: equity van {vanaf:.2f} naar {waarde:.2f} "
             f"({(waarde - vanaf) / vanaf * 100:+.1f}%) terwijl er geen positie "
             f"open stond en geen trade sloot; dagstart, run-opening en vloer "
             f"blijven op {self.referentie:.2f}"
@@ -141,15 +170,23 @@ class SaldoSprongBewaker:
             self.reden, int(STABIEL_NA.total_seconds() // 3600),
         )
 
-    def _tijdens_sprong(self, now: datetime, waarde: float) -> None:
+    def _tijdens_sprong(self, now: datetime, waarde: float,
+                        verklaard: bool = False) -> None:
         assert self.referentie is not None and self.sprong_waarde is not None
         if _relatief(waarde, self.referentie) <= DREMPEL:
             _LOGGER.info(
-                "Saldosprong voorbij: equity %.2f ligt weer binnen %.0f%% van "
-                "de referentie %.2f.", waarde, DREMPEL * 100, self.referentie,
+                "%sSaldosprong voorbij: equity %.2f ligt weer binnen %.0f%% van "
+                "de referentie %.2f.", self._voorvoegsel(), waarde, DREMPEL * 100,
+                self.referentie,
             )
             self.referentie = waarde
             self._wis()
+            return
+        if verklaard:
+            # 2.21.0: een positie of sluiting verklaart deze verandering; de
+            # sprongwaarde schuift mee, geen nieuwe gebeurtenis (en geen
+            # nieuwe wachttijd).
+            self.sprong_waarde = waarde
             return
         if _relatief(waarde, self.sprong_waarde) > DREMPEL:
             # Opnieuw gesprongen: een nieuwe gebeurtenis, opnieuw wachten.
@@ -157,8 +194,8 @@ class SaldoSprongBewaker:
             return
         if self.sprong_sinds is not None and now - self.sprong_sinds >= STABIEL_NA:
             _LOGGER.info(
-                "Saldosprong %d uur stabiel: %.2f is de nieuwe referentie "
-                "(was %.2f).", int(STABIEL_NA.total_seconds() // 3600),
+                "%sSaldosprong %d uur stabiel: %.2f is de nieuwe referentie "
+                "(was %.2f).", self._voorvoegsel(), int(STABIEL_NA.total_seconds() // 3600),
                 waarde, self.referentie,
             )
             self.referentie = waarde

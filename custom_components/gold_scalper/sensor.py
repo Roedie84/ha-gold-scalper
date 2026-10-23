@@ -362,6 +362,8 @@ SENSORS: tuple[ScalperSensor, ...] = (
             # metingen is de p99 indicatief.
             "n": ((d.get("latency") or {}).get("total") or {}).get("samples") or 0,
             "p99_indicatief": _p99_indicatief(d),
+            # 2.21.0: candles->exits en exits->signal per deelstap.
+            "deelstappen": d.get("latency_deelstappen") or {},
         },
     ),
 )

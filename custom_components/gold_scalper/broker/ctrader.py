@@ -301,6 +301,8 @@ class CTraderVenue(ExecutionVenue):
         self._lock = asyncio.Lock()
         self._wachtend: dict[str, asyncio.Future] = {}
         self._tempo_lock = asyncio.Lock()
+        #: 2.21.0: eigen slot voor de historische verzoeken (zie ``_tempo``).
+        self._tempo_hist_lock = asyncio.Lock()
         self._laatst_verzoek = 0.0
         self._laatst_historisch = 0.0
         self._uitvoeringen: asyncio.Queue | None = None
@@ -484,17 +486,33 @@ class CTraderVenue(ExecutionVenue):
                 return
 
     async def _tempo(self, soort: int) -> None:
-        """Houd de verzoeken onder de limieten van cTrader."""
+        """Houd de verzoeken onder de limieten van cTrader.
+
+        2.21.0: twee sloten. Tot nu wachtte een historisch verzoek (deals,
+        trendbars: hooguit één per 0,4 s) zijn beurt af *binnen* het slot dat
+        alle verzoeken delen. Liep de afstemming op de achtergrond (2.20.0:
+        tientallen dealverzoeken), dan stond het opvragen van de posities in
+        de cyclus achter een rij van zulke wachttijden: p99 candles->exits
+        677 ms en exits->signal 760 ms bij een mediaan van ~100 ms (XAUUSD
+        p99 2,36 s tegen IG 1,45 s). Nu wacht een historisch verzoek eerst op
+        zijn eigen slot; het gedeelde slot houdt alleen de algemene 50 ms
+        afstand aan. Beide limieten blijven gelijk."""
+        if soort in HISTORISCH:
+            async with self._tempo_hist_lock:
+                wacht = self._laatst_historisch + HISTORISCH_INTERVAL_S - time.monotonic()
+                if wacht > 0:
+                    await asyncio.sleep(wacht)
+                await self._tempo_algemeen()
+                self._laatst_historisch = self._laatst_verzoek
+            return
+        await self._tempo_algemeen()
+
+    async def _tempo_algemeen(self) -> None:
         async with self._tempo_lock:
-            nu = time.monotonic()
-            wacht = self._laatst_verzoek + ALGEMEEN_INTERVAL_S - nu
-            if soort in HISTORISCH:
-                wacht = max(wacht, self._laatst_historisch + HISTORISCH_INTERVAL_S - nu)
+            wacht = self._laatst_verzoek + ALGEMEEN_INTERVAL_S - time.monotonic()
             if wacht > 0:
                 await asyncio.sleep(wacht)
             self._laatst_verzoek = time.monotonic()
-            if soort in HISTORISCH:
-                self._laatst_historisch = self._laatst_verzoek
 
     async def _verzoek(self, soort: int, payload: dict, verwacht: int | None = None,
                        timeout: float = VERZOEK_TIMEOUT_S) -> dict:

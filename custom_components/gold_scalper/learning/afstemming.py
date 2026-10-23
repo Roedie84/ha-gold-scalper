@@ -199,6 +199,14 @@ def stem_af(
         if sleutel:
             claims[sleutel] = claims.get(sleutel, 0) + 1
 
+    # 2.21.0: binnen één positie (cTrader, positienummer) elke sluitende deal
+    # aan hooguit één eigen trade. Koppelde elke trade los de deal met de
+    # dichtstbijzijnde omvang, dan konden deel en rest dezelfde deal claimen
+    # terwijl de andere deal vrij bleef (58383755: rest 5 oz aan de deal van
+    # de deelsluiting, 4181,94 tegen 4184,55). Bij evenveel of meer deals dan
+    # trades verdelen in de volgorde van sluiten.
+    _verdeel_per_positie(koppelingen, claims, transacties)
+
     # 2.20.3: bij een positie waarvan de broker (nagezocht) minder sluitende
     # deals heeft dan eigen trades, claimen deel en rest dezelfde deal. Die
     # hoort bij de trade met het dichtstbijzijnde sluitmoment; de andere heeft
@@ -404,6 +412,60 @@ def stem_af(
             uitslag.kloppend += 1
 
     return uitslag
+
+
+def _verdeel_per_positie(koppelingen: list, claims: dict, transacties: list) -> None:
+    """2.21.0: deals van één positie één-op-één over de eigen trades verdelen.
+
+    Alleen bij koppelingen op positienummer, alleen als binnen die positie een
+    deal door meer dan één trade geclaimd wordt, en alleen als de broker
+    minstens evenveel sluitende deals heeft als er eigen trades zijn. Dan
+    gaan trades en deals beide op sluitmoment gesorteerd en worden ze op
+    volgorde gekoppeld: de deelsluiting sluit eerst, de rest daarna - bij de
+    broker net zo. Heeft de broker meer deals, dan kiest elke trade (op
+    volgorde) de nog vrije deal met het dichtstbijzijnde sluitmoment.
+    ``koppelingen`` en ``claims`` worden ter plekke bijgewerkt.
+    """
+    from ..broker.ig_capital import _match_uitkomst
+
+    per_positie: dict = {}
+    for i, (trade, _units, match) in enumerate(koppelingen):
+        if not match or match.get("matched_on") != "positienummer":
+            continue
+        pid = str(trade.broker_ticket or "").split("-")[0]
+        per_positie.setdefault(pid, []).append(i)
+    for pid, indices in per_positie.items():
+        sleutels = [koppelingen[i][2].get("tx_sleutel") for i in indices]
+        if len(set(sleutels)) == len(sleutels):
+            continue  # geen dubbele claim: niets te verdelen
+        deals = [tx for tx in transacties
+                 if str(tx.get("positionId") or "") == pid and tx.get("closeLevel") is not None]
+        if len(deals) < len(indices):
+            continue  # te weinig deals: 2.20.3 (niet_bij_broker) beslist
+
+        def sluit(waarde) -> float:
+            m = _moment(waarde)
+            return m.timestamp() if m is not None else float("inf")
+
+        volgorde = sorted(indices, key=lambda i: sluit(koppelingen[i][0].close_time))
+        deals = sorted(deals, key=lambda tx: sluit(tx.get("dateUtc")))
+        if len(deals) == len(volgorde):
+            paren = list(zip(volgorde, deals))
+        else:
+            vrij = list(deals)
+            paren = []
+            for i in volgorde:
+                eigen = sluit(koppelingen[i][0].close_time)
+                tx = min(vrij, key=lambda d: abs(sluit(d.get("dateUtc")) - eigen))
+                vrij.remove(tx)
+                paren.append((i, tx))
+        for sleutel in sleutels:
+            claims[sleutel] = claims.get(sleutel, 0) - 1
+        for i, tx in paren:
+            trade, units, _oud = koppelingen[i]
+            nieuw = _match_uitkomst(tx, float(tx["closeLevel"]), "positienummer", len(deals))
+            koppelingen[i] = (trade, units, nieuw)
+            claims[nieuw["tx_sleutel"]] = claims.get(nieuw["tx_sleutel"], 0) + 1
 
 
 def _voorlopig(trade: Trade) -> bool:

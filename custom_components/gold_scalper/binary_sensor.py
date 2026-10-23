@@ -195,6 +195,17 @@ class MarketTradeable(GoldScalperEntity, BinarySensorEntity):
         }
 
 
+def _mand_sprongen(coordinator) -> list[str]:
+    """2.21.0: actieve saldosprongen bij de leden van de Bitvavo-mand."""
+    mand = getattr(coordinator, "_mand", None)
+    if mand is None or not hasattr(mand, "saldosprongen"):
+        return []
+    try:
+        return list(mand.saldosprongen())
+    except Exception:  # noqa: BLE001 - alleen weergave
+        return []
+
+
 class DataIntegrity(GoldScalperEntity, BinarySensorEntity):
     """Aan als de OHLCV-kolommen uit de pas lopen.
 
@@ -225,6 +236,9 @@ class DataIntegrity(GoldScalperEntity, BinarySensorEntity):
         # 1.7.7: een saldosprong zonder trade is een dataprobleem.
         if (data.get("saldosprong") or {}).get("actief"):
             return True
+        # 2.21.0: ook bij een lid van de Bitvavo-mand (geen eigen sensoren).
+        if _mand_sprongen(self.coordinator):
+            return True
         # Te weinig historie is óók een dataprobleem: de indicatoren geven dan
         # waarden terug die nergens op steunen.
         return (data.get("candles") or 0) < 60
@@ -243,6 +257,7 @@ class DataIntegrity(GoldScalperEntity, BinarySensorEntity):
             "saldosprong": bool((data.get("saldosprong") or {}).get("actief")),
             "saldosprong_reden": (data.get("saldosprong") or {}).get("reden"),
             "saldo_referentie": (data.get("saldosprong") or {}).get("referentie"),
+            "saldosprong_mand": _mand_sprongen(self.coordinator),
             "hint": (
                 "Bij een probleem wordt de historie automatisch opnieuw opgehaald "
                 "bij de volgende cyclus."

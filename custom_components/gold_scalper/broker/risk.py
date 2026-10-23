@@ -235,9 +235,11 @@ class RiskManager:
             # 1.7.7: geen nieuwe dagstart op een onverklaarde saldosprong.
             if self.saldosprong is not None and self.saldosprong.actief:
                 betrouwbaar = self.saldosprong.betrouwbaar(balance)
+                naam = getattr(self.saldosprong, "naam", None)
                 _LOGGER.warning(
-                    "Dagstart op de vorige referentie %.2f in plaats van %.2f: "
-                    "%s", betrouwbaar, balance, self.saldosprong.reden,
+                    "%sDagstart op de vorige referentie %.2f in plaats van %.2f: "
+                    "%s", f"{naam}: " if naam else "", betrouwbaar, balance,
+                    self.saldosprong.reden,
                 )
                 balance = betrouwbaar
             self.state.day_start_balance = balance

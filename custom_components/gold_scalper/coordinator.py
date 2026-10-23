@@ -483,7 +483,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             self.starting_balance,
         )
         #: 1.7.7: saldosprong zonder trade = dataprobleem.
-        self.saldosprong = SaldoSprongBewaker()
+        self.saldosprong = SaldoSprongBewaker(naam=getattr(self, "symbol", None))
         self.risk.saldosprong = self.saldosprong
 
         # Beschermingslaag rond echte orders. Papermodus kent de storingen die
@@ -722,6 +722,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # _resultaten). Eerst begon de steekproef na elke herstart opnieuw en
         # bepaalde één uitschieter de p99.
         self.latency = LatencyTracker(window=LATENCY_VENSTER)
+        #: 2.21.0: deelstappen van candles->exits en exits->signal.
+        self.latency_deel = LatencyTracker(window=LATENCY_VENSTER)
         self.state = StreamState()
         self.gate = LiveGate().evaluate({}, {}, []).as_dict()
 
@@ -756,6 +758,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._last_signal = None
         #: 1.9.0: posities geopend in de lopende cyclus (hooguit één).
         self._geopend_in_cyclus = 0
+        #: 2.21.0: orders die in de lopende cyclus uitgingen, als
+        #: ``(richting, ticket, instap)``. De positielijst van de cyclus is van
+        #: vóór die orders; zonder dit telde de limiet ze niet mee.
+        self._geopend_deze_cyclus: list[tuple[int, str | None, float | None]] = []
+        #: 2.21.0: deelstappen van de lopende cyclus (zie _voorcheck_posities).
+        self._deel = LatencyBudget()
         #: 1.9.0: vrije marge zoals de broker hem deze cyclus meldde
         #: (accountvaluta); None = niet gemeld.
         self._marge_vrij: float | None = None
@@ -2186,6 +2194,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 1.7.6: de latencysteekproef, zodat p99 niet na elke herstart
             # weer op een handvol metingen rust.
             "latency": self.latency.export(),
+            "latency_deel": self.latency_deel.export(),
             # 1.10.0: de laatste afstemming met de broker. Zonder dit stond
             # de sensor na elke herstart op "nog niet", en in het weekend
             # bleef dat zo tot de markt weer openging.
@@ -2217,6 +2226,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return
         self.closures.restore(data.get("closures"))
         self.latency.restore(data.get("latency"))
+        self.latency_deel.restore(data.get("latency_deel"))
         for veld in ("backtest", "validation", "lab"):
             waarde = data.get(veld)
             if isinstance(waarde, dict) and waarde and not getattr(self, veld):
@@ -2789,6 +2799,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             await self._settle_vanished_positions(quote, now)
             # 1.7.9: lopende sluitverzoeken elke cyclus nakijken.
             await self._bewaak_sluitingen()
+            self._deel.mark("afwikkelen")
             # 1.7.3: verse schattingen binnen enkele minuten nog een paar keer
             # bij de broker navragen. Alleen opvragen en boeken.
             await self._herkans_voorlopige_afwikkelingen(now)
@@ -2806,6 +2817,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if self._correctie_teller == 1 or self._correctie_teller >= 10:
                 self._correctie_teller = 2
                 await self._correct_estimated_settlements(now)
+            self._deel.mark("correctie")
 
             # Eenmaal per handelsdag afstemmen, na 06:00 UTC: dan heeft de
             # broker de nacht verwerkt.
@@ -2841,12 +2853,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
         # 2.4.0: bars op 1m-30m voor de veldproef (15m ook in het archief).
         await self._vp_bijwerken(quote, now)
+        self._deel.mark("veldproefbars")
 
         # -- open posities beheren, vóór alles anders ------------------------ #
         # Bij een gesloten markt niet ingrijpen: een stop verplaatsen of een
         # positie sluiten op een koers van uren geleden is erger dan wachten.
         if quote.tradeable:
             await self._manage_open_positions(quote, now)
+            self._deel.mark("beheer")
             # 1.9.0: schaduwtrades met dezelfde koers en bars; geen extra
             # verzoek bij de broker.
             await self._werk_schaduw_bij(quote, now)
@@ -2856,6 +2870,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             await self._werk_bevestiging_bij(quote, now)
             # 1.9.5: tijdstopvarianten, idem. Alleen meting.
             await self._werk_varianten_bij(quote, now)
+            self._deel.mark("schaduw")
 
         # De wisselkoers elke cyclus verversen - met een pauze van vijf minuten
         # - en niet pas bij een handelssignaal. Eerst werd hij alleen vlak vóór
@@ -2865,6 +2880,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # vastgelegd of EUR/USD dicht is, en dat heeft de 72-uursregel nodig.
         await self._refresh_fx(now)
         budget.mark("exits")
+        self._deel.mark("exits")
 
         # -- rooster als tweede bron ------------------------------------------ #
         #
@@ -2921,6 +2937,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             if self._audit_counter >= 10:
                 self._audit_counter = 0
                 await self._audit_against_broker()
+        self._deel.mark("rooster_audit")
 
         # -- boekhouding ----------------------------------------------------- #
         #: 1.7.7: alleen een werkelijk gemeten equity telt voor de
@@ -2963,6 +2980,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 balance = equity = laatst
                 saldo_onbekend = str(err)[:120] or "geen antwoord"
 
+        self._deel.mark("saldo")
         # Eerst onbevestigde orders terugzoeken: vóór de telling, zodat een
         # teruggevonden positie meetelt en vastgelegd is voordat de strategie
         # opnieuw beslist.
@@ -2970,6 +2988,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             await self._resolve_pending_orders()
 
         open_positions = await self._open_positions()
+        self._deel.mark("onbevestigd_posities")
         # Onbevestigde orders tellen mee als open positie: ze kunnen er één
         # zijn. Anders houdt de positielimiet niet zolang de broker ze nog niet
         # in zijn lijst toont.
@@ -2983,6 +3002,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             now, gemeten_equity,
             positie_open=bool(aantal_open or open_positions_precheck),
             sluitingen=self.risk.sluitingen,
+            # 2.21.0: het papiersaldo volgt uit de eigen trades; een nieuwe
+            # run zet het terug op de startbalans. Geen saldosprong.
+            papier=self.paper is not None and not self.mode.places_orders,
         )
 
         # -- signaal --------------------------------------------------------- #
@@ -3016,10 +3038,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         if self.alles:
             await self._ververs_vp_uitgezet()
         await self._ververs_onderzoek()
+        self._deel.mark("voorbereiding")
         per_richting = tel_per_richting(open_positions, pending)
         for ronde, strategie in enumerate(combinatie_mod.strategieen(self._strategie)):
             eigen = posities_per_strategie.get(strategie, [])
-            eigen_richting = tel_per_richting(eigen, pending)
+            # 2.21.0: de limiet per richting telt alle strategieën samen
+            # (plus wat deze cyclus al uitging); daarvoor per strategie, zodat
+            # elke veldproefopzet zijn eigen positie mocht hebben - 22-10
+            # 18:45 tot 10 shorts tegelijk bij een limiet van 1.
+            eigen_richting = self._telling_richting(open_positions, pending)
             eigen_open = len(eigen) + (len(pending) if self.mode.places_orders else 0)
             laatste_instap = (
                 self._laatste_instap.get(strategie, 0.0) if self.combinatie
@@ -3044,6 +3071,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 signal = r_signal
                 self._last_signal = r_signal
                 budget.mark("signal")
+                self._deel.mark("signal")
             r_reject = None
             #: 1.9.0: categorie voor de schaduwtrade als een geldig signaal niet
             #: wordt uitgevoerd (zie strategy/schaduw.SCHADUW_REDENEN). None: geen
@@ -3073,6 +3101,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         schaduw_reden = "positielimiet"
                     elif r_signal.reject_reason == "cooldown":
                         schaduw_reden = "cooldown"
+                elif (limiet_reden := self._grendel_richting(
+                        1 if r_signal.direction == 1 else -1,
+                        quote.ask if r_signal.direction == 1 else quote.bid,
+                        open_positions, pending, eigen)):
+                    # 2.21.0: harde grendel, ook voor strategieën die de
+                    # telling zelf niet toetsen (veldproef, daghandel).
+                    r_reject = limiet_reden
+                    schaduw_reden = "positielimiet"
                 elif saldo_onbekend:
                     # 2.4.4: zonder gemeten saldo geen risicotoets (die zou
                     # op een ingevulde waarde een valse noodstop geven) en dus
@@ -3260,6 +3296,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             )
         budget.mark("bookkeeping")
         self.latency.record(budget)
+        self.latency_deel.record(self._deel)
 
         stats = await self.hass.async_add_executor_job(
             performance.compute_for_run, self.db, self.run_id, None,
@@ -3408,6 +3445,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 "levenscyclus_afgewikkeld": self.lifecycle.safe_to_restart,
             },
             "latency": self.latency.stats(),
+            "latency_deelstappen": self.latency_deel.stats(),
             "ig_requests": (
                 self.venue.request_stats() if hasattr(self.venue, "request_stats") else None
             ),
@@ -3477,8 +3515,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         koers én positie-overzicht binnen zijn; anders zou een aanhoudende
         time-out op /positions elke cyclus als de eerste tellen.
         """
+        # 2.21.0: begin van de beslissende cyclus. De deelstappen van
+        # candles->exits en exits->signal apart meten (XAUUSD p99 2,36 s; de
+        # staart zat in die twee schakels), en de orders van deze cyclus
+        # opnieuw bijhouden (limiet per richting).
+        self._deel = LatencyBudget()
+        self._deel.mark("candles")
+        self._geopend_deze_cyclus = []
         try:
             heeft_posities = bool(await self._open_positions())
+            self._deel.mark("posities")
         except VenueError as err:
             vastgehouden = self._houd_laatste_data(err, wat="Positie-opvraging")
             if vastgehouden is not None:
@@ -4029,6 +4075,21 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     f"{veldproef_mod.min_stopafstand(kosten):.4g}")
                 self._vp_bar_gebruikt(vp_naam, signal)
                 return False
+        # 2.21.0: limiet per richting over alle strategieën samen, met verse
+        # posities, onbevestigde orders en wat deze cyclus al uitging (tweede
+        # grendel, ook voor turbo). De dubbele prijs toetst de lus.
+        try:
+            verse = list(await self._open_positions())
+        except VenueError as err:
+            self._laatste_weigering = f"posities niet op te vragen: {err}"
+            return False
+        verse_pending = (list(self.executor.pending.values())
+                         if self.mode.places_orders else [])
+        reden = self._grendel_richting(richting, None, verse, verse_pending)
+        if reden:
+            self._laatste_weigering = reden
+            _LOGGER.info("Instap %s %s geweigerd: %s", self.symbol, side, reden)
+            return False
         if gelijktijdig_open is None:
             gelijktijdig_open = len(await self._open_positions())
         # Voor de nettingcontrole: welke posities stonden er vlak vóór de
@@ -4091,6 +4152,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.debug("Ordergrootte: %s", self.last_sizing.get("reason"))
             strategie = (getattr(signal, "components", None) or {}).get(
                 "strategie", self.primaire_strategie)
+            geopend_ticket: str | None = None
 
             if self.mode.places_orders:
                 # De poort geldt alleen voor echt geld. Op demo is er niets te
@@ -4128,6 +4190,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     self._last_entry_ts = now.timestamp()
                     self._laatste_instap[strategie] = now.timestamp()
                     self._geopend_in_cyclus += 1
+                    self._geopend_deze_cyclus.append((richting, None, entry_price))
                     self._vp_bar_gebruikt(strategie, signal)
                     return True
                 if not result.success:
@@ -4142,6 +4205,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 # resultaat, geen kosten, geen verliesanalyse, en een
                 # bewijsfase die nooit vordert. Dat maakte de demomodus
                 # zinloos, want juist het meten was het doel.
+                geopend_ticket = str(result.ticket) if result.ticket else None
                 await self._record_broker_open(
                     result, signal, quote, side, now,
                     gelijktijdig_open=gelijktijdig_open,
@@ -4165,6 +4229,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 )
                 trade.gelijktijdig_open = gelijktijdig_open
                 trade.strategie = strategie if self.combinatie else None
+                geopend_ticket = f"id:{trade.id}" if getattr(trade, "id", None) else None
                 await self.hass.async_add_executor_job(self.db.update_trade, trade)
                 # 1.9.5: tijdstopvarianten van deze positie (alleen meting).
                 await self._open_varianten(
@@ -4180,6 +4245,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             self._last_entry_ts = now.timestamp()
             self._laatste_instap[strategie] = now.timestamp()
             self._geopend_in_cyclus += 1
+            self._geopend_deze_cyclus.append((richting, geopend_ticket, entry_price))
             self._vp_bar_gebruikt(strategie, signal)
             return True
         except (ModeLockedError, VenueError) as err:
@@ -4187,7 +4253,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         except InsufficientMargin as err:
             # 1.9.0: met meerdere posities kan de papermarge op raken. Geen
             # crash van de cyclus; gewoon niet openen.
-            _LOGGER.warning("Openen geweigerd (papermarge): %s", err)
+            # 2.21.0: met de markt erbij (de Bitvavo-mand heeft er twintig).
+            _LOGGER.warning("Openen geweigerd (papermarge) op %s: %s", self.symbol, err)
+            self._laatste_weigering = f"papermarge: {err}"
         return False
 
     # -- 1.9.0: meerdere posities en schaduwtrades --------------------------- #
@@ -4320,6 +4388,73 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         except Exception:  # noqa: BLE001 - een schatting mag niets breken
             return float(self.units)
 
+    @staticmethod
+    def _positie_sleutel(p) -> str:
+        """2.21.0: ticket van een positie (broker) of ``id:N`` (papier)."""
+        ticket = getattr(p, "ticket", None) or getattr(p, "broker_ticket", None)
+        if ticket:
+            return str(ticket)
+        return f"id:{getattr(p, 'id', '')}"
+
+    def _telling_richting(self, posities: list, pending: list) -> dict[int, int]:
+        """2.21.0: posities per richting over alle strategieën samen.
+
+        Telt elke open positie (ook een beschermde, met de stop voorbij de
+        instap), elke onbevestigde order en elke order die deze cyclus
+        uitging maar nog niet in ``posities`` staat."""
+        telling = tel_per_richting(posities, pending)
+        bekend = {self._positie_sleutel(p) for p in posities}
+        for richting, ticket, _prijs in getattr(self, "_geopend_deze_cyclus", ()):
+            if ticket is None or ticket not in bekend:
+                telling[richting] = telling.get(richting, 0) + 1
+        return telling
+
+    #: 2.21.0: een instap binnen dit deel van de prijs (of 0,1 x ATR) van een
+    #: open positie in dezelfde richting is een dubbele order.
+    DUBBEL_RELATIEF = 0.0001
+    DUBBEL_ATR = 0.1
+
+    def _grendel_richting(self, richting: int, instap: float | None,
+                          posities: list, pending: list,
+                          eigen: list | None = None) -> str | None:
+        """2.21.0: reden om niet te openen, of None.
+
+        Gemeten 22-10: 18:45-18:48 tot 10 shorts tegelijk op XAUUSD bij
+        ``limiet_per_richting`` 1; 03:07 nog 4, 06:10 2. Oorzaak: de limiet
+        werd per strategie geteld (elke veldproefopzet had er een eigen), de
+        clusterlimiet van de veldproef telde beschermde posities niet, en de
+        positielijst van de cyclus wist niet van orders die in dezelfde
+        cyclus al uitgingen (bij 'alles' tot 6 per cyclus).
+
+        Met ``instap``: ook geen order binnen een haar (0,01 % of 0,1 x ATR)
+        van een open positie in dezelfde richting. Posities in ``eigen`` (de
+        eigen strategie) slaat die toets over: daarvoor geldt de spreiding."""
+        kant = "long" if richting == 1 else "short"
+        limiet = int(getattr(self.strategy_cfg, "max_positions_per_richting", 0) or 0)
+        telling = self._telling_richting(posities, pending)
+        hier = int(telling.get(richting, 0))
+        if limiet > 0 and hier >= limiet:
+            return (f"limiet per richting: {hier} van {limiet} {kant} open "
+                    "(alle strategieën samen, met beschermde posities en "
+                    "orders onderweg)")
+        if instap:
+            atr = getattr(getattr(self, "state", None), "atr", None)
+            atr = getattr(atr, "value", None)
+            marge = max(abs(float(instap)) * self.DUBBEL_RELATIEF,
+                        (atr or 0.0) * self.DUBBEL_ATR)
+            eigen_ids = {id(p) for p in (eigen or ())}
+            prijzen = [getattr(p, "open_price", None) for p in posities
+                       if richting_van(getattr(p, "side", "buy")) == richting
+                       and id(p) not in eigen_ids]
+            bekend = {self._positie_sleutel(p) for p in posities}
+            prijzen += [prijs for r, ticket, prijs in getattr(self, "_geopend_deze_cyclus", ())
+                        if r == richting and (ticket is None or ticket not in bekend)]
+            for prijs in prijzen:
+                if prijs is not None and abs(float(prijs) - float(instap)) <= marge:
+                    return (f"dubbele order: al een {kant} op {float(prijs):.6g} "
+                            f"(instap {float(instap):.6g}, marge {marge:.4g})")
+        return None
+
     async def _toets_extra_positie(
         self, signal, quote: VenueQuote, now: datetime, open_positions: list,
         equity: float | None, eigen: list | None = None,
@@ -4332,7 +4467,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         """
         richting = 1 if signal.direction == 1 else -1
         # 2.1.0: spreiding alleen tegen posities van dezelfde strategie; marge
-        # en vloer hieronder over alles samen.
+        # en vloer hieronder over alles samen. 2.21.0: plus wat deze cyclus al
+        # uitging; een dubbele prijs over alle strategieën heen weert de lus
+        # (_grendel_richting).
         zelfde = [
             p for p in (open_positions if eigen is None else eigen)
             if richting_van(getattr(p, "side", "buy")) == richting
@@ -4378,8 +4515,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                     f"al {met_risico} veldproefposities met risico in deze richting "
                     f"(max {veldproef_mod.MAX_POSITIES_MET_RISICO})"
                 )
-        if zelfde:
-            bestaand = []
+        bekend = {self._positie_sleutel(p) for p in open_positions}
+        net_geopend = [
+            (prijs, now) for r, ticket, prijs in self._geopend_deze_cyclus
+            if r == richting and prijs is not None and ticket not in bekend
+        ]
+        if zelfde or net_geopend:
+            bestaand = list(net_geopend)
             for p in zelfde:
                 ticket = str(getattr(p, "ticket", None) or getattr(p, "id", ""))
                 geopend = getattr(p, "open_time", None)

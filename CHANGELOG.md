@@ -1,5 +1,36 @@
 # Changelog — Gold Scalper
 
+## 2.21.0 - 23-10-2026
+
+Vijf verbeteringen, elk door Ruud goedgekeurd (23-10).
+
+### Pepperstone: één deal per trade binnen een positie, uitstap van de broker
+- Live: 1 afwijking bij positie 58383755 (instap 4174,32): rest 4181,94 tegen 4184,55 bij de broker; `nagezocht` leeg, dus het overzicht had al twee sluitende deals voor de positie.
+- Oorzaak (afgeleid; de deals zelf zijn van hieruit niet in te zien): binnen een positie koos elke trade los de deal met de dichtstbijzijnde omvang. De rest (0,05 lot = 5 oz) lag dichter bij de deal van de deelsluiting dan bij zijn eigen deal, zodat deel en rest dezelfde deal claimden; zo'n dubbele claim is niet eenduidig en de uitstap werd niet overgenomen (het bedrag wel, sinds 2.20.0).
+- Nu: claimen trades van één positie dezelfde deal en heeft de broker minstens evenveel sluitende deals, dan worden deals en trades op sluitmoment gekoppeld (de deelsluiting sluit eerst). Elke deal hoort dan bij precies één trade; de uitstapprijs van de broker wordt overgenomen (`ADOPTED_BROKER_SETTLEMENT_UNIQUE_MATCH`, oude waarde in `exit_price_provenance`), net als het bedrag. Minder deals dan trades: ongewijzigd (2.20.3, `niet_bij_broker`).
+
+### Limiet per richting over alle strategieën samen
+- Live 22-10 18:45-18:48 tot 10 shorts tegelijk op XAUUSD bij `limiet_per_richting` 1; 03:07 nog 4, 06:10 2 (6 en 7 oz, 4017,38 en 4016,51).
+- Oorzaken in de code: (1) de limiet werd per strategie geteld (`eigen_richting`): bij 'alles' had elke veldproefopzet zijn eigen ruimte, en de veldproef toetste alleen "al een eigen positie"; (2) de clusterlimiet van de veldproef telt alleen posities met risico, dus een beschermde positie (stop voorbij de instap) telde niet; (3) de positielijst van de cyclus wist niet van orders die in dezelfde cyclus al uitgingen (bij 'alles' tot 6 per cyclus); (4) de spreiding gold alleen binnen dezelfde strategie, zodat opzetten op één prijs en één moment openden.
+- Nu: één grendel (`_grendel_richting`) in de lus én in `_open_position` (ook turbo): alle open posities (ook beschermde), onbevestigde orders en de orders van deze cyclus tellen samen tegen `max_positions_per_richting`. Daarnaast geen order binnen 0,01 % of 0,1 x ATR van een open positie van een andere strategie in dezelfde richting, of van een order van deze cyclus (binnen de eigen strategie blijft de spreiding gelden). Bijkopen (pyramide/scalpreeks) vallen er niet onder.
+- Gevolg: met limiet 1 staat er per richting hooguit één positie open, over alle strategieën en veldproefopzetten samen. De veldproef verzamelt daardoor minder trades tegelijk. Geen nieuwe run.
+
+### Saldosprong op papier (Bitvavo-mand)
+- Live 22-10 23:47: "saldosprong zonder trade: equity van 10000,00 naar 8994,99 (-10,1 %) ... blijven op 7634,71" en om 00:00 "Dagstart op de vorige referentie 7634,71 in plaats van 9024,77", zonder markt, bij een lid van de mand (geen eigen sensoren; BTC-EUR toonde 10000 en geen dataprobleem).
+- Oorzaak: het papiersaldo is de startbalans plus de trades van de lopende run. Bij een nieuwe run (BILL-EUR: run 1 en 2) springt het naar 10000; de bewaker had nog de referentie 7634,71 en zag een onverklaarde sprong (met een geblokkeerde instap: "vloer niet betrouwbaar"). Daarna gaf gewone handel (-10 % vanaf 10000) een "nieuwe" sprong, omdat tijdens een actieve sprong een open positie of sluiting niet als verklaring telde. De uitgezette veldproefopzetten tellen niet in het papiersaldo (hun schaduwtrades staan alleen in de database) - dat vermoeden klopte niet.
+- Nu: op papier volgt de referentie elke meting en vervalt een (bewaarde) sprong; dagstart en vloer rekenen met het werkelijke papiersaldo. Tijdens een sprong bij een broker schuift een verklaarde verandering de sprongwaarde mee. Logregels noemen de markt. De mandsensor toont per markt `equity` en `saldosprong`, en de lijst `saldosprong`; Dataprobleem van de mand gaat aan bij een sprong van een lid (`saldosprong_mand`).
+
+### Latency Pepperstone: historische verzoeken houden de cyclus niet meer op
+- Gemeten: XAUUSD p99 2,36 s (mediaan ~330 ms), staart in candles->exits (p99 677 ms) en exits->signal (p99 760 ms); IG 1,45 s, Bitvavo 1,14 s.
+- Oorzaak: cTrader staat hooguit één historisch verzoek (deals, trendbars) per 0,4 s toe. Dat wachten gebeurde binnen het slot dat alle verzoeken delen. Liep de afstemming op de achtergrond (2.20.0, tientallen dealverzoeken), dan stond het opvragen van posities, saldo of een stopwijziging in de cyclus achter een rij van zulke wachttijden.
+- Nu: een eigen slot voor historische verzoeken; het gedeelde slot houdt alleen de algemene 50 ms aan. Beide limieten blijven gelijk.
+- Meting: de deelstappen van candles->exits (posities, afwikkelen, correctie, veldproefbars, beheer, schaduw, exits) en exits->signal (rooster_audit, saldo, onbevestigd_posities, voorbereiding, signal) staan als `deelstappen` in de sensor Latency p99 (venster 2000, bewaard over een herstart).
+
+### 'Openen geweigerd (papermarge)' noemt de markt
+- 6x sinds 22-10 23:24 zonder markt. Nu "Openen geweigerd (papermarge) op BILL-EUR: ..."; de reden staat ook als `weigering` per markt in de mandsensor.
+
+- Raakt geen instellingen. Test: `test_v2210_verbeteringen.py` (18; 16 faalden vóór de fix).
+
 ## 2.20.4 - 22-10-2026
 
 ### Pepperstone: afstemming koppelt op het positienummer
