@@ -1,5 +1,11 @@
 # Changelog — Gold Scalper
 
+## 2.21.1 - 23-10-2026
+
+### Eén melding "HA sluit af" per herstart
+- Live 23-10 07:38:01: 22 identieke waarschuwingen "HA sluit af ..." binnen 0,3 s, één per mandlid en losse markt (06:08 idem).
+- Nu: de eerste aanroep binnen 60 s geeft de waarschuwing, de rest gaat naar debug. Wegschrijven en de overgang naar `stopped` blijven per markt ongewijzigd.
+
 ## 2.21.0 - 23-10-2026
 
 Vijf verbeteringen, elk door Ruud goedgekeurd (23-10).

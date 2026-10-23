@@ -32,11 +32,37 @@ from .broker.adapter import size_says_closed
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 
 _LOGGER = logging.getLogger(__name__)
+
+# 2.21.1: bij een mand roept elk lid emergency_shutdown aan; de melding
+# "HA sluit af" verscheen daardoor ~22x per herstart. Eén waarschuwing per
+# afsluitmoment volstaat; herhalingen binnen dit venster gaan naar debug.
+_AFSLUITMELDING_VENSTER_S: float = 60.0
+_laatste_afsluitmelding: float | None = None
+_klok = time.monotonic
+
+
+def _meld_afsluiten() -> None:
+    """Eén waarschuwing per afsluitmoment, herhalingen op debug."""
+    global _laatste_afsluitmelding  # noqa: PLW0603
+    nu = _klok()
+    tekst = (
+        "HA sluit af. Administratie wordt weggeschreven; open posities blijven "
+        "gedekt door de broker-stops en de dead man's switch."
+    )
+    if (
+        _laatste_afsluitmelding is not None
+        and nu - _laatste_afsluitmelding < _AFSLUITMELDING_VENSTER_S
+    ):
+        _LOGGER.debug(tekst)
+        return
+    _laatste_afsluitmelding = nu
+    _LOGGER.warning(tekst)
 
 
 class LifecycleState(str, Enum):
@@ -311,10 +337,7 @@ class LifecycleController:
         veiligstellen. De posities zelf worden gedekt door de stops bij de
         broker en door de dead man's switch in de bridge.
         """
-        _LOGGER.warning(
-            "HA sluit af. Administratie wordt weggeschreven; open posities blijven "
-            "gedekt door de broker-stops en de dead man's switch."
-        )
+        _meld_afsluiten()
         for callback in flush_callbacks:
             try:
                 callback()
