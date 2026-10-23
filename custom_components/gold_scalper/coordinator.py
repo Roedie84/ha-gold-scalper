@@ -1825,6 +1825,27 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._strategie_per_ticket[ticket] = strategie
         return strategie
 
+    def _strategie_per_positie(self, posities) -> dict[str, str]:
+        """2.21.2 (L-GS-019): strategie per open positie voor de sensor.
+
+        Alleen lezen uit wat al bekend is (eigen veld, de cache die
+        ``_strategie_van`` deze cyclus vulde); geen databaseverzoek, geen
+        invloed op beslissingen. Onbekend = weggelaten.
+        """
+        uit: dict[str, str] = {}
+        for p in posities or []:
+            ticket = str(getattr(p, "ticket", None) or getattr(p, "id", "") or "")
+            if not ticket:
+                continue
+            eigen = getattr(p, "strategie", None)
+            if not self.combinatie:
+                uit[ticket] = eigen or self.primaire_strategie
+            elif eigen:
+                uit[ticket] = eigen
+            elif ticket in self._strategie_per_ticket:
+                uit[ticket] = self._strategie_per_ticket[ticket]
+        return uit
+
     @property
     def strategie_versie(self) -> str:
         """Komt in runs.strategy_version en in de vingerafdruk: een andere
@@ -3393,6 +3414,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 1.7.7: onverklaarde saldosprong (dataprobleem).
             "saldosprong": self.saldosprong.as_dict(),
             "open_positions": open_positions,
+            # 2.21.2 (L-GS-019): welke strategie/opzet hield elke positie.
+            "strategie_per_positie": self._strategie_per_positie(open_positions),
             # 1.9.0: telling per richting, limiet, netting en schaduwtrades.
             "posities_per_richting": {
                 "long": per_richting.get(1, 0),

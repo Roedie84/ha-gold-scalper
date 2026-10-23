@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.21.2 - 23-10-2026
+
+### Open posities: opzet per positie (L-GS-019)
+- Live 23-10 (2.21.0): Pepperstone 3x en IG 1x twee posities tegelijk open (16:15-16:31, 21-32 s); het attribuut `positions` van *Open posities* had alleen ticket, richting, omvang en prijzen, dus niet welke strategie/opzet de positie hield.
+- Nu: per positie ook `strategie` (bijv. `vp:inside:3m`, `daghandel`), uit het eigen veld of de bestaande cache per ticket; onbekend = leeg. Geen extra databaseverzoek.
+- Alleen weergave: raakt geen strategie, vingerafdruk, instellingen, risico of orders. Geen nieuwe run.
+- Test: `test_v2212_opzet_per_positie.py` (5).
+
 ## 2.21.1 - 23-10-2026
 
 ### Eén melding "HA sluit af" per herstart

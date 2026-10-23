@@ -17,6 +17,7 @@ from .const import DISCLAIMER, DOMAIN
 from .coordinator import GoldScalperCoordinator
 from .entity import GoldScalperEntity
 from .modes import TradingMode
+from .posities import positie_regels
 from .meetkwaliteit import SPECS
 from .status import build_status
 
@@ -271,19 +272,9 @@ SENSORS: tuple[ScalperSensor, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: len(d.get("open_positions") or []),
         attrs_fn=lambda d: {
-            "positions": [
-                {
-                    # 1.9.0: per ticket, zodat meerdere posities uit elkaar
-                    # te houden zijn.
-                    "ticket": str(getattr(p, "ticket", None) or getattr(p, "id", "") or ""),
-                    "side": p.side,
-                    "units": getattr(p, "units", None) or getattr(p, "volume", None),
-                    "open_price": p.open_price,
-                    "stop_loss": getattr(p, "stop_loss", None),
-                    "take_profit": getattr(p, "take_profit", None),
-                }
-                for p in (d.get("open_positions") or [])
-            ],
+            # 2.21.2 (L-GS-019): per positie ook de strategie/opzet.
+            "positions": positie_regels(
+                d.get("open_positions"), d.get("strategie_per_positie")),
             # 1.9.0: telling per richting en de limiet.
             "long": (d.get("posities_per_richting") or {}).get("long"),
             "short": (d.get("posities_per_richting") or {}).get("short"),
