@@ -442,3 +442,16 @@ laatste ronde: 22-10 19:40, gemeten t/m 22-10 19:45
 - Hypotheses: H-GS-11 (daghandelkosten), H-GS-12 (latency/mand), H-GS-13 (IG NY). Geen release.
 
 laatste ronde: 22-10 23:40, gemeten t/m 22-10 23:45
+
+## 23-10 03:40 · dagafsluiting 22-10
+- Actief **2.20.4** (geïnstalleerd). Demo/papier; noodstops uit; geen knoppen, geen instellingen. Geen release (niets acuut; L-GS-011/019 blijven gepland).
+- **IG** (run sinds 22-10 16:48): 39 trades / **4 clusters**, netto −214,7, bruto +31,6 tegen kosten 246,2 (6,3/trade, 7,8× bruto), PF 0,72, t −0,90. Nacht 23:45-03:45 9 trades −223,6 (één cluster −232,6 = 89 %). `vp:rsi_rev:15m` 14 trades: bruto +0,24, kosten 106,9 → H-GS-11 sterker: op IG eten de kosten elke bruto voorsprong op.
+- **Pepperstone**: 62 trades / **2 clusters**, netto +395,1 (cluster 1 +614,8, cluster 2 −219,7), PF 1,36, t 0,47. Nacht −380,1 in 23 trades. Met 2 clusters geen enkele conclusie; ≥ 30 clusters nodig voor een toets (t ≥ 2).
+- **Meetbaarheid, nieuw:** 3 Pepperstone-opzetten met **negatieve kosten** (netto > bruto: bb_fade:30m −3,48, structuur_hl:30m −4,04, structuur_trend:15m −1,56). Kan prijsverbetering of swap zijn, of bruto op een andere koers dan de broker-afrekening; vóór een voorstel per trade nagaan (n=3).
+- **H-GS-12 (latency):** nachtsessie p99 IG 1,25 s, Pepperstone 1,32 s, Bitvavo 0,95 s (overdag 22-10 32 s). Volle handelsdag vandaag beslist.
+- **H-GS-13 (IG NY):** niet meetbaar — de oude run (t/m 16:48) staat niet meer in de sensoren; per-uur-resultaat van een afgesloten run is niet leesbaar (meetbaarheid).
+- Zelf gedetecteerd 23:47: saldosprong zonder trade (equity 10.000 → 8.995, −10,1 %), dagstart op de vorige referentie gehouden. Zelfde orde als de eerdere mand-noodstop (dagverlies 10,03 %); volgen.
+- Afstemming: IG 0 afwijkingen, Pepperstone 1 (bekend). Koerstime-outs 38× (steeds 1 van 3, hersteld).
+- Hypotheses: H-GS-11 (daghandelkosten IG), H-GS-12 (latency), H-GS-13 (IG NY; nu niet meetbaar). Geen release.
+
+laatste ronde: 23-10 03:40, gemeten t/m 23-10 03:50
