@@ -489,3 +489,15 @@ laatste ronde: 23-10 11:40, gemeten t/m 23-10 11:45
 - Hypotheses: H-GS-11 (kosten IG 75 % van bruto), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
 
 laatste ronde: 23-10 15:40, gemeten t/m 23-10 15:45
+
+## 23-10 19:40 · tussenronde
+- Actief **2.21.1**. Demo/papier; geen knoppen, geen instellingen. Geen HA-herstart sinds 15:17.
+- **IG**: +13 trades → 78 / **9 clusters**, netto 127,9 → **122,6**, PF 1,09; **t 3,48 → 0,59** door één cluster (16:15-17:06, 10 trades, −143,7). Precies de waarschuwing van 15:40: bij < 30 clusters zegt t niets. Kosten 77 % van bruto (5,39/trade).
+- **Pepperstone**: +18 trades → 133 / 7 clusters, netto 238,9 → **23,0**, PF 1,007, t 0,02; cluster 7 (13:27-18:54) 25 trades −485; alle 5 clusters sinds 04:30 negatief (−1.316), de run steunt op twee nachtclusters van 22-10. Kosten 92 % van bruto.
+- 2.21.0: Pepperstone 3× 2 open (16:15, 16:30, 16:31; 21-22 s), IG 1× (16:31, 32 s) → telkens kort, richting niet leesbaar (L-GS-019).
+- **H-GS-12:** p99 Pepperstone 3,10 → 1,82 s in de avond; BTC-mand 1,04 s.
+- **Noodstop mand (papier):** 16:30:56 "NOODSTOP: dagverlies 10,05 %" → binary noodstop BTC-EUR aan; markt niet in de logregel (L-GS-022 blijft gepland).
+- **Nieuw (logging/meetbaarheid):** "HA sluit af" om 16:18/17:18/18:18/19:18 zonder HA-herstart = elk uur een mandlid dat stopt (mand 21 → 20) → **L-GS-023** (gepland). Eerdere KPI-regels "HA sluit af" telden deze mee als herstarts.
+- Hypotheses: H-GS-11 (kosten IG 77 % / PP 92 % van bruto), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
+
+laatste ronde: 23-10 19:40, gemeten t/m 23-10 19:45
