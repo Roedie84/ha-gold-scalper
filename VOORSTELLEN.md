@@ -154,3 +154,5 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Voorstel: toelating op de mediane spread over 24 u (grens 0,03 % ongewijzigd), of een lagere toelatingsgrens dan de opengrens (bijv. 0,02 % / 0,03 %), zodat een markt rond de grens niet in en uit valt.
 - Verwacht effect: PUMP-EUR valt uit de mand zoals in 2.22.0 bedoeld; minder papierverlies, mand meet alleen markten met lage kosten.
 - Meten na bouw: mandwissels per dag; trades en netto per lid; PUMP-EUR in/uit met zijn mediane spread.
+- 24-10 15:40 (extra onderbouwing): herziening 13:17 PUMP-EUR 0,0238 % (in, +10 trades tot 185, netto −2.565,22), herziening 15:17 0,0398 % (geweerd). In 4 uur aan beide kanten van de grens: de toelating hangt van het moment af.
+

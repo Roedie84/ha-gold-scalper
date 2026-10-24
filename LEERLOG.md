@@ -375,3 +375,12 @@ laatste ronde: 24-10 07:40, gemeten t/m 24-10 03:55
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
 
 laatste ronde: 24-10 11:40, gemeten t/m 24-10 11:45
+
+## 24-10 15:40 · tussenronde
+- Actief **2.22.0** (geen herstart sinds 10:16). Demo/papier; geen knoppen, geen instellingen. Goud dicht (weekend): IG en Pepperstone 0 trades; Pepperstone-short nog open (stop in winst).
+- **Mand:** PUMP-EUR 11:40 → 13:17 +10 trades, netto −2.460,68 → **−2.565,22** (−10,5 per trade), equity 7.426. Herziening 13:17: spread 0,0238 % (in); **15:17: 0,0398 % → geweerd**. Twee herzieningen, twee kanten van de grens → steunt **L-GS-025** (toelating op één moment). Uitfasering was netjes (`_stop_als_plat`: alleen stoppen als plat; 15:17 0 open).
+- Mand 12 → 16 → 15 → 14 leden; geen lid handelt nu (spot geen short / kostenfilter).
+- **H-GS-12 (latency):** p99 IG 0,49 / PP 0,69 / mand 0,54 s. Bitvavo-koersfouten 6× (5× WLD-EUR leeg boek, 1× SOL-EUR gekruist boek), telkens 1 van max. 3 → correct afgewezen.
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). n blijft 9-11 clusters IG / 8 PP: geen toets. Geen release.
+
+laatste ronde: 24-10 15:40, gemeten t/m 24-10 15:45
