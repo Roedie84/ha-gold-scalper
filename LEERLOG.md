@@ -364,3 +364,14 @@ laatste ronde: 23-10 23:40, gemeten t/m 23-10 23:45
 - HA-MCP kon niet verbinden (502 bij opbouw van de verbinding) → geen history, logs of dashboard; niets gemeten, geen release, dashboardkaart niet bijgewerkt. Volgende ronde meet door vanaf 03:55 (recorder bewaart ~10 d, dus geen verlies).
 
 laatste ronde: 24-10 07:40, gemeten t/m 24-10 03:55
+
+## 24-10 11:40 · tussenronde
+- Actief **2.22.0** (2.21.3 vanaf 07:41, 2.22.0 sinds herstart 10:16). Demo/papier; geen knoppen, geen instellingen. Goud dicht (weekend); IG en Pepperstone 0 nieuwe trades.
+- **L-GS-023 geverifieerd:** "HA sluit af" alleen bij de echte herstarts 07:40 en 10:15; om 08:18/09:18 geen valse regel meer (t/m 07:18 elk uur). **L-GS-022 geverifieerd:** de bewaarde noodstop noemt de markt (pepe-eur, bill-eur).
+- **2.22.0 D:** Pepperstone (138 trades, 8 clusters) van `failed` naar `insufficient_data`; zo bedoeld.
+- **Mand (2.22.0 B/C):** 12 leden, 20 geweerd op spread, geen noodstop meer per mand. Alleen **PUMP-EUR** handelt: sinds 10:16 3 trades, equity 7.610 → 7.518; spread bij de herziening 11:17 **0,0295 %**, net onder de grens 0,03 % (2.22.0 noemde PUMP ~0,04 % als verliezer). Run PUMP 175 trades, −2.460,68 (−14,1 per trade). → **L-GS-025** (open, Ruud).
+- **H-GS-12 (latency):** p99 IG 0,73 / PP 0,82 / mand 0,76 s.
+- Pepperstone-short (58810248) nog open in het weekend; geopend vóór 2.22.0, de weekendsluiting is vrijdag 30-10 te toetsen.
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
+
+laatste ronde: 24-10 11:40, gemeten t/m 24-10 11:45
