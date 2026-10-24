@@ -395,7 +395,7 @@ laatste ronde: 24-10 15:40, gemeten t/m 24-10 15:45
 laatste ronde: 24-10 19:40, gemeten t/m 24-10 19:50
 
 ## 24-10 23:40 · tussenronde
-- **2.22.1 draait niet.** HACS meldt v2.22.1 geïnstalleerd, maar de zip-download mislukte om 20:01:52 (GitHub-header > 8190 bytes; ook bij andere repo's) en de HA-herstart van 20:02 laadde **2.22.0** (diagnostics `integration_manifest.version`). Code nagelezen: de fix zelf klopt (`_kosten_per_oz` → `rond_prijs` rondt bij munten op significante cijfers, niet op 4 decimalen); de test van 2.22.1 dekt PUMP (stop 0,5 % te krap). Alleen herstarten helpt dus niet: eerst in HACS opnieuw downloaden.
+- **2.22.1 staat op schijf maar draait niet:** diagnostics `integration_manifest.version` = **2.22.0**; HA is sinds 10:16 niet herstart (HACS 20:02 "herstart vereist"; eerste zip-poging 20:01:52 mislukte op een GitHub-header, de tweede slaagde). Code nagelezen: de fix klopt (`rond_prijs` rondt bij munten op significante cijfers); de test van 2.22.1 dekt PUMP (stop 0,5 % te krap). Activeren = HA herstarten (Ruud).
 - **Mand:** PUMP-EUR bleef handelen: 19:53 → 23:40 +15 trades (200 → 215), netto −2.758 → **−2.896** (−9,2 per trade), equity 7.091. 21:20 geen weigering; herziening 23:17 zet PUMP op uitfaseren (3 open, alleen nog sluiten). Mand 13 leden, de rest weigert (spot-short / kostenfilter).
 - Goud dicht (weekend): IG en Pepperstone 0 trades. Demo/papier; geen knoppen, geen instellingen.
 - Hypotheses: H-GS-11 (kosten; PUMP bruto ook negatief), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). n blijft 9-11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. Geen release (de fix bestaat al).
