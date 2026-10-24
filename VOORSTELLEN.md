@@ -130,13 +130,20 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Effect meten: aantal "uitgezet"-WARNINGs na een herstart = 0.
 
 ## L-GS-022 · noodstop-waarschuwing en mand: welke markt staat stil (logging/meetbaarheid)
-- Status: **gepland** (zelf bouwen: logtekst en diagnose-attribuut; noodstop, risico en handelslogica ongewijzigd). Dagafsluiting.
+- Status: **gebouwd 2.21.3** (24-10, dagafsluiting): waarschuwing noemt de entry (`…_<markt>`), `per_markt[].noodstop` in *Mand*. Toets: na installatie staat PEPE-EUR op noodstop true. Was: **gepland**.
 - Onderbouwing: 23-10 15:18 bij de herstart "Noodstop uit een eerdere sessie blijft actief: dagverlies 10.11 % … (waarvan −39.12 nog niet gerealiseerd)" zonder entry of markt (`storage/state.py` logt alleen `halt_reason`). De mand heeft per markt een eigen toestand (`<entry_id>_<markt>`), maar `sensor.gold_scalper_btc_eur_mand` → `per_markt` toont geen noodstop; binary *Noodstop* BTC-EUR staat uit. Kandidaten: PUMP-EUR (equity 7.771) of PEPE-EUR (9.111). Eerder 21/22-10 al mand-noodstops (PUMP, BILL) die alleen uit de logtekst te halen waren.
 - Bouw: markt/entry in de waarschuwing; `per_markt[].noodstop` (true/false + reden) in het mand-attribuut. Test: geladen toestand met halted → logregel noemt de markt; mand-attribuut toont de vlag.
 - Effect meten: noodstops per markt per dag direct leesbaar uit de sensor, zonder logtekst.
 
 ## L-GS-023 · "HA sluit af" bij het stoppen van één mandlid (logging/meetbaarheid)
-- Status: **gepland** (zelf bouwen: logtekst; mand, noodstop, risico en handelslogica ongewijzigd). Dagafsluiting, samen met L-GS-022.
+- Status: **gebouwd 2.21.3** (24-10, dagafsluiting): lid stopt bij lopende mand → INFO "Bitvavo-mand: <markt> gestopt"; "HA sluit af" alleen als de mand zelf stopt (`_gestopt`) of HA afsluit. 8 tests (samen met L-GS-022). Toets: "HA sluit af" per dag = aantal echte herstarts. Was: **gepland**.
 - Onderbouwing: 23-10 16:18, 17:18, 18:18 en 19:18 WARNING "HA sluit af. Administratie wordt weggeschreven…" zonder HA-herstart (geen loader-regels, EMS-diagnose ongewijzigd sinds 15:20). Logbook: `sensor.gold_scalper_btc_eur_mand` 20 → 21 → 20 op 18:18:19/18:18:29. Code: `mand.py` `_stop_lid` → `coordinator.async_shutdown_hook` → `lifecycle.emergency_shutdown` → `_meld_afsluiten()`. De melding betekent dus "mandlid gestopt", niet "HA sluit af"; ook 08:40 (eerder als "herladen" genoteerd) past hierin. Leerlog telde deze regels als herstarts (KPI `gs_log_ha_sluit_af`).
 - Bouw: bij een lid dat de mand stopt terwijl de mand zelf doorloopt: INFO "Bitvavo-mand: <markt> gestopt (administratie bewaard)"; "HA sluit af" alleen bij EVENT_HOMEASSISTANT_STOP of het ontladen van de entry. Test: `_stop_lid` met lopende mand → geen WARNING "HA sluit af"; `async_stop` van de mand → wel één.
 - Meten: "HA sluit af" per dag = aantal echte herstarts (loader-regels); mandwissels apart leesbaar.
+
+
+## L-GS-024 · resultaat per periode volgt de kostencorrectie van de broker (rapportage)
+- Status: **gepland** (zelf bouwen: alleen rapportage; strategie, risico en orders ongewijzigd). Eerstvolgende dagafsluiting met een handelsdag.
+- Onderbouwing: 23-10 22:18 daalden de Pepperstone-kosten 300,88 → 294,16 zonder nieuwe trade (afstemming met de broker). *Resultaat per periode* (week/maand/dagen) blijft op 296,92 (−2,76 verschil), netto −137,03 in beide → de periodes tellen de kosten per trade van vóór de correctie.
+- Bouw: de periodes uit dezelfde gecorrigeerde trades halen als de kosten-sensor; test met een gecorrigeerde trade.
+- Meten: week-kosten = kosten-sensor binnen 0,01.

@@ -32,3 +32,6 @@
 | Sluitreden onbekend Pepperstone | 26,1 % (410/1.571) | 14..21-10 | 21-10 19:45 |
 | IG daghandel/veldproef run 19-10 | 182 trades / 12 clusters: netto −205 · bruto +960 · kosten 1.165; uurblokken t_bruto 1,13 / t_netto −0,24 (52) | 19..22-10 | 22-10 03:40 |
 | Pepperstone XAUUSD | 1.606 trades: netto −9.175 · bruto −2.857; t_netto −2,18 (118 blokken) | 14..22-10 | 22-10 03:40 |
+
+| IG run 22-10 16:48.. | 80 trades / ~11 clusters: netto 181,65 · bruto 616,84 · kosten 435,19 (71 %); PF 1,13; t per trade 0,81 | 22..23-10 | 24-10 03:40 |
+| Pepperstone run 22-10 16:48.. | 138 trades: netto −137,03 · bruto 159,89 · kosten 294,16; PF 0,96; t −0,11 | 22..23-10 | 24-10 03:40 |

@@ -7,186 +7,25 @@ Onderzoeksproject op IG-demo: edge van ruis onderscheiden. Alleen gemeten getall
 - Slippage 3× de aanname (0,06 vs 0,02); latency p90 207 ms, p99 253 ms.
 - Meetfout "geleerd" telde doel/stop op ruwe sluitreden → L-GS-001 gebouwd v1.7.1 (tussenronde, foute data). Klokafhankelijke tests → L-GS-002. H-GS-1 (doeltreffers 19,6 % < 40 %) gestart.
 
-## 08-10 03:40 · dagafsluiting 07-10
-- Dag 07-10: 40 trades, 4 clusters, winst 47,5%; netto −64,41 = bruto +13,69 − kosten 78,11 (1,95/trade). t netto −1,19, t bruto +0,18 (n=4, geen conclusie).
-- Totaal t/m 08-10 03:40: 61 trades, 8 clusters, netto −148,10 (bruto −39,41, kosten 108,70), PF 0,62. t netto −2,51, t bruto −0,50. Voor een bruto-edge ter grootte van de kosten (13,6/cluster, sd 28,1) zijn ~18 clusters nodig → nog 10. Geen oordeel over de strategie.
+## 08-10 · samenvatting dag (9 rondes; ingekort na 14 dagen)
 - Nacht 03:00-03:35: 5 trades (1 winst), netto −27,58, alle in regime range (range nu n=21, t −2,98; trend n=40, t −0,29). Trades niet onafhankelijk → alleen volgen (H-GS-3).
-- Waarschuwing "Slechts 1 transactie(s) over 24 uur … datumbereik komt niet aan": geen bug; venster (−6 u/+12 u) wordt toegepast, telling daalde 2→1 toen het venster voorbij 07-10 schoof. Tekst klopt niet en logt elke ~80 s → L-GS-003 (cosmetisch).
+- Waarschuwing "Slechts 1 transactie(s) over 24 uur … datumbereik komt niet aan": geen bug; venster (−6 u/+12 u) wordt toegepast, telling daalde 2→1 toen het venster voorbij 07-10 schoof. Tekst klopt niet en logt elke ~80 s → L…
 - 1 trade (03:35) op geschatte uitstapprijs (−11,23); correctielus zoekt hem tot 2 dagen → H-GS-2: binnen enkele uren gecorrigeerd. Afstemming 56/56; 5 nog niet bij de broker.
 - Latency-basis van de sensor is nu 1000 cycli (p50 176, p99 514, max 4128 ms) → niet vergelijkbaar met p99 253 ms (n=56 trades); nieuwe baseline.
 - L-GS-001 (1.7.1) nog niet geïnstalleerd → geleerd zegt nog doel 14,8% tegen 19,7% op bewijs. Testsuite main 1707 groen om 01:51 UTC (L-GS-002 viel niet om buiten de pauze).
 - Geen release (1.7.1 wacht op installatie; niets acuut).
-
-laatste ronde: 08-10 04:40, gemeten t/m 08-10 03:45
-
-## 08-10 07:40 · tussenronde
-- 1.7.1 geïnstalleerd (herstart 07:03). **L-GS-001 geverifieerd:** geleerd `target_hit_rate` 0,185 = sensor Doel geraakt 18,5% (12/65); de ATR-notitie rust nu op de juiste telling (18% tegen 40% verwacht).
-- Sinds 03:45: 4 trades (netto −31,72). Totaal 65 trades, 9 clusters: netto −179,82 = bruto −65,98 − kosten 113,84 (1,75/trade). PF 0,575, winst 41,5%.
-- t netto −2,92, t bruto −0,80 (n=9). Voor een bruto-edge ter grootte van de kosten (12,65/cluster, sd 27,45) ~19 clusters nodig → nog 10. Geen oordeel over de strategie.
+- 1.7.1 geïnstalleerd (herstart 07:03). L-GS-001 geverifieerd: geleerd `target_hit_rate` 0,185 = sensor Doel geraakt 18,5% (12/65); de ATR-notitie rust nu op de juiste telling (18% tegen 40% verwacht).
 - H-GS-3 (regime): range n=22, t −3,22, winst 27%; trend n=43, t −0,55, winst 49%. Trades in een cluster niet onafhankelijk; per regime clusters nog niet geteld → volgen, geen conclusie.
-- H-GS-2: geschatte uitstap van 03:35 — alle 65 sluitredenen nu bekend/bewezen; kosten 63 gemeten, 2 berekend (nieuwste, nog niet bij de broker).
-- Geleerd: 36/38 verliezen "verkeerde richting", 2 "stop te krap" (fixable 5%).
-- Latency p99 393,5 ms (1000 cycli; was 514,5). Drawdown 2,43%.
-- Geen release.
 
-
-## 08-10 · chatsessie
-- **L-GS-003 gebouwd 1.7.2 (08-10, chatsessie):** transactiewaarschuwing (22× tussen 03:15-04:03) vergelijkt nu met eigen trades die >6 u dicht zijn; 1× per uur WARNING, anders DEBUG. Alleen logging. Release v1.7.2 groen, HACS ververst. Meten na installatie: 0 van deze waarschuwingen in een nacht zonder echte afwijking.
-- **L-GS-004 gebouwd 1.7.3 (08-10, chatsessie):** 4 geschatte uitstappen vandaag kwamen doordat alleen het (achterlopende) transactieoverzicht werd gevraagd. Nu eerst het activiteitenoverzicht (+ /confirms), anders max. 4 herkansingen binnen 4 min; correctie/afstemming zetten bij een voorlopige trade meteen sluitreden en gemeten kosten. Alleen boekhouding. Release v1.7.3 groen, HACS ververst. Meten na installatie: 0× WARNING "geschatte uitstapprijs" per dag, Sluitreden onbekend/kosten berekend alleen voor trades < 5 min oud.
-laatste ronde: 08-10 07:40, gemeten t/m 08-10 07:43
-
-## 08-10 11:00 · varianten-analyse (onderzoek, niets aan de strategie veranderd)
-Vraag Ruud: kan de strategie meer opleveren? Alleen gelezen; geen knoppen, instellingen of code op main.
-- **Data:** tradedatabase/barsarchief zijn binair (SQLite) en niet leesbaar via de bestandseditor; daarom uit de HA-recorder: koers (mid, elke 10 s, 19 328 punten 06-10 00:00 – 08-10 09:00 UTC), open posities (zijde, units, instap, stop + verplaatsingen), signaal (regime). 66 van 68 trades teruggevonden (2 in cluster 6 vielen binnen één pollingcyclus), 10 clusters (herinstap < 10 min), regime 44 trend / 22 range = geleerd. Geen IG-aanroepen.
-- **Replay:** zelfde exitlogica als live (`exits.py`: doel/stop bij de broker, break-even 0,8×ATR, trailing 1,5/1,2), halve spread 0,40 (gemeten instap: fill − mid mediaan 0,40), stopslippage 0,06. Controle: 53/66 uitstaptijden binnen 60 s van live, zelfde uitkomsten; sim netto −253 (−3,83/trade) tegen live −200 (−2,95): de replay is ~0,9/trade pessimistischer, vergelijkingen zijn daarom gepaard (variant − basis op dezelfde trades).
-- **Bevinding (bug):** tijdstops (240 s / 900 s) vuren op IG nooit: `VenuePosition` heeft geen `open_time` → leeftijd 0. Live duur gem. 1408 s, max 5272 s. → **L-GS-005 (open, Ruud beslist)**.
-- **Resultaten** (netto in USD incl. spread en slippage; t_cl = cluster-t op netto per cluster; IS = clusters 1-5, OOS = 6-10; per trade):
-
-| variant | n | clusters | netto | netto/tr | PF | t_cl | IS n · /tr | OOS n · /tr |
-|---|---|---|---|---|---|---|---|---|
-| basis (doel 1,5 ATR) | 66 | 10 | −253 | −3,83 | 0,47 | −3,81 | 33 · −3,63 | 33 · −4,04 |
-| a. doel 2,25 ATR (×1,5) | 66 | 10 | −214 | −3,24 | 0,56 | −2,29 | 33 · −3,44 | 33 · −3,04 |
-| a. doel 3,0 ATR (×2) | 66 | 10 | −180 | −2,73 | 0,63 | −1,75 | 33 · −2,42 | 33 · −3,05 |
-| b. geen instap in range | 44 | 6 | −95 | −2,16 | 0,67 | −2,22 | 17 · −0,42 | 27 · −3,25 |
-| c1. 1 min bevestiging | 32 | 9 | −22 | −0,67 | 0,88 | −0,24 | 13 · −4,29 | 19 · +1,80 |
-| c2. 2 min bevestiging | 18 | 6 | −18 | −1,02 | 0,85 | −0,40 | 7 · −3,65 | 11 · +0,65 |
-| c3. +0,25 ATR binnen 3 min | 29 | 7 | −36 | −1,23 | 0,81 | −0,54 | 14 · −3,74 | 15 · +1,10 |
-| b + c3 | 21 | 4 | +17 | +0,80 | 1,14 | +0,43 | 6 · +0,04 | 15 · +1,10 |
-| doel 3,0 + c3 | 29 | 7 | +75 | +2,58 | 1,40 | +0,58 | 14 · +2,27 | 15 · +2,86 |
-| doel 3,0 + c2 (beste IS) | 18 | 6 | +67 | +3,71 | 1,56 | +0,60 | 7 · +6,38 | 11 · +2,01 |
-| tijdstops werkend (L-GS-005) | 66 | 10 | −88 | −1,34 | 0,57 | −1,35 | 33 · −2,18 | 33 · −0,49 |
-| tijdstops + c1 | 32 | 9 | +33 | +1,04 | 1,46 | +0,51 | 13 · −1,61 | 19 · +2,85 |
-
-- **Toets en multiple testing:** 30 varianten doorgerekend (3 doelen × regime aan/uit × 4 instapregels + 6 met tijdstops). Bonferroni: α 0,05/30 → |t| ≈ 3,6 nodig. **Geen variant heeft een netto-t boven 0,75**; de beste positieve rijen zijn de beste van 30 ruisuitkomsten op 3–7 clusters. Filters (b, c) lijken in de gepaarde vergelijking sterk (t 2–5), maar dat is grotendeels mechanisch: trades weglaten uit een verliesgevende basis verbetert het totaal altijd. Selectietoets (zelfde aantal willekeurige trades weglaten): c1 p 0,008, c3 p 0,005, b p 0,04 — op trade-niveau, trades in een cluster zijn niet onafhankelijk, dus te optimistisch.
-- **Tijd van de dag** (basis, netto/trade): Azië 00-07 −5,90 (24 tr, 6 cl), Londen 07-12 −2,48 (16, 5), NY 12-17 −1,49 (20, 2), laat 17-21 −7,00 (6, 2). Te weinig clusters per blok; geen filter getoetst.
-- **Hoeveel extra clusters:** tijdstops (gepaard verschil +16,5/cluster, sd 24,2): ~9 clusters voor t=2, ~28 voor t=3,6. Instapbevestiging c1: ~6 resp. ~18 (maar mechanisch effect, zie boven). Voor een **netto positief** resultaat met t=2: tijdstops+c1 ~156 clusters, doel 3,0+c3 ~120 — praktisch onbereikbaar op dit tempo (≈4 clusters/dag).
-- **Oordeel:** de strategie winstgevend maken is met deze data niet aan te tonen; geen parameter aanpassen op grond van deze tabel. Wel duidelijk: (1) tijdstops werken niet zoals ontworpen (bug) — herstellen verkleint het verlies waarschijnlijk (IS én OOS beter) → L-GS-005; (2) instapbevestiging en regimefilter worden hypotheses, niet ingebouwd: **H-GS-4** "1 min bevestiging in signaalrichting verbetert netto/trade" en **H-GS-5** "doel ×2 met bevestiging". Beide schaduw-meten met de replay op nieuwe clusters (geen codewijziging), oordeel pas na ≥ 20 nieuwe clusters, met correctie voor 30 geteste varianten. H-GS-3 (regime) blijft volgen: OOS hield het voordeel niet vast (−3,25/trade).
-- Reproduceren: `analyse/2026-10-08-varianten/` (trades.json, price.json.gz uitpakken, `python3 grid.py`, `extra.py`, `need.py`).
-
-laatste ronde: 08-10 11:00, gemeten t/m 08-10 09:00 UTC
-
-## 08-10 11:40 (chatsessie)
-- L-GS-005 akkoord (Ruud 11:19), gebouwd en uitgebracht als 1.7.4. Meten: sluitreden tijdstop/maximale duur verschijnt; langste duur ≤ 910 s; netto/trade per cluster tegen baseline −2,95 (68 trades, 10 clusters). Beslissen na 10 nieuwe clusters.
-- Positiegrootte bewust niet verhoogd (demosaldo 10 mln): verandert de vingerafdruk en vervuilt de meting van L-GS-005.
-
-## 08-10 11:45 · tussenronde
-- Geïnstalleerd: 1.7.3 (herstart 10:55; bevat 1.7.2). 1.7.4 (L-GS-005, tijdstops) stond in HACS nog niet als update → `update_information` gedaan: HACS toont nu 1.7.3 → 1.7.4 (wacht op installatie).
-- Sinds 07:43: 3 trades (08:42 −11,09; 09:21 −10,82 op geschatte uitstap; 10:04 +1,73) → netto −20,45, bruto −16,30, kosten 4,14. Sinds 10:04 geen trade (signaal flat, status "signaal te zwak"). Alle 3 zitten al in de varianten-analyse van 11:00 (t/m 09:00 UTC).
-- Totaal 68 trades, 10 clusters: netto −200,27 = bruto −82,29 − kosten 117,98 (1,73/trade); PF 0,551; winst 41,2%; t netto −3,28 (10 clusters); max drawdown 2,76%. Bruto-t niet opnieuw berekend (geen nieuw cluster sinds 11:00).
-- **L-GS-004:** de geschatte trade van 09:21 is bij de start van 10:55 afgestemd (sluitreden onbekend 0/68, `broker_gesloten_geschat` → `gecorrigeerd`). Sinds 1.7.3 nog geen trade → 0× "geschatte uitstapprijs" zegt nog niets. Kosten: 67 gemeten, 1 berekend (trade 10:04, broker-sluiting; berekend tot de afstemming is zo ontworpen) → meetcriterium "berekend alleen < 5 min oud" in de dagafsluiting toetsen.
-- **L-GS-003:** sinds 1.7.2/1.7.3 0× de transactiewaarschuwing (22× in de nacht ervoor); de nacht is de echte toets.
-- Latency p99 405,9 ms (n=295 cycli sinds 10:55; p50 174,9).
-- Opgeruimd: 185 per ongeluk gecommitte `__pycache__`-bestanden (commit 96dea9c) van de leerlog-branch gehaald + `.gitignore`.
-- H-GS-4/5 (instapbevestiging, doel ×2): geen nieuwe clusters → niets te schaduwmeten. H-GS-3 (regime) volgen.
-- Geen release.
-
-laatste ronde: 08-10 11:45, gemeten t/m 08-10 11:44
-
-## 08-10 15:40 · tussenronde
-- Geïnstalleerd: 1.7.6 (1.7.4 L-GS-005, 1.7.5 herstartbestendigheid, 1.7.6 `exit_regime` per trade + bewaarde latencysteekproef; chatsessie). HA-herstarts sinds 11:45: 6. Run gemarkeerd als "methodologisch gemengd" (14:19) → cijfers per regime apart.
-- Sinds 11:44: 7 trades in 2 clusters (12:35-13:04: −11,12 −1,81 −2,61 +16,83 −2,68 −10,71; 14:45 +14,67; +0,23 afstemming 14:01) → netto +2,80, bruto +12,79, kosten 9,99 (1,43/trade, 100% gemeten). Totaal 75 trades: netto −197,47, PF 0,584, winst 40,0%, t −2,82, max DD 2,76%.
-- **L-GS-005 eerste meetpunt gehaald:** sluitredenen tijdstop 3× (na 240, 241, 460 s) en maximale duur 1× (900 s, bij +9,17 USD/oz); gem. duur 1408 → 1316 s. Regime `tijdstop` 7 trades/2 clusters +0,40/trade (PF 1,10, t 0,11) tegen `zonder_tijdstop` 68/10 −2,95 (t −3,28). **Geen conclusie:** 2 clusters; gepaarde toets na ≥10 nieuwe clusters (plan in VOORSTELLEN).
-- Opvallend: tijdstop van 460 s past bij de regel (na 240 s eerst buiten, later weer binnen 0,3×ATR); de 900-s-limiet sloot een winnende positie (+9,17/oz). Beide horen bij het ontwerp; volgen of de max-duur vaker winnaars afkapt dan verliezers.
-- **Latency:** p99 1628 ms (n=477, "indicatief"; p50 262, max 4,6 s; `start->quote` max 3,4 s) tegen 406 ms om 11:45 (n=295). 1.7.6 bewaart de steekproef over herstarts (n loopt door over 5 herstarts) → eerste meetpunt gehaald. **H-GS-6 (nieuw):** de staart komt van de herstarts/drukte rond 14:19-15:39 (6 herstarts), niet van IG. Toets: p99 in de nacht zonder herstarts (dagafsluiting).
-- **L-GS-003/004:** 0× transactiewaarschuwing en 0× "geschatte uitstapprijs" in het logvenster 13:48-15:40; sluitreden onbekend 0, kosten 100% gemeten.
-- H-GS-4/5 (instapbevestiging/doel ×2): 2 nieuwe clusters, nog niet schaduwgemeten (drempel 20 clusters). H-GS-3 volgen.
-- Geen release (tussenronde, niets acuut).
-
-laatste ronde: 08-10 15:40, gemeten t/m 08-10 15:44
-
-## 08-10 19:40 · tussenronde
-- Geïnstalleerd: 1.7.6 (herstarts 16:31, 17:41, 18:36; lifecycle 18:36 reconciling → running). Run 100, demo.
-- Sinds 15:44: **26 trades in 2 clusters** (13: 17:15-18:45, 22 trades, netto −2,69, bruto +30,96; 14: 19:15-19:33, 4 trades, netto +4,27, bruto +8,10) → netto +1,58, bruto +39,06, kosten 37,48 (1,44/trade). Totaal 101 trades / 14 clusters: netto −195,88 = bruto −30,43 − kosten 165,45; PF 0,631; winst 36,6%; t −2,665 (clusters); max DD 2,76%.
-- **L-GS-005 (tijdstops):** regime `tijdstop` 33 trades / 4 clusters: netto +4,39 (+0,13/trade, PF 1,05, t 0,20), bruto +51,87 (+1,57/trade, t bruto 1,77 over 4 clusters) tegen `zonder_tijdstop` 68/10 netto −2,95/trade, bruto −1,21/trade. 24 tijdexits (23 tijdstop 240-567 s, 1 max-duur). **Geen conclusie:** 4 clusters; met de huidige spreiding (sd 11,2 USD/cluster, gem. +1,1) zijn ~400 clusters nodig voor netto t=2 — de netto-toets is praktisch onbereikbaar; de geplande gepaarde toets (≥10 clusters) blijft het beslismoment.
-- **H-GS-7 (nieuw):** tijdstops verhogen het tempo (cluster 13: 22 trades in 91 min; 8,3 trades/cluster tegen 6,8) en daarmee de kosten; het bruto voordeel (+1,57/trade) wordt grotendeels door kosten (1,44/trade) opgegeten. Toets bij ≥10 clusters: bruto/trade en kosten/cluster per regime.
-- **L-GS-004:** sluitreden onbekend 1/101 (was 0/75) — waarschijnlijk een trade die nog in de afstemming hangt (7 trades "nog niet in zijn overzicht", loopt uren achter; afstemming in_orde, 94/94 kloppend). Kosten 98 gemeten / 3 berekend (recente trades, zo ontworpen). Toetsen in de dagafsluiting: moet naar 0 na afstemming.
-- **H-GS-6 (latency):** p99 976 ms over n=1890 (niet meer indicatief; p50 239, max 4604 uit de herstartdrukte van 14-15 u). start→quote p99 357, exits→signal p99 318. Nachttoets zonder herstarts blijft staan.
-- Uitvoering: slippage gemeten 0,07 tegen 0,02 aangenomen (3,5×); doel geraakt 15,8% tegen 40% verwacht. Sessies: Londen −0,17/trade (n 42), New York −2,06 (38), Azië −5,25 (21) — geen sessie t > 0,1 → geen filter.
-- H-GS-4/5 (bevestiging, doel ×2): 4 nieuwe clusters sinds de varianten-analyse (drempel 20) → nog niet schaduwgemeten. H-GS-3 (regime): range −131,8 (55 tr, t −2,03), trend −63,8 (46, t −0,79).
-- Geen release (tussenronde, niets acuut). Geen knoppen, geen instellingen.
-
-laatste ronde: 08-10 19:40, gemeten t/m 08-10 19:44
-
-## 08-10 23:40 · tussenronde
-- Geïnstalleerd: 1.7.9 (1.7.7 saldosprong, 1.7.8 geen noodstop na eigen sluiting/race met IG, 1.7.9 sluiting pas boeken na bevestiging IG; chatsessie). Herstart 22:02 (reconciling → running). Markt sinds 23:00 dicht (dagpauze).
-- Sinds 19:44: **22 trades in 1 cluster** (15: 21:15-22:50, netto −21,17, bruto +2,38, kosten 23,55 = 1,07/trade). Totaal 123 trades / 15 clusters: netto −217,23 = bruto −28,23 − kosten 189,00; PF 0,613; winst 34,2%; t −2,95 (clusters, nagerekend); max DD 2,76%.
-- **Noodstop 21:20** ("positie open bij de broker maar niet in de database") → 12 signalen geweigerd; hervat 21:22, "alles sluiten" 21:58 (1 sluitreden "handmatig"). Dit is de race die 1.7.8/1.7.9 oplossen → na 1.7.9 tellen: 0× deze noodstop.
-- **L-GS-005 (tijdstops):** regime `tijdstop` nu 55 trades / 5 clusters: netto −16,96 (−0,31/trade, t −0,55, PF 0,85), bruto +54,07 (+0,98/trade, t bruto 1,79) tegen 19:40 +4,39 netto. Geen conclusie (5 clusters; bij gem. −3,4 en sd 13,9 USD/cluster zou pas na ~67 clusters iets significant worden). Beslismoment blijft ≥10 clusters gepaard.
-- **H-GS-7 sterker:** cluster 15 weer 22 trades in 95 min; in het tijdstopregime bruto 0,98/trade tegen kosten 1,29/trade → het bruto voordeel wordt volledig door het hogere tempo opgegeten.
-- **L-GS-004:** sluitreden onbekend 3/123 (was 1/101); afstemming in_orde (107/107 kloppend, 15 nog niet bij IG verwerkt). Kosten 120 gemeten / 3 berekend. Toets in de dagafsluiting: onbekend moet na afstemming dalen.
-- **H-GS-6 (latency):** p99 1067 ms (n=2000), p50 247, max 7,6 s (candles→exits max 6,2 s) — staart rond de noodstop/herstart. Nachttoets blijft staan.
-- Opgemerkt: 22:59:59 waarschuwing "broker meldt gesloten, rooster open" — 1 s vóór de dagpauze van 23:00 (klokrand; `closures` uur 22: 1/350). Eenmalig, geen voorstel.
-- Geen release (tussenronde, niets acuut). Geen knoppen, geen instellingen.
-
-laatste ronde: 08-10 23:40, gemeten t/m 08-10 23:44
-
-## 09-10 03:40 · dagafsluiting 08-10
-- Dag 08-10 (lokaal, clusters 8-15): 67 trades, netto −95,69 = bruto −8,58 − kosten 87,11 (1,30/trade); t netto −2,01, t bruto −0,15 (8 clusters, geen conclusie). Noodstop 21:20 (race, vóór 1.7.9).
-- Na middernacht cluster 16: 39 trades 00:01-03:41 (220 min), netto +15,21, bruto +76,40, kosten 61,19. Totaal 162 trades / 16 clusters: netto −201,00 = bruto +49,19 − kosten 250,19; PF 0,677; winst 38,9%; t −2,54 (bruto +0,41).
-- **L-GS-005 (tijdstops):** regime `tijdstop` 94 trades / 6 clusters: netto −0,73 (−0,01/trade, t −0,02), bruto +131,48 (+1,40/trade, t bruto 1,84) tegen `zonder_tijdstop` −2,95/trade (t −3,28). Bij gem./sd van nu is t bruto ≥ 2 na ~7 clusters; netto is ~0 → netto-toets onbereikbaar. Beslismoment blijft de gepaarde toets bij ≥ 10 clusters in dit regime.
-- **H-GS-7 bevestigd en uitgebreid:** bruto 1,40/trade ≈ kosten 1,41/trade; trades per cluster 15,7 (tijdstop) tegen 6,8. Tijdstops maken ook de clusters langer (cluster 16: 220 min, herinstap steeds < 10 min) → clusters groeien trager en het beslismoment schuift op. Toets (volgende dagafsluiting, uit de recorder): bruto van de eerste instap per cluster tegen de herinstappen na een tijdstop.
-- **H-GS-6 verworpen:** p99 1067 ms over 2000 metingen uit ~22:10-03:45, een venster zonder herstart (laatste 22:02). De staart komt dus niet van herstarts. Uitsplitsing p99: signal→bookkeeping 409, candles→exits 334, exits→signal 319, start→quote (IG) 217 ms → de staart zit vooral in eigen verwerking (H-GS-8, nieuw). Opvallend: p99 exact gelijk aan 23:40 (1066,704) terwijl p50 en max veranderden — volgende ronde controleren of hij beweegt.
-- **L-GS-004:** sluitreden onbekend 3/162 (1,9%), kosten gemeten 96,3%. Bij 1.7.9-herstart 22:02: 1 trade in database open maar bij IG al dicht → afgestemd.
-- **Rooster-klokrand (gebouwd 1.7.10, L-GS-006; 1831 tests groen, workflow groen, HACS ververst):** elke nacht 2× WARNING "broker gesloten, rooster open … feestdag" om 22:59:59 en 23:59:59. Oorzaak: pauze tot en met 23:59:59 vergeleken mét microseconden (23:59:59,06 = open) en een klokverschil van < 1 s op de sluiting. Handelen veranderde niet (gesloten wint).
+## 09-10 · samenvatting dag (6 rondes; ingekort na 14 dagen)
+- L-GS-005 (tijdstops): regime `tijdstop` 94 trades / 6 clusters: netto −0,73 (−0,01/trade, t −0,02), bruto +131,48 (+1,40/trade, t bruto 1,84) tegen `zonder_tijdstop` −2,95/trade (t −3,28). Bij gem./sd van nu is t bruto ≥ 2 na…
+- H-GS-7 bevestigd en uitgebreid: bruto 1,40/trade ≈ kosten 1,41/trade; trades per cluster 15,7 (tijdstop) tegen 6,8. Tijdstops maken ook de clusters langer (cluster 16: 220 min, herinstap steeds < 10 min) → clusters groeien tr…
+- H-GS-6 verworpen: p99 1067 ms over 2000 metingen uit ~22:10-03:45, een venster zonder herstart (laatste 22:02). De staart komt dus niet van herstarts. Uitsplitsing p99: signal→bookkeeping 409, candles→exits 334, exits→signal…
+- L-GS-004: sluitreden onbekend 3/162 (1,9%), kosten gemeten 96,3%. Bij 1.7.9-herstart 22:02: 1 trade in database open maar bij IG al dicht → afgestemd.
+- Rooster-klokrand (gebouwd 1.7.10, L-GS-006; 1831 tests groen, workflow groen, HACS ververst): elke nacht 2× WARNING "broker gesloten, rooster open … feestdag" om 22:59:59 en 23:59:59. Oorzaak: pauze tot en met 23:59:59 vergel…
 - L-GS-002 bleek al gebouwd in 1.7.7 (klok vast op handelsmoment); verificatie tijdens de dagpauze in de ronde van 23:40.
 - H-GS-3 (regime) en H-GS-4/5 (schaduwtoetsen, drempel 20 clusters) volgen.
-
-laatste ronde: 09-10 03:40, gemeten t/m 09-10 03:45
-
-## 09-10 07:40 · tussenronde
-- Geïnstalleerd: 1.7.10 (06:02), 1.8.0 (07:00), **1.8.1** (07:41; broker-dashboard, live koers via IG-streaming; chatsessie). Herstarts 06:03, 06:57, 07:02, 07:42; bij de laatste 1 trade in database open maar bij IG al dicht → afgestemd (`afstemming` in_orde).
-- Sinds 03:45: **48 trades**, netto −14,58 = bruto +56,10 − kosten 70,69 (1,47/trade). Totaal 210 trades: netto −215,58 = bruto +105,29 − kosten 320,88; PF 0,69; winst 37,6%; t −2,88 (16 clusters). Geen conclusie.
-- **Clusterteller staat stil:** cluster 16 loopt sinds 22:01 UTC door — 87 trades in 461 min (41% van alle trades), netto +0,63, bruto +132,50. Met tijdstops volgt de herinstap steeds < 10 min, dus komt er geen nieuw cluster bij. Gevolg: t-cluster en het beslismoment van L-GS-005 (≥ 10 clusters in het tijdstopregime, nu 6) komen niet dichterbij, hoeveel trades er ook bijkomen. → L-GS-007 (zelf bouwen: extra maat, bestaande t en oordeel ongewijzigd).
-- **L-GS-005 / H-GS-7:** regime `tijdstop` 142 trades / 6 clusters: netto −0,11/trade (t −0,51, PF 0,94), bruto +1,32/trade tegen kosten 1,43/trade — patroon ongewijzigd: bruto ≈ kosten.
-- **H-GS-8 (latency):** p99 1306 ms (was 1067); venster (~2000 rondes ≈ 02:10-07:45) bevat 4 herstarts, dus geen schone toets. p99 candles→exits 514, signal→bookkeeping 467, exits→signal 369, start→quote 353. Antwoord op de vraag van 03:40: p99 beweegt wel (geen bevroren waarde).
-- Nieuw (1.8.1): 1× WARNING "live koers via IG-streaming niet beschikbaar (verbinding verbroken door de server); dashboard ververst elke 5 s" — handel niet geraakt; volgen of het blijft.
-- Noodstop sinds 1.7.9: 0×. Sluitreden onbekend 1,9%, kosten gemeten 96,2%.
-- Geen release (tussenronde). Geen knoppen, geen instellingen.
-
-laatste ronde: 09-10 07:40, gemeten t/m 09-10 07:45
-
-## 09-10 11:40 · tussenronde
-- Geïnstalleerd: **1.9.1** (1.9.0 meerdere posities + 1.9.1 live koers; chatsessie 08:27). HA-herstarts 10:09, 10:40 (lifecycle reconciling → running). Demo.
-- **Run 100 afgesloten om 10:07** (1.9.0 start run 101 om 10:09): eindstand 239 trades / 16 clusters, netto −262,99 = bruto +92,48 − kosten 355,47; t −3,28. Sinds 07:45 nog 29 trades: netto −47,41, bruto −12,81, kosten 34,59 (1,19/trade).
-- **Run 101 = nieuwe regel (besluit Ruud 09-10):** tot 3 posities per richting, long en short naast elkaar; gelijktijdige trades vallen in één cluster. Tot 11:44: 7 trades in 1 cluster (10:11-10:45), netto −20,61, bruto −10,29, kosten 10,32; 5 tijdstops, 2 stops. 165 signalen geweigerd omdat er in dezelfde candle al een long opende. Niet vergelijkbaar met run 100 → aparte baseline.
-- **Gevolg L-GS-005:** het tijdstopregime van run 100 bleef op 6 clusters staan (142 trades: netto −0,11/trade, bruto +1,32, kosten 1,43). Het beslismoment "≥ 10 clusters" kan in run 100 niet meer gehaald worden; in run 101 meten gelijktijdige posities als één cluster. Wat het beslismoment nu wordt is aan Ruud (zie VOORSTELLEN). L-GS-007 (tijdblokken) wordt daardoor belangrijker.
-- **L-GS-004 werkt:** 11:26 afstemming corrigeerde een uitstap (4194,89 → 4199,83 bij IG; −9,82 → −1,21). Afstemming in_orde; sluitreden onbekend 0/7; kosten gemeten 5/7 (recente trades berekend, zo ontworpen).
-- **H-GS-8 (latency):** p99 1044 ms, p50 222 (n=2000, venster met 2 herstarts) → geen schone toets; staart weer in candles→exits (495) en signal→bookkeeping (405).
-- Noodstop sinds 1.7.9: 0×. Geen release (tussenronde). Geen knoppen, geen instellingen.
-
-laatste ronde: 09-10 11:40, gemeten t/m 09-10 11:45
-
-## 09-10 15:40 · tussenronde
-- Geïnstalleerd: **1.9.4** (1.9.2 schaduwtrades op echte ordergrootte, 1.9.4 daglimiet/vermogensvloer over de startbalans; chatsessies). HA-herstarts 12:10, 12:24, 12:39, 12:50, 13:53, 14:42 (lifecycle sluit netjes af). Demo, handel aan; geen knoppen gebruikt.
-- Run 101 t/m 15:44: **40 trades / 3 clusters**, netto −58,57, bruto +7,41, kosten 65,98 (1,65/trade); PF 0,43, winst 35 %, t −2,13; alle 40 in regime `tijdstop`. Sinds 11:45: 33 trades (cluster 2: 30 trades 13:00-14:49, cluster 3: 3), netto −37,96 = bruto +17,70 − kosten 55,66 (1,69/trade). H-GS-7 onveranderd: bruto ≈ 0,5/trade tegen kosten ≈ 1,7/trade.
-- Cluster 2 bevat 75 % van de trades; met meerdere posities per richting groeien clusters (30 trades in 109 min). Bij ~3 clusters/dag duurt een t-toets op ~18 clusters ≈ 6 handelsdagen. L-GS-007 (tijdblokken) wordt belangrijker.
-- Schaduwtrades (1.9.2): 7 (allemaal reden `cooldown`), netto −32,27, PF 0,14, 4 clusters — n veel te klein.
-- **Sluitreden onbekend 2/40 (5 %)** (was 0/7 om 11:40; run 100 1,9 %), bij 6 herstarts in 3 uur. H-GS-9 (nieuw): onbekend-aandeel hangt aan herstarts; toetsen op een dag zonder installaties. Afstemming `in_orde`. Kosten gemeten 90 %.
-- Latency p99 980 ms, p50 194 (n=2000, venster met herstarts → geen schone H-GS-8-toets); staart signal→bookkeeping 323, exits→signal 270, candles→exits 266.
-- Noodstop 0×. Geen release (tussenronde).
-
-laatste ronde: 09-10 15:40, gemeten t/m 09-10 15:45
-
-## 09-10 19:40 · tussenronde
-- Geïnstalleerd: **1.9.5** (L-GS-007 tijdblokken + L-GS-008 tijdstopvarianten). HA-herstarts 16:16-19:29 (7). Demo, handel aan, status wachtend; geen knoppen gebruikt. Noodstop 0×, dataprobleem uit.
-- Run 101 t/m 19:44: **53 trades / 5 clusters**, netto −60,52, kosten 81,56 → bruto +21,04; PF 0,49, winst 36 %, t −1,77; alles regime `tijdstop`. Sinds 15:44: 13 trades, netto −1,95 = bruto +13,63 − kosten 15,58 (1,20/trade).
-- **L-GS-007 werkt:** 6 uurblokken (08-15 UTC), t_netto −1,82, t_bruto +0,73, lag-1 netto 0,28. Per sessie: Londen 3 blokken netto −55,41 (bruto +5,67), New York 3 blokken netto −5,11 (bruto +15,38, t_bruto 1,70). Langste cluster 109 min (< 120). n = 6 blokken: geen conclusie; ~20 blokken nodig.
-- **L-GS-008 werkt:** 4 volledig nagespeelde trades, 240-s-variant komt 4/4 overeen met de echte trade (gem. verschil −0,05). Langere tijdstops 480/720/geen: −0,27/−1,04/−1,31 per trade t.o.v. 240 (1 blok, t n.v.t.). Oordeel pas bij ≥ 20 uurblokken.
-- H-GS-7 (bruto < kosten) houdt: bruto 0,40/trade tegen kosten 1,54/trade over run 101. H-GS-9: sluitreden onbekend 2/53 (3,8 %), geen nieuwe sinds 15:44 ondanks 7 herstarts. Kosten gemeten 96,2 %. Latency p99 890 ms (venster met herstarts). Afstemming in_orde.
-- Geen release (tussenronde).
-
-laatste ronde: 09-10 19:40, gemeten t/m 09-10 19:44
-
-## 09-10 23:40 · tussenronde
-- Geïnstalleerd: 1.9.5. HA-herstarts 19:48, 20:53, 22:43 (lifecycle sluit netjes af). Demo, handel aan; markt sinds vrijdag 23:00 dicht (weekend). Geen knoppen gebruikt. Noodstop 0×.
-- Run 101 t/m 23:00: **64 trades / 6 clusters**, netto −80,10, bruto +18,09, kosten 98,19; PF 0,44, winst 35,9 %, t −2,34. Sinds 19:44: 11 trades (20:00-20:48, één uurblok), netto −19,58 = bruto −2,95 − kosten 16,63 (1,51/trade).
-- L-GS-007 tijdblokken: 7 blokken, t_netto −2,34, **t_bruto +0,62**; Londen bruto +5,67 (3 blokken), New York bruto +12,42 (4, t_bruto 1,06). H-GS-7 (bruto < kosten) houdt: bruto 0,28/trade tegen 1,53 kosten. Geen conclusie bij 7 van ~20 blokken.
-- L-GS-008: 15 volledige trades, 240-s-variant 93,3 % gelijk aan echt (zelfde sluitreden 100 %); 480/720/geen −0,28/−0,75/−0,89 per trade t.o.v. 240 (2 blokken). Langere tijdstop tot nu slechter; oordeel bij ≥ 20 blokken.
-- **Vrijdagsluiting gemeten:** broker meldde 22:47:20-23:00 21 keer wisselend open/dicht (rooster: open tot 23:00) → 1 WARNING "… feestdag of vervroegde sluiting"; geen trades in die periode (sluitbuffer). **H-GS-10 (nieuw):** IG sluit spot goud op vrijdag in de praktijk ~13 min vóór 23:00 met een flikkerende `marketState`. Toets vrijdag 16-10; geen risico (gesloten wint), wel een misleidende meldtekst.
-- **L-GS-002 geverifieerd:** volledige suite tijdens gesloten markt (23:4x) groen: 1991 passed, 5 skipped (6 min 50 s).
-- Sluitreden onbekend 2/64 (3,1 %), kosten gemeten 96,9 %, latency p99 826 ms / p50 185 (venster met 3 herstarts). Afstemming in_orde. Geen release (tussenronde).
-
-laatste ronde: 09-10 23:40, gemeten t/m 09-10 23:50
+- Clusterteller staat stil: cluster 16 loopt sinds 22:01 UTC door — 87 trades in 461 min (41% van alle trades), netto +0,63, bruto +132,50. Met tijdstops volgt de herinstap steeds < 10 min, dus komt er geen nieuw cluster bij. G…
 
 ## 10-10 03:40 · dagafsluiting 09-10
 - Markt dicht sinds vrijdag 23:00 (weekend); demo, handel aan, geen knoppen gebruikt. Sinds 23:50 geen trades of wijzigingen.
@@ -511,3 +350,14 @@ laatste ronde: 23-10 19:40, gemeten t/m 23-10 19:45
 - Hypotheses: H-GS-11 (kosten IG 71 % / PP 187 % van bruto), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Geen release.
 
 laatste ronde: 23-10 23:40, gemeten t/m 23-10 23:45
+
+## 24-10 03:40 · dagafsluiting 23-10
+- Actief 2.21.1 (2.21.2 gedownload, actief na een HA-herstart) → **release 2.21.3** (L-GS-022 + L-GS-023, alleen logging/weergave; suite 1979 groen, 8 nieuwe tests). Demo/papier; geen knoppen, geen instellingen. Goud dicht (weekend).
+- **IG dag 23-10:** 50 trades, netto **+172,68** (bruto 449,55, kosten 276,86 = 62 %), winst 56 %. Run: 80 trades, netto 181,65, PF 1,13, t per trade 0,81, ~11 clusters. Eén cluster (16:15-17:06, −143,7) zette t van 3,48 naar 0,59 → bij < 30 clusters geen conclusie; nodig ≥ 30 clusters over ≥ 5 handelsdagen.
+- **Pepperstone dag 23-10:** 99 trades, netto **−912,22** (bruto −693,61, kosten 218,61), winst 50,5 %; 22-10 was +775. Run 138 trades, netto −137, PF 0,96, oordeel failed. Zelfde goud, zelfde uren: IG +, PP − → verschil in de opzetten per broker (observatie, n=2 dagen).
+- **H-GS-11 (kosten):** IG 62 % van bruto (run 71 %), PP 184 %. Nieuw (meetbaarheid): *Resultaat per periode* houdt de brokercorrectie van de kosten niet bij (week 296,92 tegen sensor 294,16) → **L-GS-024** (gepland).
+- **H-GS-12 (latency):** p99 nu IG 0,71 / PP 0,79 / mand 0,62 s (markt dicht); dagpieken 23-10 tot 3,1 s, geen 32 s als 22-10.
+- Mand: PEPE-EUR in noodstop blokkeert de mand; PUMP-EUR equity 7.610 (−24 %). Pepperstone houdt 1 short over het weekend (stop in winst; gaprisico = strategiekeuze Ruud, geen bug).
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar).
+
+laatste ronde: 24-10 03:40, gemeten t/m 24-10 03:55
