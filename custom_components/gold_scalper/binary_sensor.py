@@ -85,8 +85,9 @@ class LiveUnlocked(GoldScalperEntity, BinarySensorEntity):
 
 
 def _mand_gestopt(c) -> list[tuple[str, str | None]]:
-    """2.19.4: de noodstop van een mandlid stopt de hele mand (``mag_openen``),
-    dus de noodstop van de mand (hoofdlus) staat dan ook aan. Geeft
+    """2.19.4: de noodstop van een mandlid is zichtbaar op de noodstop van de
+    mand (hoofdlus). 2.22.0: hij stopt alleen die markt; de rest van de mand
+    handelt door (attribuut ``markten`` noemt wie stilstaat). Geeft
     ``(markt, reden)`` van de gestopte leden; leeg buiten een mand en voor
     de leden zelf."""
     mand = getattr(c, "_mand", None)
@@ -146,6 +147,10 @@ class RiskHalted(GoldScalperEntity, BinarySensorEntity):
         gestopt = _mand_gestopt(self.coordinator)
         if gestopt:
             attrs["markten"] = [m for m, _ in gestopt]
+            # 2.22.0: noodstop per markt, niet voor de hele mand.
+            attrs["geldt_voor"] = "alleen deze markten; de rest van de mand handelt door"
+            attrs["hint"] = ("Hervat één markt met gold_scalper.resume en 'markt', "
+                             "of alles zonder 'markt'.")
             if not attrs["reason"]:
                 attrs["reason"] = "; ".join(f"{m}: {r}" for m, r in gestopt)
         return attrs

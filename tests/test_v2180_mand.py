@@ -349,7 +349,9 @@ def test_de_lus_opent_niets_als_de_mand_vol_zit(tmp_path, monkeypatch):
 # Review 2.18.0: noodstop, onbevestigd, vermogen, opslag, afstemming
 # --------------------------------------------------------------------------- #
 
-def test_een_noodstop_bij_een_markt_houdt_de_hele_mand_tegen():
+def test_een_noodstop_bij_een_markt_houdt_alleen_die_markt_tegen():
+    # 2.22.0 (Ruud akkoord 24-10): de noodstop geldt per markt, niet meer voor
+    # de hele mand. Was: SOL-EUR geweigerd met "noodstop bij ETH-EUR".
     from gold_scalper.broker.risk import TradingState
 
     hoofd = _lid("BTC-EUR")
@@ -357,8 +359,9 @@ def test_een_noodstop_bij_een_markt_houdt_de_hele_mand_tegen():
     eth = _lid("ETH-EUR")
     eth.risk = SimpleNamespace(state=SimpleNamespace(state=TradingState.HALTED))
     m.leden = {"ETH-EUR": eth, "SOL-EUR": _lid("SOL-EUR")}
-    mag, waarom = m.mag_openen(m.leden["SOL-EUR"])
+    mag, waarom = m.mag_openen(m.leden["ETH-EUR"])
     assert not mag and "noodstop bij ETH-EUR" in waarom
+    assert m.mag_openen(m.leden["SOL-EUR"])[0] is True
 
 
 def test_een_koop_zonder_antwoord_bezet_een_plek():

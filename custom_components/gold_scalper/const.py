@@ -146,7 +146,10 @@ DEFAULT_BV_MAX_POSITIES: Final = 5
 CONF_BV_MIN_VOLUME: Final = "bitvavo_min_volume"
 DEFAULT_BV_MIN_VOLUME: Final = 250000.0
 #: Hoogste spread (procent van de koers) om in de mand te mogen.
-BV_MAND_MAX_SPREAD_PCT: Final = 0.2
+#: 2.22.0: was 0,2 %. De twee verliezers van de mand hadden een typische spread
+#: van ~0,06 % (PEPE) en ~0,04 % (PUMP); BTC/ETH/XRP zitten onder 0,002 %.
+#: Boven 0,03 % eten de kosten het verwachte resultaat van een scalp op.
+BV_MAND_MAX_SPREAD_PCT: Final = 0.03
 #: Zo vaak wordt de mand opnieuw samengesteld.
 BV_MAND_HERZIEN_MINUTEN: Final = 60
 
@@ -264,7 +267,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.21.3"
+INTEGRATION_VERSION: Final = "2.22.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als

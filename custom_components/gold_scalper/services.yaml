@@ -12,9 +12,17 @@ close_all:
 resume:
   name: Hervatten na noodstop
   description: 'Heft een noodstop op en stemt opnieuw af met de broker. Doe dit pas
-    nadat je hebt vastgesteld wat de noodstop veroorzaakte.
+    nadat je hebt vastgesteld wat de noodstop veroorzaakte. Met markt alleen die
+    markt (bijv. PEPE-EUR uit de Bitvavo-mand); zonder markt alles.
 
     '
+  fields:
+    markt:
+      name: Markt
+      description: Alleen deze markt hervatten (symbool, bijv. PEPE-EUR). Leeg = alles.
+      example: PEPE-EUR
+      selector:
+        text: null
 generate_report:
   name: Keuringsrapport maken
   description: 'Schrijft een zelfstandig HTML-rapport met resultaat, kosten en analyse

@@ -45,8 +45,20 @@ SLUIT_MAX_POGINGEN = 5
 SLUIT_BACKOFF = (10, 30, 60, 120)
 from .broker.schedule import (
     SPOT_GOLD, ClosureObservation, bij_roostergrens, cross_check, minutes_until_close,
+    minuten_tot_weekendsluiting,
 )
-from .broker.exits import ExitConfig, ExitManager, omkeer_actie, scalp_exit_config
+
+#: 2.22.0: geen nieuwe posities in het laatste uur vóór de weekendsluiting van
+#: een markt die in het weekend dicht is (goud bij Pepperstone en IG) ...
+WEEKEND_GEEN_INSTAP_MIN = 60
+#: ... en open posities sluiten zoveel minuten vóór die sluiting (Pepperstone
+#: sluit vrijdag 22:55, IG 23:00 lokale tijd). Live 23-10: XAUUSD ging om 22:55
+#: met een open short het weekend in; IG sloot op tijd, maar alleen omdat de
+#: daghandel om 20:45 UTC alles sluit. Crypto (Bitvavo) valt hier niet onder.
+WEEKEND_SLUIT_MIN = 30
+from .broker.exits import (
+    ExitAction, ExitConfig, ExitManager, omkeer_actie, scalp_exit_config,
+)
 from .broker import uitvoering as uitvoering_mod
 from .learning import onderzoek as onderzoek_mod
 from .broker.ig_capital import CapitalVenue, IgVenue
@@ -636,6 +648,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # 1.11.0 (L-GS-012): afwikkelfouten per ticket (cycli op rij) en of
         # de afwikkeling in deze cyclus faalde (dan geen instap).
         self._afwikkelfouten: dict[str, int] = {}
+        #: 2.22.0: tickets waarvoor de weekendsluiting al gelogd is.
+        self._weekend_gemeld: set[str] = set()
         self._afwikkeling_mislukt = False
         self.backtest: dict = {}
         self.audit: dict = {}
@@ -3188,6 +3202,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                                 "overvallen"
                             )
 
+                    # 2.22.0: het laatste uur vóór de weekendsluiting niets nieuws.
+                    if allowed:
+                        weekend = self._weekend_instap_reden(now)
+                        if weekend:
+                            allowed = False
+                            schaduw_reden = None
+                            r_reject = weekend
+
                     # 1.9.0: extra posities. Netting, spreiding, marge en vloer.
                     if allowed:
                         blok, blok_reden = await self._toets_extra_positie(
@@ -3885,8 +3907,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     async def _manage_open_positions(self, quote: VenueQuote, now: datetime) -> None:
         """Break-even, gedeeltelijk sluiten, trailing en tijdstops."""
+        # 2.22.0: vlak vóór de weekendsluiting alles dicht (ook zonder ATR).
+        weekend_min = self._minuten_tot_weekendsluiting(now)
+        weekend_sluiten = weekend_min is not None and weekend_min <= WEEKEND_SLUIT_MIN
         atr = self.state.atr.value or 0.0
-        if atr <= 0:
+        if atr <= 0 and not weekend_sluiten:
             return
         # spread plus geschatte slippage beide zijden (2.17.0: geschaald, plus
         # procentuele kosten bij crypto)
@@ -3963,6 +3988,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         or (omkeer.new_stop - (action.new_stop or 0))
                         * (1 if position.side == "buy" else -1) > 0):
                     action = omkeer
+
+            # 2.22.0: weekendsluiting gaat voor alles: geen positie het weekend in.
+            if weekend_sluiten:
+                action = ExitAction("close", reason=(
+                    f"weekendsluiting over {weekend_min:.0f} min"))
+                gemeld = self.__dict__.setdefault("_weekend_gemeld", set())
+                if ticket not in gemeld:
+                    gemeld.add(ticket)
+                    _LOGGER.info("%s: positie %s gesloten vóór de weekendsluiting "
+                                 "(over %.0f min).", self.symbol, ticket, weekend_min)
 
             # Pyramiden vóór de exitacties: bijkopen bij bevestiging is een
             # aparte beslissing van de vraag of je moet sluiten.
@@ -4058,6 +4093,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # cyclus al over; dit is de tweede grendel.
         if self.koers_verouderd:
             _LOGGER.warning("Instap overgeslagen: koers verouderd.")
+            return False
+        # 2.22.0: geen nieuwe positie in het laatste uur vóór het weekend
+        # (tweede grendel; ook daghandel, veldproef en turbo).
+        _weekend = getattr(self, "_weekend_instap_reden", None)
+        weekend = _weekend(now) if callable(_weekend) else None
+        if weekend:
+            self._laatste_weigering = weekend
             return False
         # 1.9.0: hooguit één nieuwe positie per cyclus (tweede grendel).
         if self._geopend_in_cyclus >= self._max_per_cyclus:
@@ -6728,6 +6770,32 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return uit if isinstance(uit, (int, float)) else None
         return minutes_until_close(SPOT_GOLD, now)
 
+    def _minuten_tot_weekendsluiting(self, now: datetime) -> float | None:
+        """2.22.0: minuten tot de weekendsluiting, of None (geen weekendsluiting
+        in zicht, of een markt die altijd open is). Eerst het rooster van de
+        venue (cTrader), anders het eigen rooster (IG), als dat aan staat."""
+        venue = getattr(self, "venue", None)
+        if getattr(venue, "altijd_open", False):
+            return None
+        if self._venue_rooster(now) is not None:
+            f = getattr(venue, "minuten_tot_weekendsluiting", None)
+            try:
+                uit = f(now) if callable(f) else None
+            except Exception:  # noqa: BLE001
+                uit = None
+            return uit if isinstance(uit, (int, float)) else None
+        if not getattr(self, "_use_schedule", True):
+            return None
+        return minuten_tot_weekendsluiting(SPOT_GOLD, now)
+
+    def _weekend_instap_reden(self, now: datetime) -> str | None:
+        """2.22.0: reden om geen nieuwe positie te openen vóór het weekend."""
+        resterend = self._minuten_tot_weekendsluiting(now)
+        if resterend is not None and resterend <= WEEKEND_GEEN_INSTAP_MIN:
+            return (f"weekendsluiting over {resterend:.0f} min: geen nieuwe "
+                    f"posities in het laatste uur")
+        return None
+
     def _kosten_per_oz(self, quote) -> float:
         """2.12.0: geschatte rondreiskosten per oz: spread + commissie + slippage."""
         spread = float(getattr(quote, "spread", None) or 0.0)
@@ -6961,6 +7029,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             resterend = self._minuten_tot_sluiting(now)
             if resterend is not None and resterend <= self._close_buffer:
                 return False
+        if self._weekend_instap_reden(now):
+            return False
         blok, _reden = await self._toets_extra_positie(
             sig, quote, now, open_positions, ctx["equity"], eigen=eigen)
         return not blok

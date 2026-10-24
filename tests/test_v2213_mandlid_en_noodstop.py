@@ -120,4 +120,4 @@ def test_noodstop_waarschuwing_noemt_de_entry():
 def test_versie():
     from gold_scalper.const import INTEGRATION_VERSION
 
-    assert INTEGRATION_VERSION == "2.21.3"
+    assert tuple(map(int, INTEGRATION_VERSION.split("."))) >= (2, 21, 3)

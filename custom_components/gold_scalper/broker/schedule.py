@@ -170,6 +170,32 @@ def minutes_until_close(
     return min(resterend) if resterend else None
 
 
+#: 2.22.0: een sluiting met minstens zoveel uur tot de volgende opening is een
+#: weekendsluiting (de dagpauze van een paar minuten tot een uur is dat niet).
+WEEKENDGAT_UUR = 6
+
+
+def minuten_tot_weekendsluiting(
+    session: Session, moment: datetime | None = None
+) -> float | None:
+    """2.22.0: minuten tot de sluiting van de handelsweek, of None.
+
+    Alleen op de sluitdag van de week en zolang de markt open is; de
+    dagelijkse onderbreking telt niet. Sessies die over het weekend lopen
+    (weekendgoud) hebben geen weekendsluiting in deze zin: None.
+    """
+    moment = (moment or datetime.now(timezone.utc)).astimezone(MARKET_TZ)
+    if session.opens_weekday > session.closes_weekday:
+        return None
+    open_now, _ = is_open(session, moment)
+    if not open_now or moment.weekday() != session.closes_weekday:
+        return None
+    klok = moment.time()
+    nu = klok.hour * 60 + klok.minute + klok.second / 60
+    sluit = session.closes_at.hour * 60 + session.closes_at.minute
+    return sluit - nu if sluit > nu else None
+
+
 def cross_check(
     broker_says_open: bool,
     session: Session = SPOT_GOLD,

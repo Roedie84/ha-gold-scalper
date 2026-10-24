@@ -662,6 +662,41 @@ class CTraderVenue(ExecutionVenue):
                 return (b - sec) / 60.0
         return None
 
+    def minuten_tot_weekendsluiting(self, moment: datetime | None = None) -> float | None:
+        """2.22.0: minuten tot het einde van het lopende handelsblok als daarna
+        de markt minstens ``WEEKENDGAT_UUR`` uur dicht is (de weekendsluiting);
+        None bij een dagpauze, een gesloten markt of een onbekend rooster.
+
+        Aaneengesloten blokken (einde = begin van het volgende) tellen als één.
+        """
+        from .schedule import WEEKENDGAT_UUR
+
+        r = self._rooster()
+        if r is None:
+            return None
+        moment = moment or datetime.now(timezone.utc)
+        tz, blokken = r
+        week = 7 * 86400
+        sec = self._week_seconde(moment, tz)
+        huidig = next(((a, b) for a, b in blokken if a <= sec < b), None)
+        if huidig is None:
+            return None
+        eind = huidig[1]
+        for _ in range(len(blokken)):
+            # Het eerstvolgende begin na ``eind`` (met de week rond).
+            gaten = [((a - eind) % week) for a, _b in blokken]
+            gat = min(gaten) if gaten else week
+            if gat > 0:
+                if gat >= WEEKENDGAT_UUR * 3600:
+                    return (eind - sec) / 60.0
+                return None
+            # Sluit direct aan: doorschuiven naar het einde van dat blok.
+            volgend = next((b for a, b in blokken if a % week == eind % week and b != eind), None)
+            if volgend is None:
+                return None
+            eind = volgend if volgend > eind else volgend + week
+        return None
+
     async def candles(self, symbol: str, timeframe: str, count: int) -> Candles:
         await self._klaar()
         periode = PERIODES.get(timeframe)

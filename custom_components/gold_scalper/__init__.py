@@ -147,7 +147,14 @@ def _register_services(hass: HomeAssistant) -> None:
             await coordinator.async_close_all()
 
     async def resume(call: ServiceCall) -> None:
-        for coordinator in _coordinators():
+        # 2.22.0: met 'markt' alleen die markt (bijv. één lid van de
+        # Bitvavo-mand); zonder 'markt' alles, zoals voorheen.
+        markt = str(call.data.get("markt") or "").strip().upper()
+        doelen = [c for c in _coordinators()
+                  if not markt or str(getattr(c, "symbol", "")).upper() == markt]
+        if markt and not doelen:
+            raise HomeAssistantError(f"Geen Gold Scalper-markt {markt} gevonden.")
+        for coordinator in doelen:
             if not await coordinator.async_resume():
                 raise HomeAssistantError(
                     "Hervatten geweigerd: de daglimiet is vandaag al te vaak "
@@ -297,7 +304,9 @@ def _register_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(DOMAIN, SERVICE_PREPARE_SHUTDOWN, _zeg_wat_er_misging("prepare_shutdown")(prepare_shutdown))
     hass.services.async_register(DOMAIN, SERVICE_CLOSE_ALL, _zeg_wat_er_misging("close_all")(close_all))
-    hass.services.async_register(DOMAIN, SERVICE_RESUME, _zeg_wat_er_misging("resume")(resume))
+    hass.services.async_register(
+        DOMAIN, SERVICE_RESUME, _zeg_wat_er_misging("resume")(resume),
+        schema=vol.Schema({vol.Optional("markt"): str}))
     hass.services.async_register(DOMAIN, SERVICE_GENERATE_REPORT, _zeg_wat_er_misging("generate_report")(generate_report))
     async def import_history(call: ServiceCall) -> ServiceResponse:
         """Vul het archief met historie van de broker.

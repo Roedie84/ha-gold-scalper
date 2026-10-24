@@ -191,7 +191,13 @@
     },
     "resume": {
       "name": "Hervatten",
-      "description": "Heft een noodstop op na handmatige controle."
+      "description": "Heft een noodstop op na handmatige controle. Met markt alleen die markt.",
+      "fields": {
+        "markt": {
+          "name": "Markt",
+          "description": "Alleen deze markt hervatten (bijv. PEPE-EUR). Leeg = alles."
+        }
+      }
     },
     "generate_report": {
       "name": "Keuringsrapport maken",

@@ -1,5 +1,31 @@
 # Changelog — Gold Scalper
 
+## 2.22.0 - 24-10-2026
+
+Vier verbeteringen, elk door Ruud goedgekeurd (24-10).
+
+### A. Vrijdag afsluiten vóór de weekendsluiting
+- Live 23-10: XAUUSD (Pepperstone) ging met een open short (ticket 58810248, open sinds 21:57) het weekend in; de markt sloot om 22:55. IG sloot op tijd (22:46), maar alleen omdat de daghandel om 20:45 UTC alles sluit - een algemene regel was er niet. De bestaande sluitbuffer (10 min) hield alleen nieuwe posities tegen.
+- Nu: herkenning van de weekendsluiting uit het rooster van de broker (cTrader: einde van het handelsblok met minstens 6 uur tot het volgende; de dagpauze telt niet) of anders het IG-rooster (vrijdag 23:00). Het laatste uur vóór die sluiting geen nieuwe posities (cyclus, `_open_position` als tweede grendel, turbo); vanaf 30 minuten ervoor worden open posities gesloten (reden "weekendsluiting over N min"). Pepperstone dus vanaf 22:25, IG vanaf 22:30.
+- Crypto (Bitvavo, `altijd_open`) valt er niet onder.
+
+### B. Spreadgrens 0,03 % in de Bitvavo-mand
+- Live: de twee verliezers PEPE-EUR (~0,06 %) en PUMP-EUR (~0,04 %); BTC/ETH/XRP onder 0,002 %. De grens was 0,2 %.
+- Nu: `BV_MAND_MAX_SPREAD_PCT` = 0,03 %. Markten met genoeg volume maar een bredere spread komen niet in de mand; daarnaast opent een lid niets zolang zijn actuele spread boven de grens ligt. De herziening logt de grens en de geweerde markten; *Mand* toont `max_spread_pct` en `geweerd_op_spread`.
+
+### C. Noodstop per markt in plaats van per mand
+- Live: sinds 23-10 16:31 lag de hele mand stil door PEPE-EUR (dagverlies 10,05 % ≥ 10 %) - "mand: noodstop bij PEPE-EUR" bij alle 19 andere markten.
+- Nu: een lid in noodstop stopt alleen zichzelf ("noodstop bij PEPE-EUR (alleen deze markt)"); de rest van de mand blijft meten. *Mand* toont `noodstop_markten` en per markt `noodstop`; *Noodstop* van de mand blijft aan zolang een markt stilstaat, met `markten` en `geldt_voor`.
+- `gold_scalper.resume` heeft een optioneel veld `markt` (bijv. PEPE-EUR): alleen die markt hervatten. Zonder `markt` alles, zoals voorheen (ook de knop).
+- De bewaarde noodstop van PEPE-EUR blijft na de herstart staan; de andere markten stonden zelf niet in noodstop en handelen na de herstart weer.
+- Test `test_v2180_mand.py::test_een_noodstop_bij_een_markt_houdt_de_hele_mand_tegen` beschreef het oude gedrag en is aangepast naar `..._houdt_alleen_die_markt_tegen`.
+
+### D. Oordeel 'failed'/'passed' pas bij genoeg clusters
+- Live: XAUUSD 138 trades in 8 clusters stond op `failed`; IG met 80 trades op `insufficient_data`. Het oordeel volgde het aantal trades, terwijl trades vlak na elkaar geen losse waarnemingen zijn.
+- Nu: `failed` en `passed` pas bij minstens `MIN_CLUSTERS` (30, uit `learning/onderzoek.py`) clusters over minstens 5 handelsdagen (`MIN_HANDELSDAGEN_OORDEEL`); daaronder `insufficient_data`. De cijfers tonen `handelsdagen`. Harde grenzen (drawdown > 25 %, nul verliezers) blijven ook daaronder `failed`: dat is een feit of een boekhoudfout, geen statistiek.
+
+- Test: `test_v2220_verbeteringen.py` (25). Versiecheck in `test_v2213_mandlid_en_noodstop.py` naar ≥.
+
 ## 2.21.3 - 24-10-2026
 
 ### Logging en meetbaarheid: mandlid gestopt en noodstop per markt (L-GS-022, L-GS-023)

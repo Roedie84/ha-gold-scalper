@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 from .database import Trade, TradeDatabase
+from ..learning.onderzoek import MIN_CLUSTERS
 from ..timeutil import trading_day_of
 
 #: Minimaal aantal trades voordat statistieken betekenis krijgen.
@@ -41,6 +42,10 @@ T_STAT_THRESHOLD = 2.0
 #: minuten, herinstap telkens ~10 s na sluiten - dezelfde marktsituatie,
 #: geen vier onafhankelijke waarnemingen.
 CLUSTER_MINUTEN = 10.0
+#: 2.22.0: een oordeel 'failed' of 'passed' pas bij minstens ``MIN_CLUSTERS``
+#: (30, uit het onderzoek) clusters over minstens zoveel handelsdagen. Daaronder
+#: is het insufficient_data: 138 trades in 8 clusters zijn 8 waarnemingen.
+MIN_HANDELSDAGEN_OORDEEL = 5
 
 
 def _tijd(tekst) -> datetime | None:
@@ -344,6 +349,21 @@ def per_tijdblok(trades: Sequence[Trade], details: Sequence[dict] | None = None)
     return uit
 
 
+def _handelsdagen(trades: Sequence[Trade]) -> int:
+    """2.22.0: aantal verschillende handelsdagen (Europe/Amsterdam) met een
+    geopende trade; onleesbare tijden tellen niet."""
+    dagen = set()
+    for t in trades:
+        moment = getattr(t, "open_time", None) or getattr(t, "close_time", None)
+        if not moment:
+            continue
+        try:
+            dagen.add(trading_day_of(moment))
+        except (TypeError, ValueError):
+            continue
+    return len(dagen)
+
+
 def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict:
     """Bereken alle prestatiemetrieken over een reeks gesloten trades."""
     closed = [t for t in trades if t.net_pnl is not None]
@@ -466,6 +486,8 @@ def compute(trades: Sequence[Trade], starting_balance: float = 10_000.0) -> dict
         "t_statistic": round(t_stat, 3),
         "t_statistic_per_trade": round(t_per_trade, 3),
         "clusters": len(clusters),
+        # 2.22.0: voor de poort van het oordeel (clusters over handelsdagen).
+        "handelsdagen": _handelsdagen(closed),
         "t_basis": (
             f"{len(clusters)} clusters uit {len(closed)} trades "
             f"(herinstap binnen {CLUSTER_MINUTEN:.0f} min = zelfde cluster)"
@@ -528,6 +550,8 @@ def verdict(stats: dict) -> dict:
         }
 
     reasons: list[str] = []
+    #: 2.22.0: grenzen die ook onder het minimum aan clusters gelden.
+    harde: list[str] = []
     if stats["net_pnl"] <= 0:
         reasons.append("netto resultaat is niet positief")
     if stats["cost_ratio"] is not None and stats["cost_ratio"] >= 1.0:
@@ -549,7 +573,7 @@ def verdict(stats: dict) -> dict:
         # maar een waarschuwingssignaal: meestal een fout in de kostenboeking,
         # de exitlogica of de simulatie. Dit ongemerkt laten passeren zou de
         # poort openzetten op basis van een boekhoudfout.
-        reasons.append(
+        harde.append(
             f"geen enkele verliezende trade over {trades} trades; dat wijst op "
             "een fout in de administratie of exitlogica, niet op een edge"
         )
@@ -560,7 +584,42 @@ def verdict(stats: dict) -> dict:
         stats.get("max_drawdown_pct_trade_sequence") or 0.0,
     )
     if dd_oordeel > 25:
-        reasons.append(f"drawdown van {dd_oordeel}% is te groot")
+        harde.append(f"drawdown van {dd_oordeel}% is te groot")
+
+    # 2.22.0: het oordeel volgt de clusters, niet het aantal trades. Trades vlak
+    # na elkaar in dezelfde marktsituatie zijn geen losse waarnemingen (de
+    # t-statistiek telt al per cluster); 138 trades in 8 clusters gaven
+    # 'failed' terwijl er 8 waarnemingen waren. Onder de grens is het
+    # insufficient_data - behalve bij een harde grens (drawdown, nul
+    # verliezers): dat is een feit of een boekhoudfout, geen statistiek, en
+    # blijft 'failed'. Alleen als de cijfers clusters bevatten (compute doet
+    # dat altijd).
+    clusters = stats.get("clusters")
+    dagen = stats.get("handelsdagen")
+    if clusters is not None and (
+            clusters < MIN_CLUSTERS
+            or (dagen is not None and dagen < MIN_HANDELSDAGEN_OORDEEL)):
+        basis = (f"{trades} trades in {clusters} clusters"
+                 + (f" over {dagen} handelsdagen" if dagen is not None else ""))
+        if not harde:
+            return {
+                "verdict": "insufficient_data",
+                "verdict_text": (
+                    f"{basis}: te weinig om iets te concluderen. Minimaal "
+                    f"{MIN_CLUSTERS} clusters over {MIN_HANDELSDAGEN_OORDEEL} "
+                    "handelsdagen nodig."
+                ),
+                "ready_for_live": False,
+                "blocking_reasons": [],
+            }
+        return {
+            "verdict": "failed",
+            "verdict_text": (f"{basis} voldoet de strategie niet: "
+                             + "; ".join(harde) + "."),
+            "ready_for_live": False,
+            "blocking_reasons": harde,
+        }
+    reasons.extend(harde)
 
     if not reasons:
         return {

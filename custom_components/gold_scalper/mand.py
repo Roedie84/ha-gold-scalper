@@ -22,8 +22,15 @@ als leden zonder eigen entiteiten. Wat ze delen, regelt deze klasse:
   opent intussen niets nieuws. Markten met een open positie worden bewaard,
   zodat ze na een herstart terugkomen, ook als ze geen topper meer zijn.
 
-Aan/uit, noodstop en hervatten gelden voor de hele mand: de schakelaar van de
-hoofdlus wordt naar alle leden doorgezet.
+Aan/uit en hervatten gelden voor de hele mand: de schakelaar van de hoofdlus
+wordt naar alle leden doorgezet. Een noodstop geldt sinds 2.22.0 per markt:
+gaat één lid over zijn dagverlieslimiet, dan stopt alleen dat lid; de rest
+van de mand blijft meten. Hervatten kan per markt (``gold_scalper.resume``
+met ``markt``) of voor alles.
+
+Spreadgrens (2.22.0): een markt komt alleen in de mand bij een spread van
+hooguit ``BV_MAND_MAX_SPREAD_PCT`` (0,03 %), en een lid opent niets zolang zijn
+actuele spread daarboven ligt.
 """
 
 from __future__ import annotations
@@ -133,6 +140,8 @@ class BitvavoMand:
         #: instappen; die teruggezette posities telden nog niet mee (live
         #: gezien 20-10 11:30: 8 van hooguit 5 open na een herstart).
         self._gereed = False
+        #: 2.22.0: markten met genoeg volume maar een te brede spread.
+        self.geweerd_spread: list[dict] = []
         #: Een plek die net is toegezegd: markt -> (tijdstip, open op dat moment).
         #: Twee leden in dezelfde seconde zien anders allebei nog een vrije plek.
         self._toegezegd: dict[str, tuple[float, int]] = {}
@@ -202,16 +211,38 @@ class BitvavoMand:
             return False, "mand: start nog op (eerst alle markten met hun posities)"
         if markt in self.uitfaseren or markt not in {x.symbol for x in self.alle()}:
             return False, "mand: markt valt uit de mand, alleen nog sluiten"
-        gestopt = [x.symbol for x in self.alle() if self._gestopt_door_risico(x)]
-        if gestopt:
-            # Eén noodstop geldt voor de hele mand.
-            return False, f"mand: noodstop bij {', '.join(gestopt)}"
+        if self._gestopt_door_risico(c):
+            # 2.22.0: een noodstop geldt per markt. Alleen dit lid staat stil;
+            # de andere leden blijven meten (was: de hele mand, sinds 23-10
+            # 16:31 door PEPE-EUR).
+            return False, f"noodstop bij {markt} (alleen deze markt)"
+        spread = self._spread_pct(c)
+        if spread is not None and spread > BV_MAND_MAX_SPREAD_PCT:
+            # 2.22.0: kosteneis - boven de grens geen nieuwe positie.
+            return False, (f"mand: spread {spread:.4f} % boven de grens van "
+                           f"{BV_MAND_MAX_SPREAD_PCT} %")
         self._toegezegd.pop(markt, None)
         open_nu = self.aantal_open()
         if open_nu >= self.max_posities:
             return False, f"mand: al {open_nu} van hooguit {self.max_posities} posities open"
         self._toegezegd[markt] = (time.monotonic(), self._open_bij(c))
         return True, None
+
+    @staticmethod
+    def _spread_pct(c) -> float | None:
+        """2.22.0: actuele spread van een lid in procent van de middenkoers."""
+        q = getattr(c, "_last_quote", None)
+        try:
+            bid, ask = float(q.bid), float(q.ask)
+        except (TypeError, ValueError, AttributeError):
+            return None
+        if bid <= 0 or ask < bid:
+            return None
+        return (ask - bid) / ((ask + bid) / 2) * 100
+
+    def gestopte_markten(self) -> list[str]:
+        """2.22.0: markten in noodstop (alleen die markten staan stil)."""
+        return [x.symbol for x in self.alle() if self._gestopt_door_risico(x)]
 
     def vrijgeven(self, c) -> None:
         """2.18.2: de lus opende toch niets (kostenfilter, risico, grootte):
@@ -337,9 +368,11 @@ class BitvavoMand:
         from .broker import bitvavo as bv
 
         try:
+            geweerd: list = []
             self.selectie = await bv.mand_toppers(
                 self.hoofd.venue, self.aantal, self.min_volume, BV_MAND_MAX_SPREAD_PCT,
-                verplicht=[self.hoofd.symbol])
+                verplicht=[self.hoofd.symbol], geweerd=geweerd)
+            self.geweerd_spread = geweerd
             self.laatste_fout = None
         except Exception as err:  # noqa: BLE001 - de lopende leden draaien gewoon door
             self.laatste_fout = str(err)
@@ -373,9 +406,12 @@ class BitvavoMand:
                 self.uitfaseren.discard(markt)
                 continue
             await self._stop_als_plat(markt, c)
-        _LOGGER.info("Bitvavo-mand: %s markten (%s), %s posities open",
+        _LOGGER.info("Bitvavo-mand: %s markten (%s), %s posities open; spreadgrens "
+                     "%s %%, geweerd op spread: %s",
                      len(self.alle()), ", ".join([self.hoofd.symbol, *self.leden]),
-                     self.aantal_open())
+                     self.aantal_open(), BV_MAND_MAX_SPREAD_PCT,
+                     ", ".join(f"{r['market']} ({r['spread_pct']} %)"
+                               for r in self.geweerd_spread[:10]) or "geen")
 
     async def _stop_als_plat(self, markt: str, c) -> None:
         """Stoppen als er niets open staat - gecontroleerd binnen het slot van
@@ -533,6 +569,12 @@ class BitvavoMand:
             "min_volume": self.min_volume, "herzien_om": self.herzien_om,
             "fout": self.laatste_fout, "per_markt": rijen,
             "saldosprong": [r["markt"] for r in rijen if r.get("saldosprong")],
+            # 2.22.0: noodstop per markt en de spreadgrens van de mandkeuze.
+            "noodstop_markten": [r["markt"] for r in rijen if r.get("noodstop")],
+            "max_spread_pct": BV_MAND_MAX_SPREAD_PCT,
+            "geweerd_op_spread": [
+                {"markt": r["market"], "spread_pct": r["spread_pct"]}
+                for r in self.geweerd_spread[:20]],
         }
 
     def saldosprongen(self) -> list[str]:

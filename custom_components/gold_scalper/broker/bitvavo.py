@@ -315,6 +315,10 @@ class BitvavoVenue(ExecutionVenue):
         # Geen sluiting; groot genoeg dat geen enkele sluitregel ooit afgaat.
         return 10_000_000.0
 
+    def minuten_tot_weekendsluiting(self, now: datetime) -> None:   # noqa: ARG002
+        """2.22.0: crypto handelt 24/7; geen weekendsluiting."""
+        return None
+
     def broker_limits(self) -> BrokerLimits:
         """Grenzen voor de veiligheidslaag, uit de marktgegevens."""
         m = self._markt or {}
@@ -1014,7 +1018,8 @@ STABIEL = frozenset({
 
 def kies_markten(markten: list[dict], tickers: list[dict], quote: str, aantal: int,
                  min_volume: float, max_spread_pct: float,
-                 verplicht: list[str] | None = None) -> list[dict]:
+                 verplicht: list[str] | None = None,
+                 geweerd: list | None = None) -> list[dict]:
     """2.18.0: de meest liquide markten voor de mand.
 
     Alleen markten in ``quote`` (EUR) die nu handelen en een stoporder kennen,
@@ -1051,20 +1056,27 @@ def kies_markten(markten: list[dict], tickers: list[dict], quote: str, aantal: i
     goed = [r for r in rijen if r["volume"] >= min_volume and r["spread_pct"] <= max_spread_pct
             and r["market"] not in verplicht]
     goed.sort(key=lambda r: r["volume"], reverse=True)
+    if geweerd is not None:
+        # 2.22.0: genoeg volume maar een te brede spread: zichtbaar maken.
+        weg = [r for r in rijen if r["volume"] >= min_volume
+               and r["spread_pct"] > max_spread_pct and r["market"] not in verplicht]
+        weg.sort(key=lambda r: r["volume"], reverse=True)
+        geweerd.extend(weg)
     vooraan = [next((r for r in rijen if r["market"] == v), {"market": v, "volume": None, "spread_pct": None})
                for v in verplicht]
     return (vooraan + goed)[:max(len(vooraan), int(aantal))]
 
 
 async def mand_toppers(venue: "BitvavoVenue", aantal: int, min_volume: float,
-                       max_spread_pct: float, verplicht: list[str] | None = None) -> list[dict]:
+                       max_spread_pct: float, verplicht: list[str] | None = None,
+                       geweerd: list | None = None) -> list[dict]:
     """De mand ophalen: twee publieke verzoeken (alle markten, alle tickers)."""
     markten = await venue.markten()
     tickers = await venue._request("GET", "/ticker/24h")
     if not isinstance(tickers, list):
         raise VenueError("Bitvavo gaf geen 24-uurs tickers")
     return kies_markten(markten, tickers, venue.quote_valuta, aantal, min_volume,
-                        max_spread_pct, verplicht)
+                        max_spread_pct, verplicht, geweerd=geweerd)
 
 
 def _tick(markt: dict) -> float | None:
