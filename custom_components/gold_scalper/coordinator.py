@@ -6804,7 +6804,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 spread = float(quote.ask) - float(quote.bid)
             except (TypeError, ValueError, AttributeError):
                 spread = 0.0
-        totaal = (max(0.0, spread) + self._commissie(1.0)
+        # 2.22.1: per eenheid zonder afronding; ``_commissie`` rondt het bedrag
+        # af op 4 decimalen, en bij een munt van 0,0037 euro werd de fee per
+        # eenheid (0,0000186) dan 0 - het filter zag alleen spread + slip.
+        ruw = getattr(self, "_commissie_ruw", None)
+        commissie = ruw(1.0) if callable(ruw) else self._commissie(1.0)
+        totaal = (max(0.0, spread) + commissie
                   + schaal_mod.usd(veldproef_mod.SLIP_PER_OZ))
         return schaal_mod.rond_prijs(totaal, 4)
 
@@ -6823,6 +6828,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
     def _commissie(self, units: float | None) -> float:
         """2.9.3: commissie rondreis (open + dicht) in USD voor ``units`` oz."""
+        return round(self._commissie_ruw(units), 4)
+
+    def _commissie_ruw(self, units: float | None) -> float:
+        """2.22.1: als ``_commissie``, zonder afronding (voor kosten per eenheid)."""
         per_lot = _commissie_venue(self.venue)
         vast = 2 * per_lot * abs(float(units or 0)) / CONTRACT_SIZE
         # 2.17.0: procentuele kosten (Bitvavo) tegen de laatste koers.
@@ -6833,7 +6842,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         tarief = float(getattr(getattr(self, "venue", None), "tarief_per_zijde", 0.0) or 0.0) \
             if getattr(getattr(self, "venue", None), "alleen_long", False) else 0.0
         procent = 2.0 * tarief * float(koers or 0.0) * abs(float(units or 0))
-        return round(vast + procent, 4)
+        return vast + procent
 
     def _turbo_start(self) -> None:
         """Abonneer op de IG-koersstroom (dezelfde als het paneel)."""

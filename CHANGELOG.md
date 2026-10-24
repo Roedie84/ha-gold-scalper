@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.22.1 - 24-10-2026
+
+### Kostenfilter rekende de taker-fee niet mee bij munten met een kleine koers (bug)
+- Live 24-10: in de Bitvavo-mand haalde alleen PUMP-EUR (koers 0,0037) het kostenfilter, met stops van ~0,3-0,5 %. BTC, ETH en XRP werden met dezelfde 0,25 %/zijde geweigerd ("minimaal 2893" bij BTC = ~4 % van de koers). Oorzaak: de kosten per eenheid kwamen uit `_commissie(1.0)`, dat het bedrag afrondt op 4 decimalen; de fee per eenheid (2 x 0,0025 x 0,0037 = 0,0000186) werd 0 en het filter zag alleen spread + slip.
+- Gevolg gemeten: PUMP-EUR n=384 (runs 4-5), netto -5.124 EUR, bruto -1.024, kosten 4.100; 372 van 384 op de stop. 3m n=167 bruto t -5,5.
+- Nu: `_kosten_per_oz` gebruikt `_commissie_ruw` (zelfde berekening, zonder afronding). `_commissie` (boekingen in geld) rondt af zoals altijd. Goud (IG, Pepperstone) en munten met een grote koers: ongewijzigd.
+- Verwacht: PUMP-EUR valt onder hetzelfde filter als de rest (stop >= 8 x rondreiskosten, ~4 %); de mand handelt dan zelden. Dat is de eerlijke uitkomst bij 0,5 % rondreis; de regels zelf zijn niet gewijzigd.
+- Test: `test_v2221_kosten_kleine_koers.py` (5).
+
 ## 2.22.0 - 24-10-2026
 
 Vier verbeteringen, elk door Ruud goedgekeurd (24-10).
