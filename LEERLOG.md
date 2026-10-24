@@ -384,3 +384,12 @@ laatste ronde: 24-10 11:40, gemeten t/m 24-10 11:45
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). n blijft 9-11 clusters IG / 8 PP: geen toets. Geen release.
 
 laatste ronde: 24-10 15:40, gemeten t/m 24-10 15:45
+
+## 24-10 19:40 · tussenronde
+- Actief **2.22.0** (geen herstart sinds 10:16). Demo/papier; geen knoppen, geen instellingen. Goud dicht (weekend): IG en Pepperstone 0 trades; Pepperstone-short nog open. Geen nieuwe Gold Scalper-logregels.
+- **Mand:** herziening 19:17 liet **PUMP-EUR weer toe** (spread 0,0295 %, net onder 0,03 %) na de weigering van 15:17 (0,0398 %) → derde wissel in 6 uur. Sinds 15:40 +15 trades, netto −2.565 → **−2.758** (−12,9 per trade), equity 7.236, 2 open. Steunt **L-GS-025** (open, Ruud).
+- ZIG-EUR valt uit de mand met 1 open positie (alleen nog sluiten) - zo bedoeld.
+- **H-GS-12 (latency):** p99 IG 0,49 / PP 0,53 / mand 0,45 s.
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). n blijft 9-11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. Geen release.
+
+laatste ronde: 24-10 19:40, gemeten t/m 24-10 19:50

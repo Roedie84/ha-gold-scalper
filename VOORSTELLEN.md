@@ -153,6 +153,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Onderbouwing (24-10 11:40): 2.22.0 weert 20 markten op de grens 0,03 %. PUMP-EUR, in 2.22.0 als verliezer met ~0,04 % genoemd, stond bij de herziening van 11:17 op 0,0295 % en bleef in de mand. Het is het enige lid dat handelt (de rest: spot geen short / kostenfilter): sinds 10:16 3 trades, equity 7.610 → 7.518; run 175 trades, netto −2.460,68 (−14,1 per trade). Of PUMP meedoet hangt nu af van de spread op één moment.
 - Voorstel: toelating op de mediane spread over 24 u (grens 0,03 % ongewijzigd), of een lagere toelatingsgrens dan de opengrens (bijv. 0,02 % / 0,03 %), zodat een markt rond de grens niet in en uit valt.
 - Verwacht effect: PUMP-EUR valt uit de mand zoals in 2.22.0 bedoeld; minder papierverlies, mand meet alleen markten met lage kosten.
+- Aanvulling 24-10 19:40: derde wissel - 13:17 in (0,0238 %), 15:17 uit (0,0398 %), **19:17 weer in (0,0295 %)**; 15:40 → 19:53 +15 trades, netto −2.565 → **−2.758** (−12,9 per trade), equity 7.236, 2 open.
 - Meten na bouw: mandwissels per dag; trades en netto per lid; PUMP-EUR in/uit met zijn mediane spread.
 - 24-10 15:40 (extra onderbouwing): herziening 13:17 PUMP-EUR 0,0238 % (in, +10 trades tot 185, netto −2.565,22), herziening 15:17 0,0398 % (geweerd). In 4 uur aan beide kanten van de grens: de toelating hangt van het moment af.
 
