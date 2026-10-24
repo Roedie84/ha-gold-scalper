@@ -360,4 +360,7 @@ laatste ronde: 23-10 23:40, gemeten t/m 23-10 23:45
 - Mand: PEPE-EUR in noodstop blokkeert de mand; PUMP-EUR equity 7.610 (−24 %). Pepperstone houdt 1 short over het weekend (stop in winst; gaprisico = strategiekeuze Ruud, geen bug).
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar).
 
-laatste ronde: 24-10 03:40, gemeten t/m 24-10 03:55
+## 24-10 07:40 · tussenronde (niet gemeten)
+- HA-MCP kon niet verbinden (502 bij opbouw van de verbinding) → geen history, logs of dashboard; niets gemeten, geen release, dashboardkaart niet bijgewerkt. Volgende ronde meet door vanaf 03:55 (recorder bewaart ~10 d, dus geen verlies).
+
+laatste ronde: 24-10 07:40, gemeten t/m 24-10 03:55
