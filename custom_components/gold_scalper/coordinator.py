@@ -7252,7 +7252,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     # -- afsluiten ---------------------------------------------------------- #
 
     @_met_schaal
-    async def async_shutdown_hook(self) -> None:
+    async def async_shutdown_hook(self, mandlid: bool = False) -> None:
         """Bij het HA-stop-event en bij het ontladen: administratie veiligstellen.
 
         1.7.5: wacht eerst (begrensd) op een lopende cyclus, bewaart dan de
@@ -7305,7 +7305,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # Een run hoort alleen te eindigen als de opzet wijzigt of als je
             # er zelf een nieuwe begint.
             await self.hass.async_add_executor_job(self._sluit_bestanden)
-            await self.lifecycle.emergency_shutdown([])
+            # 2.21.3 (L-GS-023): een mandlid dat stopt is geen HA-stop
+            await self.lifecycle.emergency_shutdown(
+                [], mandlid=(getattr(self, "symbol", None) or "?") if mandlid else None
+            )
         finally:
             if verkregen:
                 self._cyclus_slot.release()

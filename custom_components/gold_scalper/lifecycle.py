@@ -328,7 +328,9 @@ class LifecycleController:
             ),
         )
 
-    async def emergency_shutdown(self, flush_callbacks: list) -> None:
+    async def emergency_shutdown(
+        self, flush_callbacks: list, mandlid: str | None = None
+    ) -> None:
         """Laatste redmiddel bij een HA-stop-event.
 
         Hier is weinig tijd voor - HA gunt shutdown-handlers maar een korte
@@ -336,14 +338,26 @@ class LifecycleController:
         duren en zou halverwege afgekapt worden), alleen de administratie
         veiligstellen. De posities zelf worden gedekt door de stops bij de
         broker en door de dead man's switch in de bridge.
+
+        2.21.3 (L-GS-023): `mandlid` = de markt van een lid dat de mand stopt
+        terwijl de mand zelf doorloopt. Dat is geen HA-stop: een INFO-regel in
+        plaats van "HA sluit af" (23-10: elk uur zo'n waarschuwing zonder
+        herstart, en de leerronde telde ze als herstarts).
         """
-        _meld_afsluiten()
+        if mandlid:
+            _LOGGER.info(
+                "Bitvavo-mand: %s gestopt (administratie bewaard).", mandlid
+            )
+        else:
+            _meld_afsluiten()
         for callback in flush_callbacks:
             try:
                 callback()
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Flush bij afsluiten mislukt")
-        self._transition(LifecycleState.STOPPED, "HA stop-event")
+        self._transition(
+            LifecycleState.STOPPED, "mandlid gestopt" if mandlid else "HA stop-event"
+        )
 
     def as_dict(self) -> dict:
         return {

@@ -179,8 +179,11 @@ class StateStore:
 
         if state.halted:
             _LOGGER.warning(
-                "Noodstop uit een eerdere sessie blijft actief: %s. "
+                "Noodstop uit een eerdere sessie blijft actief (%s): %s. "
                 "Gebruik gold_scalper.resume nadat je de oorzaak hebt vastgesteld.",
+                # 2.21.3 (L-GS-022): welke markt; bij de mand eindigt de
+                # entry-id op _<markt> (23-10 15:18 stond er geen markt bij)
+                self._entry_id,
                 state.halt_reason,
             )
         elif state.enabled:

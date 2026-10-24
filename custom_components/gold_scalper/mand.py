@@ -451,7 +451,7 @@ class BitvavoMand:
         if self.hass.data.get(DOMAIN, {}).get(sleutel) is c:
             self.hass.data[DOMAIN].pop(sleutel, None)
         try:
-            await asyncio.shield(c.async_shutdown_hook())
+            await asyncio.shield(c.async_shutdown_hook(mandlid=True))
         except BaseException:  # noqa: BLE001
             db = getattr(c, "db", None)
             if db is not None:
@@ -479,7 +479,9 @@ class BitvavoMand:
             await c.async_shutdown()
         except Exception:  # noqa: BLE001
             pass
-        await c.async_shutdown_hook()
+        # 2.21.3 (L-GS-023): loopt de mand door (async_stop zet _gestopt
+        # eerst), dan is dit geen HA-stop.
+        await c.async_shutdown_hook(mandlid=not self._gestopt)
 
     async def async_stop(self) -> None:
         if self._gestopt:
@@ -516,6 +518,8 @@ class BitvavoMand:
                 "netto": (data.get("stats") or {}).get("net_pnl"),
                 "trades": (data.get("stats") or {}).get("trades"),
                 "weigering": getattr(c, "_laatste_weigering", None),
+                # 2.21.3 (L-GS-022): staat dit lid zelf in een noodstop?
+                "noodstop": bool(self._gestopt_door_risico(c)),
                 # 2.21.0: equity en een actieve saldosprong per markt. De leden
                 # hebben geen eigen sensoren; zonder dit was een sprong bij
                 # een lid nergens te zien (22-10 23:47).

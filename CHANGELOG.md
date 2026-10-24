@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.21.3 - 24-10-2026
+
+### Logging en meetbaarheid: mandlid gestopt en noodstop per markt (L-GS-022, L-GS-023)
+- Live 23-10 16:18, 17:18, 18:18 en 19:18: "HA sluit af" zonder HA-herstart. Een mandlid dat bij de uurlijkse herziening de mand verlaat, liep via `emergency_shutdown`. Nu een INFO-regel "Bitvavo-mand: <markt> gestopt (administratie bewaard)"; "HA sluit af" alleen als de mand zelf stopt of HA afsluit. De administratie wordt op dezelfde manier bewaard.
+- Live 23-10 15:18: "Noodstop uit een eerdere sessie blijft actief" noemde geen markt. De regel noemt nu de entry (bij de mand eindigend op `_<markt>`), en *Mand* → `per_markt[].noodstop` (true/false) laat per markt zien wie in noodstop staat.
+- Alleen logging en weergave: raakt geen strategie, risicogrenzen, noodstop, orders of instellingen. Geen nieuwe run.
+- Test: `test_v2213_mandlid_en_noodstop.py` (8).
+
 ## 2.21.2 - 23-10-2026
 
 ### Open posities: opzet per positie (L-GS-019)
