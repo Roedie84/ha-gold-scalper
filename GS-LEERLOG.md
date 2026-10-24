@@ -278,3 +278,13 @@ laatste ronde: 23-10 06:05
 - Volgende ronde (na 24-10 14:48): Pep `vp_tijdvakken_uit` + 3m overwegen als 3m bij n ≥ 100 nog bruto < 0; mand: marktkeuze (alleen memecoins halen het filter, kosten ≈ verlies); risk_per_trade_pct 3 bij Pep = groot (gezet 22-10, niet door deze ronde).
 
 laatste ronde: 23-10 20:00
+
+## 24-10 ~07:55 · ronde 18 (geplande controle; 2.21.3 actief sinds herstart 05:41 UTC, 2.22.0 gedownload → herstart = Ruud)
+- Sinds ronde 17: 2.21.3 en 2.22.0 uit de chat (weekendsluiting, spreadgrens mand 0,03 %, noodstop per markt, oordeel op clusters). Geen dubbel werk; deze ronde geen code.
+- Weekend: goud dicht. **Pepperstone** run 5 n=138 netto −137 (PF 0,96, t −0,11); sinds ronde 17 1 trade. Per tijdvak: 3m n=59 −738 (bruto −547, kosten 190), 15m n=44 +235, 30m n=27 +364. structuur_hl:15m n=11 +357 (t 3,6) / structuur_trend:30m n=7 +273: n te klein, Bonferroni niet gehaald. 1 short open over het weekend (58810248, stop 3999,16 ≈ instap).
+- **IG** run 136 n=80 +182 (PF 1,13, t 0,81); rsi_rev:15m n=31 bruto +229, kosten 218 (7,0/trade) → kostregel bij n ≥ 40.
+- **Mand**: geen trades sinds noodstop PEPE-EUR (23-10 16:31); 2.22.0 laat na herstart de rest weer meten. Logs schoon (alleen de bewaarde noodstops PEPE/BILL).
+- Instellingen: niets (48-u-grens Pep/IG tot 24-10 14:48; markt dicht).
+- Volgende ronde: na herstart 2.22.0 controleren (weekendsluiting vr, mand per markt, oordeel); Pep 3m bij n ≥ 100 nog bruto < 0 → `vp_tijdvakken_uit` + 3m overwegen.
+
+laatste ronde: 24-10 07:55
