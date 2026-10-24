@@ -288,3 +288,12 @@ laatste ronde: 23-10 20:00
 - Volgende ronde: na herstart 2.22.0 controleren (weekendsluiting vr, mand per markt, oordeel); Pep 3m bij n ≥ 100 nog bruto < 0 → `vp_tijdvakken_uit` + 3m overwegen.
 
 laatste ronde: 24-10 07:55
+
+## 24-10 ~18:05 · ronde 19 (geplande controle; 2.22.0 actief sinds herstart ~08:17 UTC)
+- **Gebouwd 2.22.1** (bug, suite 2009 groen + 7 skip, release via workflow, in HACS gedownload; herstart = Ruud): kostenfilter rekende de taker-fee niet mee bij een kleine koers. `_commissie(1.0)` rondt af op 4 decimalen → PUMP-fee per eenheid 0,0000186 werd 0; filter zag alleen spread+slip (min. stop 0,27 % i.p.v. ~4 % zoals BTC/ETH/XRP). Nu `_commissie_ruw` in `_kosten_per_oz`; goud ongewijzigd.
+- **Mand**: alleen PUMP-EUR handelt (spread 0,0295 % net onder de grens 0,03 %). n=384 (runs 4-5) netto −5.124, bruto −1.024, kosten 4.100; 372/384 op de stop; 3m n=167 bruto t −5,5. Sinds herstart n=28 −369 (win 7 %). Na 2.22.1 verwacht: mand vrijwel stil (alles weigert op kosten) — eerlijke uitkomst bij 0,5 % rondreis.
+- **Pepperstone/IG**: weekend dicht, geen nieuwe trades. Pep run 5 n=138 −137 (oordeel nu insufficient_data door 2.22.0); IG n=80 +182. Pep-short 58810248 nog open over het weekend.
+- Logs: alleen losse koersfouten Bitvavo (gekruist orderboek SOL-EUR, 6×). Instellingen: niets (fix lost het mandprobleem op; markt dicht).
+- Volgende ronde: na herstart 2.22.1 controleren dat PUMP weigert ("kostenfilter"); maandag Pep 3m (n=59 bruto −547) bij n ≥ 100 → `vp_tijdvakken_uit` + 3m overwegen; vrijdag weekendsluiting meten. Open vraag voor Ruud (geen actie nu): mand alleen zinvol met lagere kosten (maker/limietorders) of langere tijdvakken.
+
+laatste ronde: 24-10 18:05
