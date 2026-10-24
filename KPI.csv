@@ -442,3 +442,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-24 19:40,TUSSEN,gs_mand_leden,14,1,"herziening 19:17: 14 leden, 20 geweerd op spread; ZIG-EUR uitfaseren met 1 open; mand 3 open (PUMP 2, ZIG 1)"
 2026-10-24 19:40,TUSSEN,gs_latency_p99_s,0.53,3,"IG 0.49, Pepperstone 0.53, mand 0.45 (goud dicht)"
 2026-10-24 19:40,TUSSEN,gs_koersfout_bitvavo,0,1,"geen nieuwe koersfouten na 15:42 (teller system_log 6)"
+2026-10-24 23:40,TUSSEN,gs_versie_actief,2.22.0,1,"diagnostics integration_manifest.version 2.22.0; HACS meldt v2.22.1 geinstalleerd maar zip-download 20:01:52 mislukt (GitHub-header > 8190 bytes), herstart 20:02:05 laadde de oude code -> kostenfilterfix niet actief"
+2026-10-24 23:40,TUSSEN,gs_mand_pump_trades,15,215,"19:53 -> 23:40: 200 -> 215 trades, netto -2758.39 -> -2895.79 (-9.2/trade), equity 7091; 21:20 weigering leeg (filter liet door); 23:17 uitfaseren, 3 open"
+2026-10-24 23:40,TUSSEN,gs_mand_leden,13,1,"herziening 23:17: 13 leden; overige weigeren op spot-short of kostenfilter (BTC min. 2895)"
+2026-10-24 23:40,TUSSEN,gs_trades_goud,0,1,"weekend: IG en Pepperstone 0 trades"
