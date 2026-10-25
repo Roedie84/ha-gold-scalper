@@ -35,3 +35,4 @@
 
 | IG run 22-10 16:48.. | 80 trades / ~11 clusters: netto 181,65 · bruto 616,84 · kosten 435,19 (71 %); PF 1,13; t per trade 0,81 | 22..23-10 | 24-10 03:40 |
 | Pepperstone run 22-10 16:48.. | 138 trades: netto −137,03 · bruto 159,89 · kosten 294,16; PF 0,96; t −0,11 | 22..23-10 | 24-10 03:40 |
+| Bitvavo-mand: handelende leden | 0 van 10 (PUMP-EUR geweerd op spread 0,067 %) | 25-10 02:17 | 25-10 03:40 |
