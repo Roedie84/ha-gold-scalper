@@ -297,3 +297,11 @@ laatste ronde: 24-10 07:55
 - Volgende ronde: na herstart 2.22.1 controleren dat PUMP weigert ("kostenfilter"); maandag Pep 3m (n=59 bruto −547) bij n ≥ 100 → `vp_tijdvakken_uit` + 3m overwegen; vrijdag weekendsluiting meten. Open vraag voor Ruud (geen actie nu): mand alleen zinvol met lagere kosten (maker/limietorders) of langere tijdvakken.
 
 laatste ronde: 24-10 18:05
+
+## 25-10 ~07:50 · ronde 20 (geplande controle; 2.22.1 actief sinds herstart 06:00 CET)
+- 2.22.1 actief (update-entiteit off = bijgewerkt). Geen nieuwe commits op main sinds 2.22.1; tussenronde 07:40 had dezelfde stand → geen dubbel werk, geen code.
+- Zondag: goud dicht, IG/Pep 0 nieuwe trades (Pep-short 58810248 open). Mand: 12 leden, 0 trades/0 open, oordeel insufficient_data, toestand running; PUMP niet meer in handel (kostenfilter/spread).
+- Logs: alleen bewaarde noodstops pepe-eur/bill-eur (geen mandlid, geen effect) en 1 losse Bitvavo-koersfout (ANIME-EUR). Instellingen: niets.
+- Volgende ronde (ma 26-10): Pep 3m (n=59 bruto −547) bij n ≥ 100 → `vp_tijdvakken_uit` + 3m; mand: weigert PUMP op "kostenfilter"?; L-GS-026 staat gepland voor de dagafsluiting 26-10 (niet zelf bouwen).
+
+laatste ronde: 25-10 07:50
