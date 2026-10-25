@@ -453,3 +453,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-25 03:40,DAG,gs_mand_handelende_leden,0,10,"6 spot geen short, 4 kostenfilter"
 2026-10-25 03:40,DAG,gs_latency_p99_s,0.76,3,"IG 0.68, PP 0.76, mand 0.48 (markt dicht)"
 2026-10-25 03:40,DAG,gs_dns_storing,1,1,"~00:45 Bitvavo 3-6x op rij mislukt, cTrader 2-3 van 3; afgevangen, extern"
+2026-10-25 07:40,TUSSEN,gs_versie_actief,2.22.1,1,"HA herstart 06:00:45 CET; update-entiteit installed v2.22.1 (kostenfilterfix actief)"
+2026-10-25 07:40,TUSSEN,gs_latency_p99_s,0.72,3,"IG 0.66, Pepperstone 0.72, mand 0.54 (goud dicht)"
+2026-10-25 07:40,TUSSEN,gs_mand_leden,12,1,"herziening 06:01Z: 12 leden, 0 open, 0 trades; 20 geweerd op spread (o.a. PEPE 0.038 %); noodstop_markten leeg"
+2026-10-25 07:40,TUSSEN,gs_trades_goud,0,1,"zondag: IG en Pepperstone 0 trades; Pepperstone-short open (1)"

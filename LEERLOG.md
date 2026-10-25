@@ -368,3 +368,13 @@ laatste ronde: 24-10 23:40, gemeten t/m 24-10 23:45
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). n 11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. L-GS-024 wacht op een handelsdag én de installatie van 2.22.1.
 
 laatste ronde: 25-10 03:40, gemeten t/m 25-10 03:50
+
+## 25-10 07:40 · tussenronde
+- **HA herstart 06:00 CET: 2.22.1 actief** (kostenfilterfix). Demo/papier; geen knoppen, geen instellingen.
+- Goud dicht (zondag): IG en Pepperstone 0 trades; Pepperstone-short nog open. Mand (herziening 06:01Z): 12 leden, 0 open, 0 trades (spot geen short / kostenfilter); PEPE geweerd op spread 0,038 %; `noodstop_markten` leeg.
+- Bij de start opnieuw "Noodstop uit een eerdere sessie blijft actief" voor pepe-eur en bill-eur (geen mandleden, geen effect). Nog geen voorstel: lijkt bewust (de noodstop moet blijven als de markt terugkomt).
+- **H-GS-12 (latency):** p99 IG 0,66 / PP 0,72 / mand 0,54 s (markt dicht).
+- 2.22.1 draait → **L-GS-026** mag in de dagafsluiting van 26-10 gebouwd worden; L-GS-024 wacht op een handelsdag (ma 26-10 → 27-10 03:40).
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). n 11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. Geen release.
+
+laatste ronde: 25-10 07:40, gemeten t/m 25-10 07:45

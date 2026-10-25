@@ -159,7 +159,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - 24-10 15:40 (extra onderbouwing): herziening 13:17 PUMP-EUR 0,0238 % (in, +10 trades tot 185, netto −2.565,22), herziening 15:17 0,0398 % (geweerd). In 4 uur aan beide kanten van de grens: de toelating hangt van het moment af.
 
 ## L-GS-026 · mand: resultaat van een vertrokken markt blijft zichtbaar (meetbaarheid)
-- Status: **gepland** (zelf bouwen: alleen een diagnose-attribuut; mandkeuze, strategie, risico en orders ongewijzigd). Bouwen in de eerstvolgende dagafsluiting nadat 2.22.1 is geïnstalleerd (niet stapelen).
+- Status: **gepland — voorwaarde vervuld** (2.22.1 actief sinds de herstart 25-10 06:00): bouwen in de dagafsluiting 26-10 03:40. Was: **gepland** (zelf bouwen: alleen een diagnose-attribuut; mandkeuze, strategie, risico en orders ongewijzigd). Bouwen in de eerstvolgende dagafsluiting nadat 2.22.1 is geïnstalleerd (niet stapelen).
 - Onderbouwing (25-10 03:40): `mand.overzicht()` bouwt `per_markt` alleen uit de huidige leden (`self.alle()`). PUMP-EUR (215 trades, netto −2.896 om 23:40) viel bij de herziening van 02:17 uit de mand; zijn eindresultaat staat nergens meer in de attributen. Dat maakt een markt-voor-markt-toets (L-GS-025, kosten per lid) achteraf onmogelijk.
 - Bouw: attribuut `vertrokken` op *Mand*: per vertrokken markt markt, vertrokken_om, reden (spread/uitfaseren/noodstop), trades, netto, equity bij vertrek; max. 20, bewaard over een herstart. Test met een lid dat uitfaseert.
 - Meten na installatie: elke vertrokken markt verschijnt met trades en netto gelijk aan de laatste `per_markt`-regel.
