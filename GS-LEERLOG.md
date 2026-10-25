@@ -305,3 +305,13 @@ laatste ronde: 24-10 18:05
 - Volgende ronde (ma 26-10): Pep 3m (n=59 bruto −547) bij n ≥ 100 → `vp_tijdvakken_uit` + 3m; mand: weigert PUMP op "kostenfilter"?; L-GS-026 staat gepland voor de dagafsluiting 26-10 (niet zelf bouwen).
 
 laatste ronde: 25-10 07:50
+
+## 25-10 ~19:50 · ronde 21 (geplande controle; 2.23.0 actief, update-entiteit off)
+- Sinds ronde 20: 2.22.2 (mandgrootboek) en 2.23.0 (spot-longs 1h/4h/1d) uit de chat; tussenronde 19:40 (LEERLOG.md) plande L-GS-027 (opstartartefact mandsensoren) voor de dagafsluiting 26-10 → niet dubbel gebouwd; geen code deze ronde.
+- **Mand** (stand 19:48): 19 leden, 564 trades (oud, vooral PUMP/PEPE/BILL), netto −6.340, PF 0,12; 2.23.0-longs nog 0 gesloten → geen oordeel. Mand-equity 3.711 < vermogensvloer 5.000 is de som van alle leden (elk eigen saldo); geen blokkade, papier.
+- PEPE-EUR weer lid en geblokkeerd door de bewaarde noodstop (10,05 %); bewust zo laten (hervatten = Ruud, en PEPE was een verliezer).
+- **Goud**: zondag dicht; IG/Pep 0 nieuwe trades, Pep-short 58810248 open. Logs: alleen bewaarde noodstops PEPE/BILL.
+- Instellingen: niets (markt dicht; Pep 3m n=59 < 100).
+- Volgende ronde (ma 26-10): Pep 3m bij n ≥ 100 en bruto < 0 → `vp_tijdvakken_uit` + 3m; eerste gesloten `vp:*:1h|4h|1d` in de mand (netto vs. kosten); L-GS-027 na dagafsluiting controleren.
+
+laatste ronde: 25-10 19:50
