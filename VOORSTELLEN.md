@@ -163,3 +163,9 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Onderbouwing (25-10 03:40): `mand.overzicht()` bouwt `per_markt` alleen uit de huidige leden (`self.alle()`). PUMP-EUR (215 trades, netto −2.896 om 23:40) viel bij de herziening van 02:17 uit de mand; zijn eindresultaat staat nergens meer in de attributen. Dat maakt een markt-voor-markt-toets (L-GS-025, kosten per lid) achteraf onmogelijk.
 - Bouw: attribuut `vertrokken` op *Mand*: per vertrokken markt markt, vertrokken_om, reden (spread/uitfaseren/noodstop), trades, netto, equity bij vertrek; max. 20, bewaard over een herstart. Test met een lid dat uitfaseert.
 - Meten na installatie: elke vertrokken markt verschijnt met trades en netto gelijk aan de laatste `per_markt`-regel.
+
+## L-GS-027 · mandsensoren pas na het opstarten (geen 0/deelsom in de eerste 25 s)
+- Status: **gepland** (zelf bouwen: rapportage/meetfout; handel, risico en noodstop-logica ongewijzigd). Dagafsluiting 26-10 03:40, mits geen andere release open staat.
+- Onderbouwing (25-10 19:40): bij 5 starts (15:54, 16:09, 16:37, 17:25, 18:47) tonen *Trades* en *Nettoresultaat* van de mand eerst 0 (eigen BTC-EUR-stats, `mand_stats` nog None), dan een deelsom (152/163/376/316 trades; −1.807/−1.243/−4.823/−3.077) en na ~25 s 564/−6.340; *Noodstop* flapt 10 s aan (15:55, 17:25). `grootboek()`/`statistiek()` draaien al vóór `_gereed` en vóór `_laad_archief()` in `Mand.async_start`.
+- Bouw: zolang de mand niet gereed is en het archief niet geladen, geven de mandsensoren (trades, netto, equity, oordeel, noodstop van de hoofdlus) geen waarde (onbeschikbaar) in plaats van de eigen markt of een deelsom. Test: start met 3 leden waarvan 1 nog niet geladen → geen deelsom gepubliceerd.
+- Meten na installatie: bij elke herstart 0 tussenwaarden in de recorder (alleen unavailable → eindwaarde), noodstop zonder flap.

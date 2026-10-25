@@ -466,3 +466,9 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-25 15:40,TUSSEN,gs_mand_open_posities,14,1,"eerste longs van 2.23.0 (1h/4h/1d) op SOL ADA ETH HYPE WLD NEAR SUI ONDO LINK DOGE XLM LTC AVAX FARTCOIN; max 50, papier"
 2026-10-25 15:40,TUSSEN,gs_latency_p99_s,1.90,3,"IG 1.60, Pepperstone 1.90, mand 1.38 (was ~0.7); DNS-storing 13:36-15:39 (116x koersopvraging mislukt, max 5 op rij)"
 2026-10-25 15:40,TUSSEN,gs_trades_goud,0,1,zondag; Pepperstone-short open (1)
+2026-10-25 19:40,TUSSEN,gs_mand_trades_totaal,564,0,"0 gesloten sinds 15:40; netto -6340.02, 214W/350V, PF 0.12, t -1.309"
+2026-10-25 19:40,TUSSEN,gs_mand_open_posities,18,1,"19 leden; +BABY 2, ANIME 2; papier, max 50"
+2026-10-25 19:40,TUSSEN,gs_mand_noodstop_markten,1,1,"PEPE-EUR (oude noodstop dagverlies 10.05 %) terug als lid; 1095 weigeringen"
+2026-10-25 19:40,TUSSEN,gs_opstart_deelsom_herstarts,5,5,"trades/netto tonen 0 en een deelsom in de eerste ~25 s na 15:54, 16:09, 16:37, 17:25, 18:47; noodstop flapt 10 s"
+2026-10-25 19:40,TUSSEN,gs_latency_p99_s,1.84,2,"IG 1.84, mand 1.48; markt dicht, na DNS-storing en herstarts"
+2026-10-25 19:40,TUSSEN,gs_trades_goud,0,1,zondag; Pepperstone-short open (1)
