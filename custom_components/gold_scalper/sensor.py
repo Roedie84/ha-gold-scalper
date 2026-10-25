@@ -19,6 +19,7 @@ from .entity import GoldScalperEntity
 from .modes import TradingMode
 from .posities import positie_regels
 from .meetkwaliteit import SPECS
+from .mand import sensor_equity, sensor_equity_attrs, sensor_stats, sensor_trades_extra
 from .status import build_status
 
 
@@ -31,7 +32,9 @@ class ScalperSensor(SensorEntityDescription):
 
 
 def _stats(d: dict) -> dict:
-    return d.get("stats") or {}
+    # 2.22.2: bij de Bitvavo-mand de statistiek over alle markten van de mand
+    # (ook die er niet meer in zitten); anders die van de eigen markt.
+    return sensor_stats(d)
 
 
 SENSORS: tuple[ScalperSensor, ...] = (
@@ -100,8 +103,8 @@ SENSORS: tuple[ScalperSensor, ...] = (
     ScalperSensor(
         key="equity", name="Equity", icon="mdi:scale-balance",
         state_class=SensorStateClass.MEASUREMENT, suggested_display_precision=2,
-        value_fn=lambda d: d.get("equity"),
-        attrs_fn=lambda d: {"balance": d.get("balance")},
+        value_fn=sensor_equity,
+        attrs_fn=sensor_equity_attrs,
     ),
     ScalperSensor(
         key="net_pnl", name="Nettoresultaat", icon="mdi:cash",
@@ -138,6 +141,8 @@ SENSORS: tuple[ScalperSensor, ...] = (
             "close_reasons": _stats(d).get("close_reasons"),
             # 2.1.0: bij de combinatie het resultaat per strategie.
             "per_strategie": _stats(d).get("per_strategie") or None,
+            # 2.22.2: bij de mand per markt (ook markten buiten de mand).
+            **sensor_trades_extra(d),
         },
     ),
     ScalperSensor(

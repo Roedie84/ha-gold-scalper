@@ -1,5 +1,17 @@
 # Changelog — Gold Scalper
 
+## 2.22.2 - 25-10-2026
+
+### Bitvavo-mand: trades van alle markten zichtbaar en bewaard in één grootboek (bug)
+- Live 23-25 oktober: de sensoren van de mand (`sensor.gold_scalper_btc_eur_trades`, `_equity`, `_nettoresultaat`, `_oordeel`) stonden op 0 trades en 10000, terwijl de mand wel handelde: PEPE-EUR 163 trades (-1242,87), PUMP-EUR 221 (-2941,44), BILL-EUR 152 (-1807,21), PTB-EUR 4 (-44,63); stand 25-10 06:01.
+- Oorzaak 1: elk mandlid heeft sinds 2.17.0 een eigen database (`gold_scalper_bitvavo_<markt>.db`), een eigen run en een eigen grootboek. De trades werden daar correct opgeslagen en overleefden herstarts, maar de sensoren lazen alleen de hoofdlus (BTC-EUR), die zelf niets opende (spot: geen short; kostenfilter).
+- Oorzaak 2: een markt die de mand verliet (na 2.22.0 o.a. PEPE-EUR en PUMP-EUR door de spreadgrens van 0,03 %) werd gestopt en verdween daarmee volledig uit beeld, ook uit *Mand* → `per_markt` en uit het bewijs voor de poort naar live.
+- Nu: een grootboek van de hele mand. Draaiende markten tellen via hun lus; markten die niet (meer) draaien worden uit hun eigen database gelezen (laatste papieren run met dezelfde strategie en markt, zelfde regel als de poort). De mand onthoudt welke markten ooit meededen (`ooit` in het mandbestand) en vindt bij het opstarten ook alle bestaande `gold_scalper_bitvavo_*.db` terug: de trades van PEPE, PUMP, BILL, PTB enz. komen zonder aparte migratie terug.
+- Sensoren van de mand: *Trades*, *Nettoresultaat*, *Kosten*, *Winstpercentage*, *Profit factor*, *t-statistiek*, *Max. drawdown* en *Oordeel* gaan over alle gesloten trades van de mand; *Trades* heeft `per_markt` (trades, netto, equity, bron `lus`/`database`) en `eigen_markt`. *Equity* = startbalans + resultaat van alle markten (inclusief open posities van draaiende markten), met `equity_eigen_markt`. *Mand* heeft `totaal` en `buiten_mand`.
+- De poort naar live telt ook de trades van markten die de mand al verlieten.
+- Alleen boekhouding en weergave: raakt geen strategie, risicogrenzen, noodstop, orders of instellingen. Geen nieuwe run. Trades in eerdere runs (een andere opzet) tellen niet mee; per markt buiten de mand staat dat aantal in `eerdere_runs_trades`.
+- Test: `test_v2222_mand_grootboek.py` (8): openen, sluiten, opslaan, herstart met een andere samenstelling, sensorwaarde, markt die terugkomt (niet dubbel), gestopt lid, andere strategie.
+
 ## 2.22.1 - 24-10-2026
 
 ### Kostenfilter rekende de taker-fee niet mee bij munten met een kleine koers (bug)

@@ -36,7 +36,9 @@ actuele spread daarboven ligt.
 from __future__ import annotations
 
 import asyncio
+import glob
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -77,6 +79,124 @@ def _tijd(waarde) -> datetime:
         return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
     except (TypeError, ValueError):
         return datetime.min.replace(tzinfo=timezone.utc)
+
+
+def db_bestand(markt: str) -> str:
+    """2.22.2: het databasebestand van een Bitvavo-markt (zelfde regel als de
+    coordinator sinds 2.17.0)."""
+    return f"gold_scalper_bitvavo_{str(markt).lower().replace('-', '_')}.db"
+
+
+def markt_uit_bestand(naam: str) -> str | None:
+    """Omgekeerd: ``gold_scalper_bitvavo_pepe_eur.db`` -> ``PEPE-EUR``."""
+    voor, na = "gold_scalper_bitvavo_", ".db"
+    naam = os.path.basename(str(naam))
+    if not (naam.startswith(voor) and naam.endswith(na)):
+        return None
+    kern = naam[len(voor):-len(na)]
+    return kern.upper().replace("_", "-") if kern else None
+
+
+def ontdek_markten(map_pad: str) -> list[str]:
+    """2.22.2: alle markten waarvan een database bestaat. De bestanden blijven
+    staan als een markt de mand verlaat; zo vindt de mand ook trades terug van
+    markten die al weg waren (PEPE-EUR, PUMP-EUR, BILL-EUR, ...)."""
+    uit = []
+    for pad in sorted(glob.glob(os.path.join(map_pad, "gold_scalper_bitvavo_*.db"))):
+        markt = markt_uit_bestand(pad)
+        if markt:
+            uit.append(markt)
+    return uit
+
+
+def _samenvatting(markt: str, trades: list, run: dict | None, runs: int,
+                  bron: str) -> dict:
+    netto = [float(t.net_pnl or 0.0) for t in trades]
+    start = float((run or {}).get("starting_balance") or 0.0) or None
+    laatste = max((str(t.close_time) for t in trades if t.close_time), default=None)
+    return {
+        "markt": markt,
+        "trades": len(trades),
+        "wins": sum(1 for x in netto if x > 0),
+        "losses": sum(1 for x in netto if x <= 0),
+        "netto": round(sum(netto), 2),
+        "kosten": round(sum(float(t.total_cost or 0.0) for t in trades), 2),
+        "startbalans": start,
+        "run_id": (run or {}).get("id"),
+        "runs": runs,
+        "laatste_trade": laatste,
+        "bron": bron,
+    }
+
+
+def lees_markt(pad: str, markt: str, strategie_versie: str) -> tuple[dict, list] | None:
+    """2.22.2: gesloten trades van de laatste papieren run van één markt, direct
+    uit zijn database (voor markten die nu niet draaien). Synchroon: in een
+    executor aanroepen. None als er geen bestand of geen passende run is."""
+    from .modes import TradingMode
+    from .storage.database import TradeDatabase
+
+    if not os.path.exists(pad):
+        return None
+    db = TradeDatabase(pad)
+    try:
+        db.connect()
+        passend = [
+            r for r in db.list_runs(limit=50)
+            if str(r.get("mode")) == TradingMode.PAPER.value
+            and str(r.get("strategy_version")) == str(strategie_versie)
+            and str(r.get("symbol") or "").upper() == markt.upper()
+        ]
+        if not passend:
+            return None
+        run = passend[0]
+        trades = db.closed_trades(int(run["id"]))
+        samenvatting = _samenvatting(markt, trades, run, len(passend), "database")
+        # Ter informatie: trades in eerdere papieren runs (een andere opzet;
+        # die horen niet bij dit bewijs en tellen niet mee).
+        samenvatting["eerdere_runs_trades"] = sum(
+            len(db.closed_trades(int(r["id"]))) for r in passend[1:])
+        return samenvatting, trades
+    finally:
+        try:
+            db.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+# -- sensorwaarden (2.22.2; los van Home Assistant, zodat ze testbaar zijn) ---- #
+
+def sensor_stats(d: dict) -> dict:
+    """De statistiek achter trades/netto/oordeel: bij de hoofdlus van de mand
+    die van de hele mand, anders die van de eigen markt."""
+    return d.get("mand_stats") or d.get("stats") or {}
+
+
+def sensor_equity(d: dict):
+    boek = d.get("mand_boek") or {}
+    if boek.get("equity") is not None:
+        return boek["equity"]
+    return d.get("equity")
+
+
+def sensor_equity_attrs(d: dict) -> dict:
+    boek = d.get("mand_boek") or {}
+    if not boek:
+        return {"balance": d.get("balance")}
+    return {
+        "balance": boek.get("balans", d.get("balance")),
+        "startbalans": boek.get("startbalans"),
+        "equity_eigen_markt": d.get("equity"),
+        "balance_eigen_markt": d.get("balance"),
+    }
+
+
+def sensor_trades_extra(d: dict) -> dict:
+    boek = d.get("mand_boek") or {}
+    if not boek:
+        return {}
+    return {"per_markt": boek.get("per_markt"),
+            "eigen_markt": (d.get("stats") or {}).get("trades")}
 
 
 def is_mand(options: dict) -> bool:
@@ -145,6 +265,15 @@ class BitvavoMand:
         #: Een plek die net is toegezegd: markt -> (tijdstip, open op dat moment).
         #: Twee leden in dezelfde seconde zien anders allebei nog een vrije plek.
         self._toegezegd: dict[str, tuple[float, int]] = {}
+        #: 2.22.2: het grootboek van de hele mand. Markten die nu niet draaien
+        #: (uit de mand gevallen, geweerd op spread) houden hier hun gesloten
+        #: trades: markt -> (samenvatting, trades). Bron: hun eigen database.
+        self._archief: dict[str, tuple[dict, list]] = {}
+        #: Markten die ooit in de mand zaten (bewaard; plus de bestanden).
+        self.ooit: set[str] = set()
+        #: Statistiek over alle gesloten trades van de mand (hooguit eens per
+        #: twee minuten berekend): (moment, stats, aantal trades).
+        self._mand_stats: tuple[float, dict, tuple] | None = None
 
     # -- gedeeld ---------------------------------------------------------------- #
 
@@ -276,16 +405,9 @@ class BitvavoMand:
                                      "bewijsfase doorlopen (modus paper)."],
                 "summary": "Live gesloten: geen papieren bewijsfase.",
             }
-        trades: list = []
-        for c in self.alle():
-            try:
-                run = await self.hass.async_add_executor_job(c._laatste_papieren_run)
-                if run is not None:
-                    trades.extend(await self.hass.async_add_executor_job(c.db.closed_trades, run))
-            except Exception:  # noqa: BLE001 - één onleesbaar lid breekt de poort niet
-                _LOGGER.debug("Mand: trades van %s niet te lezen", getattr(c, "symbol", "?"),
-                              exc_info=True)
-        trades.sort(key=lambda t: _tijd(getattr(t, "close_time", None)))
+        # 2.22.2: ook de markten die de mand al verlieten (hun trades horen
+        # bij hetzelfde bewijs).
+        trades = await self.alle_gesloten_trades()
         stats = await self.hass.async_add_executor_job(
             performance.compute_for_run, h.db, bewijs, trades)
         run = await self.hass.async_add_executor_job(h.db.get_run, bewijs)
@@ -319,6 +441,7 @@ class BitvavoMand:
             data = await self._store.async_load() or {}
         except Exception:  # noqa: BLE001
             data = {}
+        self.ooit |= {str(m).upper() for m in data.get("ooit") or []}
         return [str(m).upper() for m in data.get("met_positie") or []]
 
     async def _bewaar(self) -> None:
@@ -332,6 +455,8 @@ class BitvavoMand:
             await self._store.async_save({
                 "met_positie": met_positie,
                 "selectie": [r["market"] for r in self.selectie],
+                # 2.22.2: elke markt die ooit meedeed (voor het grootboek).
+                "ooit": sorted(self.ooit | {c.symbol for c in self.alle()}),
             })
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Mand niet bewaard", exc_info=True)
@@ -344,6 +469,7 @@ class BitvavoMand:
             await self._herzien(extra=bewaard)
         finally:
             self._gereed = True
+        await self._laad_archief()
         self._stop_timer = async_track_time_interval(
             self.hass, self._tik, timedelta(minutes=BV_MAND_HERZIEN_MINUTEN))
 
@@ -363,6 +489,8 @@ class BitvavoMand:
             await self._herzien_kern(extra)
             if not self._gestopt:
                 await self._bewaar()
+        if not self._gestopt and self._gereed:
+            await self._laad_archief()
 
     async def _herzien_kern(self, extra: list[str] | None = None) -> None:
         from .broker import bitvavo as bv
@@ -501,6 +629,10 @@ class BitvavoMand:
         self.uitfaseren.discard(markt)
         if c is None:
             return
+        # 2.22.2: de markt blijft in het grootboek; na het stoppen opnieuw uit
+        # zijn database gelezen (bij de volgende herziening).
+        self.ooit.add(markt)
+        self._archief.pop(markt, None)
         self.hass.data.get(DOMAIN, {}).pop(c.entry.entry_id, None)
         try:
             from .broker_stream import async_stop_stream
@@ -537,6 +669,144 @@ class BitvavoMand:
             if c.enabled != waarde:
                 await c.async_set_enabled(waarde)
 
+    # -- grootboek van de hele mand (2.22.2) ------------------------------------ #
+
+    async def _laad_archief(self) -> None:
+        """Lees de gesloten trades van markten die nu niet draaien uit hun eigen
+        database. Eenmalig per markt (ze veranderen niet zolang de markt stil
+        staat); een markt die weer gaat draaien, telt via zijn lus."""
+        try:
+            map_pad = self.hass.config.path()
+            gevonden = await self.hass.async_add_executor_job(ontdek_markten, map_pad)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Mand: databases niet te doorzoeken", exc_info=True)
+            gevonden = []
+        self.ooit |= set(gevonden)
+        draaiend = {c.symbol for c in self.alle()}
+        for markt in list(self._archief):
+            if markt in draaiend:
+                self._archief.pop(markt, None)
+        versie = getattr(self.hoofd, "strategie_versie", None)
+        nieuw = 0
+        for markt in sorted(self.ooit - draaiend - set(self._archief)):
+            pad = self.hass.config.path(db_bestand(markt))
+            try:
+                uit = await self.hass.async_add_executor_job(lees_markt, pad, markt, versie)
+            except Exception as err:  # noqa: BLE001 - één onleesbare markt breekt niets
+                _LOGGER.warning("Bitvavo-mand: trades van %s niet te lezen: %s", markt, err)
+                continue
+            if uit is not None:
+                self._archief[markt] = uit
+                nieuw += 1
+        if nieuw:
+            self._mand_stats = None
+            _LOGGER.info(
+                "Bitvavo-mand: grootboek aangevuld met %s markt(en) buiten de mand "
+                "(%s trades)", nieuw,
+                sum(s["trades"] for s, _ in self._archief.values()))
+
+    @staticmethod
+    def _rij_lid(c) -> dict:
+        data = getattr(c, "data", None) or {}
+        stats = data.get("stats") or {}
+        start = getattr(c, "starting_balance", None)
+        equity = data.get("equity")
+        return {
+            "markt": c.symbol, "trades": stats.get("trades") or 0,
+            "wins": stats.get("wins") or 0, "losses": stats.get("losses") or 0,
+            "netto": round(float(stats.get("net_pnl") or 0.0), 2),
+            "kosten": round(float(stats.get("total_costs") or 0.0), 2),
+            "startbalans": start, "equity": equity,
+            "run_id": stats.get("run_id"), "bron": "lus",
+        }
+
+    def grootboek(self) -> dict:
+        """2.22.2: trades, netto en equity van de hele mand: de draaiende markten
+        uit hun lus, de andere uit hun database. De equity van de mand is de
+        startbalans plus het resultaat van alle markten (inclusief de open
+        posities van de draaiende markten)."""
+        rijen = [self._rij_lid(c) for c in self.alle()]
+        draaiend = {r["markt"] for r in rijen}
+        for markt, (samenvatting, _) in sorted(self._archief.items()):
+            if markt in draaiend:
+                continue
+            rijen.append({**samenvatting, "equity": (
+                (samenvatting.get("startbalans") or 0.0) + samenvatting["netto"]
+                if samenvatting.get("startbalans") else None)})
+        start = float(getattr(self.hoofd, "starting_balance", None) or 0.0)
+        resultaat = 0.0
+        for r in rijen:
+            if r.get("bron") == "lus" and r.get("equity") is not None and r.get("startbalans"):
+                resultaat += float(r["equity"]) - float(r["startbalans"])
+            else:
+                resultaat += float(r.get("netto") or 0.0)
+        netto = round(sum(float(r.get("netto") or 0.0) for r in rijen), 2)
+        return {
+            "trades": sum(int(r.get("trades") or 0) for r in rijen),
+            "wins": sum(int(r.get("wins") or 0) for r in rijen),
+            "losses": sum(int(r.get("losses") or 0) for r in rijen),
+            "netto": netto,
+            "kosten": round(sum(float(r.get("kosten") or 0.0) for r in rijen), 2),
+            "startbalans": start or None,
+            "balans": round(start + netto, 2) if start else None,
+            "equity": round(start + resultaat, 2) if start else None,
+            "open_posities": self.aantal_open(),
+            "markten_met_trades": sorted(r["markt"] for r in rijen if r.get("trades")),
+            "per_markt": sorted(
+                ({k: r.get(k) for k in ("markt", "trades", "wins", "losses", "netto",
+                                        "equity", "run_id", "bron", "laatste_trade",
+                                        "eerdere_runs_trades")
+                  if k in r}
+                 for r in rijen if r.get("trades") or r.get("bron") == "database"),
+                key=lambda r: (-(r.get("trades") or 0), r["markt"])),
+        }
+
+    async def alle_gesloten_trades(self) -> list:
+        """Alle gesloten trades van de mand: de draaiende markten (laatste
+        papieren run) en de markten in het archief."""
+        trades: list = []
+        draaiend = set()
+        for c in self.alle():
+            draaiend.add(c.symbol)
+            try:
+                run = await self.hass.async_add_executor_job(c._laatste_papieren_run)
+                if run is not None:
+                    trades.extend(await self.hass.async_add_executor_job(c.db.closed_trades, run))
+            except Exception:  # noqa: BLE001 - één onleesbaar lid breekt niets
+                _LOGGER.debug("Mand: trades van %s niet te lezen", getattr(c, "symbol", "?"),
+                              exc_info=True)
+        for markt, (_, archief) in self._archief.items():
+            if markt not in draaiend:
+                trades.extend(archief)
+        trades.sort(key=lambda t: _tijd(getattr(t, "close_time", None)))
+        return trades
+
+    def _stats_sleutel(self) -> tuple:
+        """Verandert zodra er ergens in de mand een trade sluit."""
+        boek = self.grootboek()
+        return (boek["trades"], boek["netto"])
+
+    async def statistiek(self, max_leeftijd: float = 600.0) -> dict | None:
+        """2.22.2: de statistiek (trades, netto, t, oordeel) over de hele mand.
+        Opnieuw berekend zodra er een trade bij komt, anders hooguit eens per
+        ``max_leeftijd`` seconden."""
+        from .storage import performance
+
+        nu = time.monotonic()
+        sleutel = self._stats_sleutel()
+        if (self._mand_stats and nu - self._mand_stats[0] < max_leeftijd
+                and self._mand_stats[2] == sleutel):
+            return self._mand_stats[1]
+        h = self.hoofd
+        if getattr(h, "db", None) is None or getattr(h, "run_id", None) is None:
+            return None
+        trades = await self.alle_gesloten_trades()
+        stats = await self.hass.async_add_executor_job(
+            performance.compute_for_run, h.db, h.run_id, trades)
+        stats["over_hele_mand"] = True
+        self._mand_stats = (time.monotonic(), stats, sleutel)
+        return stats
+
     def overzicht(self) -> dict:
         """Voor de sensor en het dashboard."""
         rijen = []
@@ -563,8 +833,14 @@ class BitvavoMand:
                 "saldosprong": (data.get("saldosprong") or {}).get("reden")
                 if (data.get("saldosprong") or {}).get("actief") else None,
             })
+        boek = self.grootboek()
         return {
             "markten": len(rijen), "open_posities": self.aantal_open(),
+            # 2.22.2: het grootboek van de hele mand, ook van markten die er
+            # niet meer in zitten.
+            "totaal": {k: boek[k] for k in ("trades", "wins", "losses", "netto",
+                                            "kosten", "equity", "balans")},
+            "buiten_mand": [r for r in boek["per_markt"] if r.get("bron") == "database"],
             "max_posities": self.max_posities, "doel_aantal": self.aantal,
             "min_volume": self.min_volume, "herzien_om": self.herzien_om,
             "fout": self.laatste_fout, "per_markt": rijen,

@@ -949,7 +949,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             bestand = "gold_scalper_ctrader.db"
         elif getattr(self.venue, "name", None) == VENUE_BITVAVO:
             # 2.17.0: per markt een eigen database (eigen runs en statistiek).
-            bestand = f"gold_scalper_bitvavo_{self.symbol.lower().replace('-', '_')}.db"
+            from .mand import db_bestand
+
+            bestand = db_bestand(self.symbol)
         path = self.hass.config.path(bestand)
         self.db = TradeDatabase(path)
         await self.hass.async_add_executor_job(self.db.connect)
@@ -3407,6 +3409,18 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         await self._persist()
         await self._notify(stats)
 
+        # 2.22.2: bij de hoofdlus van de Bitvavo-mand tonen de sensoren voor
+        # trades, netto, equity en het oordeel de hele mand, niet alleen de
+        # eigen markt (BTC-EUR stond op 0 trades terwijl PEPE-EUR en PUMP-EUR
+        # samen ruim 380 trades hadden).
+        mand_stats = mand_boek = None
+        if getattr(self, "_mand", None) is not None and self._mand.hoofd is self:
+            try:
+                mand_boek = self._mand.grootboek()
+                mand_stats = await self._mand.statistiek()
+            except Exception:  # noqa: BLE001 - weergave; de handel gaat door
+                _LOGGER.debug("Grootboek van de mand niet op te bouwen", exc_info=True)
+
         columns = ("timestamp", "open", "high", "low", "close", "volume")
         candle_lengths = (
             {len(getattr(self._candles, f)) for f in columns}
@@ -3461,6 +3475,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             } if self.combinatie else {},
             "gate": self.gate,
             # 2.18.0: de Bitvavo-mand (alleen bij de hoofdlus).
+            "mand_boek": mand_boek,
+            "mand_stats": mand_stats,
             "mand": (self._mand.overzicht()
                      if getattr(self, "_mand", None) is not None and self._mand.hoofd is self
                      else None),
