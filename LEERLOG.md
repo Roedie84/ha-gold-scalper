@@ -388,3 +388,13 @@ laatste ronde: 25-10 07:40, gemeten t/m 25-10 07:45
 - Hypotheses: H-GS-11, H-GS-12, H-GS-13 (IG NY; niet meetbaar). Goud n 11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. 2.23.0-opzetten: nog 0 trades. Geen release.
 
 laatste ronde: 25-10 11:40, gemeten t/m 25-10 11:45
+
+## 25-10 15:40 · tussenronde
+- 2.23.0 actief; geen herstart sinds 10:53. Demo/papier; geen knoppen, geen instellingen.
+- **Mand (2.23.0, eerste longs):** 14 open papierposities (SOL, ADA, ETH, HYPE, WLD, NEAR, SUI, ONDO, LINK, DOGE, XLM, LTC, AVAX, FARTCOIN; 6 daarvan in uitfasering, alleen nog sluiten). Gesloten +3 sinds 11:40: PROMPT 2 (−16,58), CT 1 (−27,26) → **564 trades, netto −6.340**, PF 0,12, t −1,31. De 2.23.0-opzetten zelf: nog 0 gesloten → geen oordeel.
+- Weigeringen sluiten aan: 37× "dubbele order: al een long", 29× kostenfilter, 477× spot geen short.
+- **H-GS-12 (latency):** p99 IG **1,60** / PP **1,90** / mand **1,38 s** (was ~0,7): DNS-storing 13:36-15:39 (116 waarschuwingen, max 5 mislukt op rij → entiteiten kort onbeschikbaar, geen beslissingen). Extern; p99 meet de storing mee → bij de dagafsluiting p99 buiten storingsminuten apart noemen.
+- Goud dicht (zondag): IG/Pepperstone 0 trades; Pepperstone-short nog open.
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Goud n 11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. Geen release.
+
+laatste ronde: 25-10 15:40, gemeten t/m 25-10 15:45

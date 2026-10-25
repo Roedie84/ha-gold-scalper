@@ -462,3 +462,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-25 11:40,TUSSEN,gs_mand_netto_per_trade,-11.2,561,"PF 0.12, t -1.31; PUMP/BILL/PEPE 538 trades -6038"
 2026-10-25 11:40,TUSSEN,gs_trades_goud,0,1,zondag; Pepperstone-short open (1)
 2026-10-25 11:40,TUSSEN,gs_latency_p99_s,0.71,2,"IG 0.71, mand 0.71 (goud dicht)"
+2026-10-25 15:40,TUSSEN,gs_mand_trades_totaal,564,3,"+3 sinds 11:40: PROMPT-EUR 2 (-16.58), CT-EUR 1 (-27.26); netto -6340.02, 214W/350V"
+2026-10-25 15:40,TUSSEN,gs_mand_open_posities,14,1,"eerste longs van 2.23.0 (1h/4h/1d) op SOL ADA ETH HYPE WLD NEAR SUI ONDO LINK DOGE XLM LTC AVAX FARTCOIN; max 50, papier"
+2026-10-25 15:40,TUSSEN,gs_latency_p99_s,1.90,3,"IG 1.60, Pepperstone 1.90, mand 1.38 (was ~0.7); DNS-storing 13:36-15:39 (116x koersopvraging mislukt, max 5 op rij)"
+2026-10-25 15:40,TUSSEN,gs_trades_goud,0,1,zondag; Pepperstone-short open (1)
