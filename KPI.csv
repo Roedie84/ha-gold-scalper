@@ -472,3 +472,8 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-25 19:40,TUSSEN,gs_opstart_deelsom_herstarts,5,5,"trades/netto tonen 0 en een deelsom in de eerste ~25 s na 15:54, 16:09, 16:37, 17:25, 18:47; noodstop flapt 10 s"
 2026-10-25 19:40,TUSSEN,gs_latency_p99_s,1.84,2,"IG 1.84, mand 1.48; markt dicht, na DNS-storing en herstarts"
 2026-10-25 19:40,TUSSEN,gs_trades_goud,0,1,zondag; Pepperstone-short open (1)
+2026-10-25 23:40,TUSSEN,gs_trades_goud,6,6,"zo 23:00-23:45: Pepperstone 138 -> 144 (incl. sluiting weekendshort); IG 0 (rooster_wijkt_af: pauze 23:00-24:00)"
+2026-10-25 23:40,TUSSEN,gs_pp_netto_totaal,-24.79,144,"bruto 330.09, kosten 354.88, kostenratio 1.075; kosten 97.9 % gemeten"
+2026-10-25 23:40,TUSSEN,gs_mand_trades,564,564,"19 open papierlongs, 0 gesloten sinds 15:40; netto -6340, PF 0.12, t -1.31"
+2026-10-25 23:40,TUSSEN,gs_mand_attr_kb,18.0,269,"recorder weigert attributen sinds 23:00:15 (>16 kB); per_markt 10.7, buiten_mand 5.5 kB (L-GS-028)"
+2026-10-25 23:40,TUSSEN,gs_latency_p99_s,0.76,2,"Pepperstone 0.76, mand 0.58 (genormaliseerd na DNS-storing); IG geen meting"

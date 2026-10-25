@@ -409,3 +409,14 @@ laatste ronde: 25-10 15:40, gemeten t/m 25-10 15:45
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). Goud n 11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. Geen release (tussenronde).
 
 laatste ronde: 25-10 19:40, gemeten t/m 25-10 19:45
+
+## 25-10 23:40 · tussenronde
+- 2.23.0 actief; geen herstart sinds 18:47. Demo/papier; geen knoppen, geen instellingen.
+- **Goud open (zo 23:00):** Pepperstone 138 → **144 trades** (de open short sloot 23:01, daarna 5 nieuwe; 23:45 1 open). Netto Pepperstone totaal −24,79 (bruto +330,09, kosten 354,88, kostenratio 1,08); kosten 97,9 % gemeten. **IG 0 trades:** status `rooster_wijkt_af` - broker zegt open, rooster dicht ("dagelijkse onderbreking 23:00-24:00", en zondag valt buiten de rooster-week die maandag 00:00 opent). Bewust: bij onenigheid wint 'gesloten' (schedule.py). Gevolg gemeten: IG mist elke dag 23:00-24:00 waarin Pepperstone handelt (vanavond 6 trades). Nog geen voorstel: eerst ≥ 3 avonden vergelijken (H-GS-13).
+- IG-afstemming 23:01: 1323/1324 trades kloppen, 1 afwijking (−37,44 tegen −34,04 bij de broker, overgenomen).
+- **Mand:** 19 leden, 19 open papierlongs, 0 gesloten → nog **564 trades, netto −6.340**, PF 0,12, t −1,31. PEPE weer uit de mand (spread 0,055 %) → noodstop-sensor volgt het lidmaatschap: aan 20:48-21:48, uit sinds 21:48 (herziening per uur). ANIME: 3.890× "risico in deze richting boven de grens".
+- **Meetbaarheid (nieuw):** sinds **23:00:15** weigert de recorder de attributen van `sensor.gold_scalper_btc_eur_mand` (18,0 kB > 16 kB; 269× in 45 min) → geen historie meer van open posities/weigeringen per markt. Grootte: `per_markt` 10,7 kB, `buiten_mand` 5,5 kB (waarvan 3,6 kB markten met 0 trades). → **L-GS-028** (gepland, zelf bouwen: rapportage; samen met L-GS-027 in de dagafsluiting).
+- **H-GS-12 (latency):** p99 Pepperstone 0,76 / mand 0,58 s (19:40 mand 1,48) - terug op het normale niveau na de DNS-storing; IG geen nieuwe meting (handelt niet).
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency, genormaliseerd), H-GS-13 (IG NY/rooster). Goud n 11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. Geen release (tussenronde).
+
+laatste ronde: 25-10 23:40, gemeten t/m 25-10 23:45
