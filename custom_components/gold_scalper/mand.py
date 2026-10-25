@@ -81,6 +81,13 @@ def _tijd(waarde) -> datetime:
         return datetime.min.replace(tzinfo=timezone.utc)
 
 
+def _top(teller, n: int) -> dict:
+    """2.23.0: de ``n`` grootste tellingen, aflopend."""
+    if not isinstance(teller, dict):
+        return {}
+    return dict(sorted(teller.items(), key=lambda kv: (-kv[1], kv[0]))[:n])
+
+
 def db_bestand(markt: str) -> str:
     """2.22.2: het databasebestand van een Bitvavo-markt (zelfde regel als de
     coordinator sinds 2.17.0)."""
@@ -824,6 +831,11 @@ class BitvavoMand:
                 "netto": (data.get("stats") or {}).get("net_pnl"),
                 "trades": (data.get("stats") or {}).get("trades"),
                 "weigering": getattr(c, "_laatste_weigering", None),
+                # 2.23.0: alle weigeringen sinds de start, per richting en
+                # reden (de laatste alleen liet zien wat toevallig het laatst
+                # gebeurde - meestal een short, die spot niet kan).
+                "weigeringen": _top(getattr(c, "weigeringen", None), 8),
+                "opzet_tijdvakken": list(getattr(c, "vp_tijdvakken", ()) or ()),
                 # 2.21.3 (L-GS-022): staat dit lid zelf in een noodstop?
                 "noodstop": bool(self._gestopt_door_risico(c)),
                 # 2.21.0: equity en een actieve saldosprong per markt. De leden
@@ -834,7 +846,13 @@ class BitvavoMand:
                 if (data.get("saldosprong") or {}).get("actief") else None,
             })
         boek = self.grootboek()
+        samen: dict[str, int] = {}
+        for c in self.alle():
+            for k, v in (getattr(c, "weigeringen", None) or {}).items():
+                samen[k] = samen.get(k, 0) + int(v)
         return {
+            # 2.23.0: weigeringen van de hele mand per richting en reden.
+            "weigeringen": _top(samen, 12),
             "markten": len(rijen), "open_posities": self.aantal_open(),
             # 2.22.2: het grootboek van de hele mand, ook van markten die er
             # niet meer in zitten.

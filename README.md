@@ -130,6 +130,15 @@ toont de markten, open posities en weigeringen. In het Gold Scalper-paneel is de
 (*Bitvavo-mand*) met bovenaan alle open posities van alle markten in één tabel
 en per markt een kaart (2.18.1).
 
+**Opzetten op spot** (2.23.0): op Bitvavo handelen de veldproefopzetten op
+1h, 4h en 1d in plaats van 1m-30m (zelfde negen families, zelfde stop
+1,5 x ATR, doel 2R en duur 48 bars). Reden: een rondreis kost ~0,5 % van de
+koers en het kostenfilter (stop minstens 8 x de kosten) vraagt dan een stop
+van ~4 %; op 1m-30m haalde geen enkele long dat. Het filter zelf is niet
+versoepeld, shorts worden nooit omgedraaid en de mandkeuze blijft op volume
+en spread. De sensor *Mand* telt de weigeringen per markt en per richting
+(`weigeringen`, getallen weggelaten) en voor de hele mand.
+
 Zie `VENUES.md` en `BROKERS.md`.
 
 ---
@@ -199,7 +208,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **2.22.2** (zie `CHANGELOG.md`).
+Huidige versie: **2.23.0** (zie `CHANGELOG.md`).
 
 Sinds 2.0.0 is de standaardstrategie **daghandel** (trend op uurbasis, uiterlijk
 20:45 UTC dicht); scalpen blijft kiesbaar via de instelling *Strategie*, en sinds 2.1.0 ook

@@ -21,6 +21,7 @@ import functools
 import hashlib
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -264,6 +265,26 @@ def _commissie_venue(venue) -> float:
     return float(waarde) if isinstance(waarde, (int, float)) and waarde > 0 else 0.0
 
 
+_GETAL = re.compile(r"[-+]?\d+(?:[.,]\d+)*(?:e[-+]?\d+)?")
+
+
+def weigering_sleutel(reden: str | None) -> str:
+    """2.23.0: een weigeringsreden zonder getallen, zodat het kostenfilter
+    (elke keer een andere stopafstand) één sleutel wordt."""
+    tekst = _GETAL.sub("#", str(reden or "onbekend")).strip()
+    return tekst[:80]
+
+
+def tel_weigering(c, reden: str | None, richting=None) -> None:
+    """2.23.0: tel een geweigerd handelbaar signaal per reden en richting."""
+    teller = getattr(c, "weigeringen", None)
+    if not isinstance(teller, dict):
+        return
+    kant = "long" if (richting or 0) > 0 else "short" if (richting or 0) < 0 else "?"
+    sleutel = f"{kant}: {weigering_sleutel(reden)}"
+    teller[sleutel] = teller.get(sleutel, 0) + 1
+
+
 def deel_units(gevraagd: float, bevestigd) -> float:
     """Hoeveel er bij een deelsluiting echt dicht ging (2.9.2).
 
@@ -489,7 +510,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 max_open_positions=2 * self.strategy_cfg.max_positions_per_richting
                 + (1 if options.get(CONF_STRATEGIE) == STRATEGIE_COMBINATIE else 0)
                 # 2.4.0: bij 'alles' één positie per veldproefopzet erbij.
-                + ((1 + len(veldproef_mod.namen()))
+                + ((1 + len(veldproef_mod.namen(veldproef_mod.tijdvakken_voor(self._is_spot))))
                    if options.get(CONF_STRATEGIE) == STRATEGIE_ALLES else 0),
             ),
             self.starting_balance,
@@ -698,7 +719,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._exits_scalp = ExitManager(scalp_exit_config())
         #: 2.4.0: veldproef - bars op 1m-30m, exitbeheer per opzet, laatste
         #: gebruikte signaalbar per opzet.
-        self.veldproef = veldproef_mod.MeerTijdvakken()
+        #: 2.23.0: op spot (Bitvavo) handelen de opzetten op 1h/4h/1d; de
+        #: bars van 1m-30m blijven (de daghandel rekent op 15m).
+        _spot = self._is_spot
+        self.vp_tijdvakken = veldproef_mod.tijdvakken_voor(_spot)
+        self.vp_namen = veldproef_mod.namen(self.vp_tijdvakken)
+        self.veldproef = veldproef_mod.MeerTijdvakken(
+            veldproef_mod.bar_tijdvakken(_spot),
+            hoger=veldproef_mod.SPOT_HOGER_TIJDVAK if _spot else None)
+        #: 2.23.0: geweigerde handelbare signalen per reden (getallen eruit).
+        self.weigeringen: dict[str, int] = {}
         self._exits_vp: dict[str, ExitManager] = {}
         self._vp_laatste_bar: dict[str, int] = {}
         #: 2.5.6: bewezen verliezende opzetten (n >= 100, t < -2) en wanneer
@@ -715,7 +745,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         #: 2.10.0: veldproef-tijdvakken met de hand uit; geldt meteen.
         self.vp_tijdvakken_uit = tuple(
             str(x) for x in (options.get(CONF_VP_TIJDVAKKEN_UIT) or ())
-            if str(x) in veldproef_mod.TIJDVAKKEN)
+            if str(x) in veldproef_mod.ALLE_TIJDVAKKEN)
         if self.vp_tijdvakken_uit:
             self._vp_uitgezet = veldproef_mod.handmatig_uitgezet({}, self.vp_tijdvakken_uit)
         if self.scalp_handmatig_uit:
@@ -1718,7 +1748,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         """2.4.0: veldproefbars opwarmen uit het archief, en waar dat te weinig
         heeft uit de koersgeschiedenis van Home Assistant (10-secondenkoersen)."""
         nodig = veldproef_mod.MIN_BARS + 5
-        for tf in veldproef_mod.TIJDVAKKEN:
+        for tf in tuple(self.veldproef.agg):
             if self.archive is None:
                 break
             try:
@@ -3077,7 +3107,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         await self._ververs_onderzoek()
         self._deel.mark("voorbereiding")
         per_richting = tel_per_richting(open_positions, pending)
-        for ronde, strategie in enumerate(combinatie_mod.strategieen(self._strategie)):
+        for ronde, strategie in enumerate(combinatie_mod.strategieen(
+                self._strategie, getattr(self, "vp_namen", None))):
             eigen = posities_per_strategie.get(strategie, [])
             # 2.21.0: de limiet per richting telt alle strategieën samen
             # (plus wat deze cyclus al uitging); daarvoor per strategie, zodat
@@ -3254,6 +3285,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                                     bid=quote.bid, ask=quote.ask, nu=now)
                             except Exception:  # noqa: BLE001 - meting raakt de handel niet
                                 _LOGGER.debug("Bevestigingsmeting niet gestart", exc_info=True)
+
+                # 2.23.0: handelbaar signaal geweigerd: tellen per reden.
+                if r_reject and r_signal.should_trade and not uitgevoerd:
+                    tel_weigering(self, r_reject, r_signal.direction)
 
                 # 1.9.0: geldig signaal, niet uitgevoerd: schaduwtrade.
                 # 2.4.0: geen schaduwtrades voor de veldproef (die handelt echt).

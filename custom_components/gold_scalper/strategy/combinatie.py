@@ -27,7 +27,7 @@ from . import veldproef
 COMBINATIE_VERSIE = "combinatie-1.9.0"  # 2.6.3: veldproef-uitstap in R. 2.6.2: 2.6.2: veldproef op risico. 2.6.1: 2.6.1: scalp/tijdvak als groep uit. 2.5.9: deelwinst. 2.5.7: winstslot. 2.5.5: 2.5.5: break-even uiterlijk +1,5 USD
 
 
-def strategieen(keuze: str) -> tuple[str, ...]:
+def strategieen(keuze: str, vp_namen=None) -> tuple[str, ...]:
     """Welke strategieën beslissen, in volgorde (daghandel eerst: die heeft
     de zeldzame signalen en mag niet achter een scalpinstap in de cyclus
     aansluiten)."""
@@ -35,7 +35,9 @@ def strategieen(keuze: str) -> tuple[str, ...]:
         return (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP)
     if keuze == STRATEGIE_ALLES:
         # 2.4.0: daarna alle veldproefopzetten.
-        return (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP, *veldproef.namen())
+        # 2.23.0: ``vp_namen`` - de opzetten van deze markt (spot: 1h/4h/1d).
+        return (STRATEGIE_DAGHANDEL, STRATEGIE_SCALP,
+                *(vp_namen if vp_namen is not None else veldproef.namen()))
     if keuze == STRATEGIE_SCALP:
         return (STRATEGIE_SCALP,)
     return (STRATEGIE_DAGHANDEL,)

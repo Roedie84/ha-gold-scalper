@@ -37,6 +37,17 @@ VELDPROEF_VERSIE = "veldproef-2.1.0"  # 2.6.3: uitstap in R. 2.6.2: 2.6.2: groot
 PREFIX = "vp:"
 
 TIJDVAKKEN = ("1m", "3m", "5m", "15m", "30m")
+#: 2.23.0: de opzetten op een spot-venue (Bitvavo). Een rondreis kost daar
+#: ~0,5 % van de koers (taker 0,25 % per zijde); de kostenregel (stop minstens
+#: KOSTEN_STOP_FACTOR x de kosten, ~4 % van de koers) liet op 1m-30m geen
+#: enkele long door (BTC-EUR 22-25/10: stops van 50-380 euro tegen een minimum
+#: van ~2.900). De regel blijft; de opzetten schuiven naar de tijdvakken waar
+#: 1,5 x ATR die afstand kan halen. Zelfde families, zelfde stop/doel/duur.
+SPOT_TIJDVAKKEN = ("1h", "4h", "1d")
+#: Alle tijdvakken die een opzet kunnen hebben (voor groeps- en handregels).
+ALLE_TIJDVAKKEN = TIJDVAKKEN + SPOT_TIJDVAKKEN
+#: 2.23.0: het hogere tijdvak (trendcontext bij instap) op spot.
+SPOT_HOGER_TIJDVAK = "1d"
 FAMILIES = (
     "ema_cross", "donchian", "rsi_rev", "bb_fade", "structuur_trend",
     "structuur_hl", "momentum", "pullback", "inside",
@@ -171,7 +182,7 @@ def uitgezette_opzetten(per_opzet: dict[str, list[float]]) -> dict[str, dict]:
         groep = groep_uitgezet(netto)
         if groep is None:
             continue
-        for naam in namen():
+        for naam in namen(ALLE_TIJDVAKKEN):
             if naam.endswith(":" + tf):
                 uit[naam] = {**groep, "groep": tf}
     return uit
@@ -200,7 +211,7 @@ def handmatig_uitgezet(per_opzet: dict[str, list[float]],
     """2.10.0: alle opzetten van met de hand uitgezette tijdvakken."""
     uit: dict[str, dict] = {}
     gekozen = set(tijdvakken or ())
-    for naam in namen():
+    for naam in namen(ALLE_TIJDVAKKEN):
         if ontleed(naam)[1] not in gekozen:
             continue
         netto = per_opzet.get(naam) or []
@@ -220,8 +231,21 @@ def groep_uitgezet(netto: list[float]) -> dict | None:
     return {"n": len(netto), "netto": round(sum(netto), 2), "t": round(t, 2)}
 
 
-def namen() -> tuple[str, ...]:
-    return tuple(f"{PREFIX}{f}:{tf}" for tf in TIJDVAKKEN for f in FAMILIES)
+def namen(tijdvakken=None) -> tuple[str, ...]:
+    """Alle opzetnamen; standaard op de goud/CFD-tijdvakken (2.23.0: of de
+    meegegeven tijdvakken, bijv. :data:`SPOT_TIJDVAKKEN`)."""
+    return tuple(f"{PREFIX}{f}:{tf}" for tf in (tijdvakken or TIJDVAKKEN) for f in FAMILIES)
+
+
+def tijdvakken_voor(spot: bool) -> tuple[str, ...]:
+    """2.23.0: op welke tijdvakken de opzetten handelen."""
+    return SPOT_TIJDVAKKEN if spot else TIJDVAKKEN
+
+
+def bar_tijdvakken(spot: bool) -> tuple[str, ...]:
+    """2.23.0: van welke tijdvakken bars bijgehouden worden. Op spot ook de
+    gewone: de daghandel rekent op de 15m-bars van de veldproef."""
+    return ALLE_TIJDVAKKEN if spot else TIJDVAKKEN
 
 
 def is_veldproef(naam: str | None) -> bool:
@@ -441,8 +465,11 @@ def _context(c: Candles, s: list[float], e50: list[float], a: float, mo: float) 
 class MeerTijdvakken:
     """Bouwt bars op alle veldproeftijdvakken uit dezelfde koersen."""
 
-    def __init__(self) -> None:
-        self.agg = {tf: QuoteAggregator(tf, max_bars=MAX_BARS) for tf in TIJDVAKKEN}
+    def __init__(self, tijdvakken=None, hoger: str | None = None) -> None:
+        self.agg = {tf: QuoteAggregator(tf, max_bars=MAX_BARS)
+                    for tf in (tijdvakken or TIJDVAKKEN)}
+        #: 2.23.0: het tijdvak voor de trendcontext bij instap.
+        self.hoger = hoger or HOGER_TIJDVAK
         self._cache: dict[str, Kenmerken | None] = {}
 
     def voeg_toe(self, prijs: float, moment, tradeable: bool) -> list[str]:
@@ -455,7 +482,9 @@ class MeerTijdvakken:
 
     def vul(self, tf: str, c: Candles) -> None:
         """Opwarmen met historische bars (archief of recorder)."""
-        agg = self.agg[tf]
+        agg = self.agg.get(tf)
+        if agg is None:
+            return
         rijen = [[int(t), o, h, l, cl, float(v or 1)] for t, o, h, l, cl, v in zip(
             c.timestamp, c.open, c.high, c.low, c.close, c.volume)]
         bestaand = {r[0] for r in agg._closed}
@@ -463,8 +492,8 @@ class MeerTijdvakken:
         self._cache.pop(tf, None)
 
     def candles(self, tf: str) -> Candles | None:
-        agg = self.agg[tf]
-        if not agg._closed:
+        agg = self.agg.get(tf)
+        if agg is None or not agg._closed:
             return None
         return agg.candles()
 
@@ -536,9 +565,10 @@ def instap_context(bars: "MeerTijdvakken", tf: str, k: Kenmerken) -> dict:
     """
     eigen = getattr(k, "context", None) or {}
     hoog = eigen
-    if tf != HOGER_TIJDVAK:
+    hoger = getattr(bars, "hoger", None) or HOGER_TIJDVAK
+    if tf != hoger:
         try:
-            kh = bars.kenmerken(HOGER_TIJDVAK)
+            kh = bars.kenmerken(hoger)
             hoog = (getattr(kh, "context", None) or {}) if kh is not None else {}
         except Exception:  # noqa: BLE001
             hoog = {}
