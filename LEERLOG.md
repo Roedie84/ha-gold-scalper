@@ -378,3 +378,13 @@ laatste ronde: 25-10 03:40, gemeten t/m 25-10 03:50
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG NY; niet meetbaar). n 11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. Geen release.
 
 laatste ronde: 25-10 07:40, gemeten t/m 25-10 07:45
+
+## 25-10 11:40 · tussenronde
+- **Andere sessie releasede 2.22.2 (10:04, mandgrootboek) en 2.23.0 (10:52, spot-longs op 1h/4h/1d); geïnstalleerd** via de herstarts van 10:08 en 10:53. Demo/papier; geen knoppen, geen instellingen.
+- **L-GS-026 gedekt door 2.22.2:** `Trades.per_markt` toont alle 32 markten uit hun database, ook vertrokken. Eerste volledige mandstand (sinds run-start, papier): **561 trades, netto −6.296**, 213 W / 348 V (38 %), 548× stop, 1× doel. PUMP 223 (−2.988; 15 % winst), BILL 152 (−1.807), PEPE 163 (−1.243; 60 % winst), ICNT 15 (−197), PTB 4, IOST 3, ZIG 1 (+7); 25 markten 0.
+- **H-GS-11 (kosten) versterkt:** mand −11,2 per trade, PF 0,12, t −1,31; verlies zit bij de drie munten met de kleine koers (PUMP/BILL/PEPE = 538 van 561 trades, −6.038) - precies de kostenfout van vóór 2.22.1.
+- **Meetbaarheid:** *Equity* mand = 10.000 + som van alle markten = 3.684 terwijl *Vermogensvloer* 5.000 (hoofdlus) toont → oogt als vloerbreuk, is het niet (risico leest de eigen lus; `mand.py` sensor_equity). Ook *Max. drawdown* 63 % gaat over die opgetelde reeks. Bewuste keuze in 2.22.2 → alleen vastgelegd.
+- Goud dicht (zondag): IG/Pepperstone 0 trades; Pepperstone-short nog open. Mand 15 leden, 0 open, 0 nieuwe trades sinds 07:40. Latency p99 IG 0,71 / mand 0,71 s (H-GS-12, markt dicht).
+- Hypotheses: H-GS-11, H-GS-12, H-GS-13 (IG NY; niet meetbaar). Goud n 11 clusters IG / 8 PP (nodig ≥ 30 over ≥ 5 handelsdagen): geen toets. 2.23.0-opzetten: nog 0 trades. Geen release.
+
+laatste ronde: 25-10 11:40, gemeten t/m 25-10 11:45
