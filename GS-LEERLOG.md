@@ -315,3 +315,13 @@ laatste ronde: 25-10 07:50
 - Volgende ronde (ma 26-10): Pep 3m bij n ≥ 100 en bruto < 0 → `vp_tijdvakken_uit` + 3m; eerste gesloten `vp:*:1h|4h|1d` in de mand (netto vs. kosten); L-GS-027 na dagafsluiting controleren.
 
 laatste ronde: 25-10 19:50
+
+## 26-10 ~07:55 · ronde 22 (geplande controle; 2.24.0 actief sinds herstart 07:47)
+- 2.24.0 actief (update-entiteit off). Tussenronde 07:40 en 2.24.0 uit andere sessies; L-GS-030 gepland voor dagafsluiting 27-10 → niet dubbel gebouwd, geen code.
+- L-GS-029 eerste toets OK: na herstart 07:47 geen "Noodstop uit een eerdere sessie" meer (BILL-EUR); 0 recorder-WARNINGs mand; alle noodstop-sensoren off.
+- **Pepperstone** run 5 n=168 netto +111 (bruto 548, kosten 437, PF 1,03, t 0,16). 3m n=72 netto −550, bruto −303 (bruto t −0,57); 15m n=60 +390; 30m n=27 +364. structuur_hl:15m n=12 +359 (t 3,5): klein n, Bonferroni niet gehaald.
+- **IG** run 136 n=89 netto +91 (bruto 578, kosten 487 = 84 %); rsi_rev:15m n=38 bruto 181 > 0,5 x kosten (130) → kostregel niet geraakt.
+- Instellingen: niets (Pep 3m n=72 < 100 → wachten).
+- Volgende ronde: Pep 3m bij n ≥ 100 en bruto < 0 → `vp_tijdvakken_uit` + 3m; IG rsi_rev:15m bij n ≥ 40; mand: eerste `vp:*:1h|4h|1d` gesloten.
+
+laatste ronde: 26-10 07:55
