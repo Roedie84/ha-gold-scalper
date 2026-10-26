@@ -434,3 +434,15 @@ laatste ronde: 26-10 15:40, gemeten t/m 26-10 15:45
 - Hypotheses: H-GS-11 (kosten; vandaag ook bruto negatief), H-GS-12 (latency; IG blijft > 1 s, na een rustige nacht opnieuw), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release.
 
 laatste ronde: 26-10 19:40, gemeten t/m 26-10 19:45
+
+## 26-10 23:40 · tussenronde
+- **2.24.2 actief** (andere sessie 20:00 UTC+1; herstarts 20:06, 20:25, 21:08, 21:52). **2.24.1 werkt:** *Open posities* mand = 19 = `Mand.open_posities`. Demo/papier; geen knoppen, geen instellingen.
+- Goud: IG 116 → **120 trades** (−136,80; run netto −380,39, PF 0,848, t −0,61); Pepperstone 198 → **200** (−201,46: 19:58 −100,80 en 21:54 −100,66; run −291,19, PF 0,935, t −0,23). 19:58 verloren beide brokers tegelijk (IG −99,37) = één marktbeweging, niet onafhankelijk. Clusters IG ~11 / PP ~15 (nodig ≥ 30 per broker): **geen toets**.
+- Mand: 0 nieuwe trades (573, netto −6.407,64), 19 open.
+- **H-GS-13 verklaard (avond 2 van 3):** beide brokers dicht **21:59/22:00 → 23:01 CET** = 17:00-18:00 New York; de VS hebben tot 01-11 nog zomertijd. Het rooster heeft de pauze vast op 23:00-24:00 Amsterdam → IG wacht tot 24:00 terwijl Pepperstone om 23:01 weer opende. Geen rooster- of brokerfout maar een tijdzonefout in het rooster, alleen in de DST-weken → **L-GS-031** (open). Toets: vr 30-10 sluiting 22:00 CET; vanaf 02-11 weer 23:00-24:00.
+- **Stilstandcontrole:** *Tijdstopvarianten* IG/PP ≥ 10 d op 0 ("te weinig blokken") - meet alleen scalp, de veldproef heeft geen tijdstop → kan nooit vorderen; ook exitregime "tijdstop" op alle veldproeftrades → **L-GS-032** (gepland, rapportage, dagafsluiting). Mand: *Resultaat per periode* en *Kosten gemeten* unknown sinds 20-10, *Afstemming* "nog_niet" (papier, geen broker) → dagafsluiting: code nalezen of dat bewust is.
+- **L-GS-030 n=8:** elke herstart *Trades* ~30 s **0** → onbekend → 573, *Open posities* 0 bij het afsluiten; bouwen in de dagafsluiting 27-10.
+- Latency p99 IG 1,10 / PP 1,04 / mand 0,64 s (4 herstarts) - H-GS-12 na een rustige nacht opnieuw.
+- Hypotheses: H-GS-11 (kosten; bruto vandaag ook negatief), H-GS-12 (latency), H-GS-13 (→ verklaard, L-GS-031). Geen release (tussenronde; 2.24.2 vandaag al gereleased).
+
+laatste ronde: 26-10 23:40, gemeten t/m 26-10 23:45
