@@ -177,7 +177,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Meten na installatie: 0 recorder-waarschuwingen voor de mandsensor; attributen weer in de historie.
 
 ## L-GS-030 · mandsensoren ook in de allereerste verversing onbekend (rest van L-GS-027)
-- Status: **gepland** (zelf bouwen: rapportage/meetfout; handel, risico, noodstop en mandkeuze ongewijzigd). 2.24.0 is sinds 07:47 actief → dagafsluiting 27-10 03:40. Herhaald bij de herstart van 07:47 (0 gedurende 22 s), n=2. 11:40: herstart 10:28 opnieuw (0 gedurende 25 s), n=3.
+- Status: **gepland** (zelf bouwen: rapportage/meetfout; handel, risico, noodstop en mandkeuze ongewijzigd). 2.24.0 is sinds 07:47 actief → dagafsluiting 27-10 03:40. Herhaald bij de herstart van 07:47 (0 gedurende 22 s), n=2. 11:40: herstart 10:28 opnieuw (0 gedurende 25 s), n=3. 19:40: herstart 19:15 opnieuw (0 gedurende 12 s), n=4.
 - Onderbouwing (26-10 07:40): herstart 07:12 met 2.23.1: `sensor.gold_scalper_btc_eur_trades` 569 → **0** (07:12:17) → onbekend (07:12:30) → 569 (07:13:02). In `__init__.py` lopen `async_config_entry_first_refresh` en `async_forward_entry_setups` vóór `coordinator._mand = mand`; in die eerste cyclus is `self._mand` None, dus `mand_wacht` False en gaan de eigen BTC-EUR-stats (0 trades) naar de sensor. Netto bleef onbekend (geen trades → None), noodstop flapte niet.
 - Bouw: de coördinator weet al bij aanmaken dat hij hoofd van een mand wordt (`is_mand(options)`) en toont tot `boek_gereed` geen mandwaarden, ook als `_mand` nog None is. Test: eerste verversing zonder `_mand` bij een mand-entry → trades/netto/equity None.
 - Meten na installatie: bij elke herstart 0 keer 0/deelsom op *Trades*.

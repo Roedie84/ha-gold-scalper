@@ -423,3 +423,14 @@ laatste ronde: 26-10 11:40, gemeten t/m 26-10 11:45
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency, herstarts), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release.
 
 laatste ronde: 26-10 15:40, gemeten t/m 26-10 15:45
+
+## 26-10 19:40 · tussenronde
+- 2.24.0 actief; **2.24.1 gedownload 19:32, wacht op een herstart** (HA-herstart 19:15 was ervóór). *Open posities* op het mandapparaat dus nog 0 terwijl `Mand.open_posities` 19 is - verwacht, geen nieuwe fout. Demo/papier; geen knoppen, geen instellingen.
+- Goud: IG 109 → **116 trades** (−76,64; run netto −243,59, PF 0,896, t −0,49); Pepperstone 190 → **198** (+3,20; run −89,73, PF 0,979, t −0,07). Afstemming beide `in_orde`, 1 positie open elk.
+- **Zelfde regime loopt door:** IG cluster 11 nu 33 trades 02:15-17:31 UTC (916 min), netto −423,41 / bruto −217,99; zonder dat cluster run +179,81. PP cluster 15: 23 trades 08:57-17:30 UTC, −258,44 / bruto −194,31. Een hele handelsdag is bij doorlopend handelen één cluster → clusters per broker stijgen nauwelijks (IG 11, PP 15). Voor ≥ 30 clusters per broker zijn bij dit tempo (~1-3 nieuwe per dag) nog 2-3 weken nodig. **Geen toets.**
+- Mand: 569 → **573 trades** (+10,75; netto −6.407,64, PF 0,123, t −1,32), 19 open, 19 markten.
+- **L-GS-030 n=4:** herstart 19:15 *Trades* **0** (19:15:27, 12 s) → onbekend → 573 (19:16:10); netto alleen onbekend; *Mand* 5 → 13 → 22 → 19 (opbouw).
+- DNS-storing 19:33 (Bitvavo/IG/cTrader 4-6 op rij mislukt, entiteiten 11 s onbeschikbaar, afgevangen; extern). Latency p99 IG **1,41** s / PP 0,99 / mand 0,68 (herstart + DNS).
+- Hypotheses: H-GS-11 (kosten; vandaag ook bruto negatief), H-GS-12 (latency; IG blijft > 1 s, na een rustige nacht opnieuw), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release.
+
+laatste ronde: 26-10 19:40, gemeten t/m 26-10 19:45
