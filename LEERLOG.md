@@ -389,3 +389,14 @@ laatste ronde: 25-10 23:40, gemeten t/m 25-10 23:45
 - Hypotheses: H-GS-11 (kosten; PP week 43 kosten 110 % van bruto), H-GS-12 (latency, genormaliseerd), H-GS-13 (IG rooster 23-24 u; 1/3 avonden). Geen nieuwe voorstellen; L-GS-025 blijft open.
 
 laatste ronde: 26-10 03:40, gemeten t/m 26-10 03:45
+
+## 26-10 07:40 · tussenronde
+- HA herstartte 07:12 → **2.23.1 actief**. **2.24.0** (andere sessie 07:42: L-GS-025 mediane spread 24 u, L-GS-029 oude dagverlies-noodstops niet terugzetten, slippage in bp) is gedownload en wacht op een herstart. Demo/papier; geen knoppen, geen instellingen.
+- **L-GS-028 eerste toets OK:** 0 recorder-WARNINGs voor `sensor.gold_scalper_btc_eur_mand` sinds 07:12 (laatste 07:10:59; 25-10 23:00 → 07:11 ~1.700×).
+- **L-GS-027 deels:** bij de herstart 07:12 bleef *Nettoresultaat* netjes onbekend en flapte *Noodstop* niet, maar *Trades* stond **13 s op 0** (07:12:17) voor onbekend → 569 (07:13:02). Oorzaak in de code: de eerste verversing en het aanmaken van de sensoren (`__init__.py`) lopen vóór `coordinator._mand = mand`, dus `mand_wacht` is dan nog False en de eigen BTC-EUR-stats (0 trades) gaan erdoor. *Mand* (aantal markten) liep 5 → 13 → 25 → 21 tijdens het opstarten van de leden (echte opbouw, geen meetfout). → **L-GS-030** (gepland, zelf bouwen: rapportage; na installatie van 2.24.0, niet stapelen).
+- Goud: IG 83 → **89 trades** (−88,81; run netto 91,01, PF 1,056, t 0,37); Pepperstone 162 → **168** (−33,51; run 111,23, PF 1,031, t 0,09). n IG ~13 / PP ~11 clusters (nodig ≥ 30 over ≥ 5 handelsdagen): **geen toets**. IG 1 positie open.
+- Mand: +1 trade (+9,27) → 569, netto −6.418, PF 0,12, t −1,32. Na de herstart weer "Noodstop uit een eerdere sessie" voor BILL-EUR (10,11 %) → 2.24.0 (L-GS-029) ruimt dat op.
+- **H-GS-12 (latency):** p99 IG 0,91 / PP 0,78 / mand 0,59 s - normaal.
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency, normaal), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release (tussenronde).
+
+laatste ronde: 26-10 07:40, gemeten t/m 26-10 07:45
