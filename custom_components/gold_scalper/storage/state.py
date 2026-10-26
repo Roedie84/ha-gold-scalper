@@ -25,6 +25,8 @@ import logging
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from datetime import date, datetime, timezone
+
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
@@ -41,6 +43,10 @@ class RuntimeState:
     enabled: bool = False
     halted: bool = False
     halt_reason: str | None = None
+    #: 2.24.0 (L-GS-029): handelsdag (ISO) waarop de noodstop afging. Een
+    #: dagverlies-noodstop van een eerdere handelsdag wordt bij het opstarten
+    #: niet teruggezet.
+    halt_day: str | None = None
     #: Verliesreeks blijft staan: drie verliezers gevolgd door een herstart
     #: zijn nog steeds drie verliezers.
     consecutive_losses: int = 0
@@ -162,6 +168,67 @@ async def _verwijder_gedeeld(gedeeld: dict, entry_id: str) -> None:
     await _schrijf_gedeeld(gedeeld)
 
 
+def is_dagverlies_noodstop(reden: str | None) -> bool:
+    """2.24.0 (L-GS-029): een noodstop op de dagverlieslimiet (zie
+    ``RiskManager.can_open``: "dagverlies x% bereikt de limiet ...")."""
+    return str(reden or "").strip().lower().startswith("dagverlies")
+
+
+def noodstop_dag(state: RuntimeState) -> date | None:
+    """2.24.0 (L-GS-029): de handelsdag waarop een bewaarde noodstop afging.
+
+    Eerst het veld ``halt_day`` (vanaf 2.24.0). Een toestand van een oudere
+    versie heeft dat niet; dan de laatste ``NOODSTOP``-regel met dezelfde reden
+    uit de bewaarde risicogebeurtenissen (die heeft een tijdstip). Geen van
+    beide: onbekend. ``state.day`` telt niet: die rolt ook door terwijl de
+    noodstop staat en zegt dus niets over wanneer hij afging.
+    """
+    from ..timeutil import trading_day
+
+    if state.halt_day:
+        try:
+            return date.fromisoformat(str(state.halt_day))
+        except ValueError:
+            pass
+    reden = str(state.halt_reason or "")
+    for regel in reversed(list(state.risk_triggered or [])):
+        tekst = str(regel)
+        tijd, sep, rest = tekst.partition(" NOODSTOP: ")
+        if not sep or (reden and rest.strip() != reden.strip()):
+            continue
+        try:
+            moment = datetime.fromisoformat(tijd.strip())
+        except ValueError:
+            continue
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        return trading_day(moment)
+    return None
+
+
+def verlopen_dagverlies_noodstop(state: RuntimeState, vandaag: date) -> bool:
+    """2.24.0 (L-GS-029): is dit een dagverlies-noodstop van een eerdere
+    handelsdag? Alleen dan wordt hij bij het opstarten niet teruggezet.
+
+    Andere noodstops (equity onder de vloer, dode data, trade-limiet) blijven
+    altijd staan. Een dagverlies-noodstop zonder bekende dag blijft staan als
+    de bewaarde handelsdag vandaag is (voorzichtig); anders vervalt hij - de
+    dagverliestoets rekent bij de eerste instap opnieuw vanaf het bewaarde
+    dagstartsaldo, dus een verlies van vandaag zet hem meteen terug.
+    """
+    if not state.halted or not is_dagverlies_noodstop(state.halt_reason):
+        return False
+    dag = noodstop_dag(state)
+    if dag is None:
+        try:
+            dag = date.fromisoformat(str(state.day)) if state.day else None
+        except ValueError:
+            dag = None
+        if dag is None:
+            return True
+    return dag < vandaag
+
+
 class StateStore:
     """Leest en schrijft de toestand per config entry."""
 
@@ -170,12 +237,45 @@ class StateStore:
         self._store: Store = self._gedeeld["store"]
         self._entry_id = entry_id
         self._all: dict[str, Any] = {}
+        self.vervallen_noodstop: str | None = None
+
+    @staticmethod
+    def _nu() -> datetime:
+        return datetime.now(timezone.utc)
 
     async def async_load(self) -> RuntimeState:
         self._all = await _lees_gedeeld(self._gedeeld)
         raw = self._all.get(self._entry_id) or {}
         fields = {f for f in RuntimeState.__dataclass_fields__}
         state = RuntimeState(**{k: v for k, v in raw.items() if k in fields})
+
+        # 2.24.0 (L-GS-029): een dagverlies-noodstop van een eerdere handelsdag
+        # komt niet terug (na elke herstart stonden PEPE-EUR en BILL-EUR weer
+        # stil met "uit een eerdere sessie"). Meteen gewist in het bestand,
+        # zodat hij ook bij een volgende start niet terugkomt.
+        self.vervallen_noodstop: str | None = None
+        from ..timeutil import trading_day
+
+        vandaag = trading_day(self._nu())
+        if verlopen_dagverlies_noodstop(state, vandaag):
+            dag = noodstop_dag(state)
+            self.vervallen_noodstop = state.halt_reason
+            _LOGGER.info(
+                "Dagverlies-noodstop van een eerdere handelsdag (%s) niet "
+                "teruggezet (%s): %s", dag.isoformat() if dag else "onbekend",
+                self._entry_id, state.halt_reason,
+            )
+            state.halted = False
+            state.halt_reason = None
+            state.halt_day = None
+            try:
+                await self.async_save(state)
+            except Exception:  # noqa: BLE001 - de coordinator bewaart later opnieuw
+                _LOGGER.debug("Gewiste noodstop niet meteen bewaard", exc_info=True)
+        elif state.halted and not state.halt_day:
+            dag = noodstop_dag(state)
+            if dag is not None:
+                state.halt_day = dag.isoformat()
 
         if state.halted:
             _LOGGER.warning(

@@ -109,6 +109,10 @@ class RiskState:
     consecutive_losses: int = 0
     paused_until: datetime | None = None
     halt_reason: str | None = None
+    #: 2.24.0 (L-GS-029): handelsdag waarop de noodstop afging. Een
+    #: dagverlies-noodstop van een eerdere handelsdag komt na een herstart
+    #: niet terug.
+    halt_day: date | None = None
     triggered: list[str] = field(default_factory=list)
 
 
@@ -409,11 +413,12 @@ class RiskManager:
         self.state.triggered.append(f"{now.isoformat(timespec='seconds')} pauze: {reason}")
         _LOGGER.warning("Handel gepauzeerd tot %s: %s", self.state.paused_until, reason)
 
-    def restore_halt(self, reason: str) -> None:
+    def restore_halt(self, reason: str, day: date | None = None) -> None:
         """Een bewaarde noodstop terugzetten na een herstart, zonder hem als
         nieuwe gebeurtenis te melden of te registreren."""
         self.state.state = TradingState.HALTED
         self.state.halt_reason = reason
+        self.state.halt_day = day
 
     def halt(self, reason: str) -> None:
         """Noodstop. Hervat alleen na handmatig ingrijpen."""
@@ -421,6 +426,10 @@ class RiskManager:
             return
         self.state.state = TradingState.HALTED
         self.state.halt_reason = reason
+        try:
+            self.state.halt_day = trading_day(datetime.now(timezone.utc))
+        except (TypeError, ValueError):  # een vervangen klok in een test
+            self.state.halt_day = self.state.day
         self.state.triggered.append(
             f"{datetime.now(timezone.utc).isoformat(timespec='seconds')} NOODSTOP: {reason}"
         )
@@ -454,6 +463,7 @@ class RiskManager:
         if self.state.state is TradingState.HALTED:
             self.state.state = TradingState.RUNNING
             self.state.halt_reason = None
+            self.state.halt_day = None
 
         bericht = (
             f"Dagtellers teruggezet. Vandaag stond er {verloren:.2f} verlies, "
@@ -493,6 +503,7 @@ class RiskManager:
         self.state.resumes_today += 1
         self.state.state = TradingState.RUNNING
         self.state.halt_reason = None
+        self.state.halt_day = None
         self.state.consecutive_losses = 0
 
         if balance is not None:

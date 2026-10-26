@@ -1,5 +1,25 @@
 # Changelog — Gold Scalper
 
+## 2.24.0 - 26-10-2026
+
+### Bitvavo-mand: toelating op de mediane spread over 24 uur (L-GS-025)
+- Live: PUMP-EUR en PEPE-EUR hangen rond de spreadgrens van 0,03 % en wisselden bij de uurlijkse herziening steeds in en uit de mand (toelating op één momentopname van de 24-uurs ticker).
+- Nu: elk kwartier (`BV_MAND_SPREAD_MONSTER_MINUTEN`) én bij elke herziening een waarneming van de spread van alle EUR-markten met minstens de helft van het minimumvolume (`spreadhistorie.py`). De toelating toetst de **mediaan over de laatste 24 uur**; de grens blijft 0,03 %. Bewaard in het bestand van de mand (`spread_historie`), dus herstelbaar na een herstart. Minder dan 12 waarnemingen in het venster (net geïnstalleerd, nieuwe markt): de momentopname, zoals voorheen.
+- Openen blijft op de **actuele** spread (ongewijzigd): de mediaan zegt of een markt structureel goedkoop genoeg is, de actuele spread is wat een instap nu kost.
+- *Mand*: `spread_mediaan_24u` (markt -> mediaan, alleen bij genoeg waarnemingen), `geweerd_op_spread[].spread_mediaan_24u_pct`, `spread_toelating: mediaan_24u`, `spread_historie_markten`. Logregel van de herziening vermeldt "(mediaan 24 u)".
+
+### Oude dagverlies-noodstops komen na een herstart niet meer terug (L-GS-029)
+- Live sinds 25-10 (4x): na elke herstart stonden PEPE-EUR (10,05 %) en BILL-EUR (10,11 %) weer stil met "Noodstop uit een eerdere sessie blijft actief". 2.23.1 (L-GS-027) loste dit níet op: dat ging over de mandsensoren tijdens het opstarten, niet over het terugzetten van de noodstop.
+- Nu bewaart de toestand de handelsdag van de noodstop (`halt_day`, handelstijdzone Europe/Amsterdam). Bij het opstarten wordt een **dagverlies**-noodstop alleen teruggezet als hij van vandaag is; anders vervalt hij en wordt hij meteen uit het bestand gewist (nooit opnieuw geladen). Logregel (INFO): "Dagverlies-noodstop van een eerdere handelsdag (...) niet teruggezet".
+- Toestand van vóór 2.24.0 (geen `halt_day`): de dag uit de bewaarde NOODSTOP-regel (`risk_triggered`); ontbreekt die, dan blijft hij staan als de bewaarde handelsdag vandaag is, anders vervalt hij. Een dagverlies van vandaag zet de dagverliestoets bij de eerste instap opnieuw (dagstartsaldo blijft bewaard).
+- Andere noodstops (equity onder de vloer, geen tickdata, trade-limiet) blijven altijd staan, zoals voorheen. Hervatten en `reset_day` wissen de dag mee.
+
+### Slippage-melding leesbaar bij goedkope munten
+- "Slippage van 0.000 begrensd op 0.000": nu vier significante cijfers plus basispunten van de middenkoers, bv. "4.2e-08 (85.71 bp) begrensd op 2e-08 (40.82 bp)". Ook "Trade vastgelegd ... slippage" (in bp) en "Gemeten slippage" (significante cijfers).
+
+- Raakt geen strategie, risicogrenzen, orders of instellingen.
+- Test: `test_v2240_mediaan_noodstop_slippage.py` (26), o.a. attributen van *Mand* met mediaan bij een volle mand < 15,5 kB.
+
 ## 2.23.1 - 26-10-2026
 
 ### Bitvavo-mand: sensoren pas na het opstarten, attributen weer in de recorder (meetfouten)

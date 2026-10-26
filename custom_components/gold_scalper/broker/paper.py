@@ -71,6 +71,23 @@ class BrokerCosts:
     commission_rate: float = 0.0
 
 
+def prijs_en_bp(waarde: float, midden: float | None) -> str:
+    """2.24.0: een prijsverschil leesbaar bij elke koers: vier significante
+    cijfers plus basispunten van de middenkoers ("4.2e-08 (0.85 bp)")."""
+    try:
+        w = float(waarde)
+    except (TypeError, ValueError):
+        return str(waarde)
+    tekst = f"{w:.4g}"
+    try:
+        m = float(midden) if midden is not None else 0.0
+    except (TypeError, ValueError):
+        m = 0.0
+    if m > 0:
+        tekst += f" ({w / m * 1e4:.2f} bp)"
+    return tekst
+
+
 @dataclass(slots=True)
 class Quote:
     """Een marktquote.
@@ -213,10 +230,15 @@ class PaperBroker:
 
         ceiling = quote.spread * self.MAX_SLIPPAGE_SPREAD_MULTIPLE
         if ceiling > 0 and slippage > ceiling:
+            # 2.24.0: in significante cijfers en basispunten van de
+            # middenkoers. Bij munten van een fractie van een cent stond hier
+            # "0.000 begrensd op 0.000": niet te zien of het model ontspoorde.
+            midden = (quote.bid + quote.ask) / 2.0
             _LOGGER.warning(
-                "Slippage van %.6g begrensd op %.6g (%.1fx de spread). Zo'n hoge "
+                "Slippage van %s begrensd op %s (%.1fx de spread). Zo'n hoge "
                 "waarde wijst op een fout in het kostenmodel, niet op de markt.",
-                slippage, ceiling, self.MAX_SLIPPAGE_SPREAD_MULTIPLE,
+                prijs_en_bp(slippage, midden), prijs_en_bp(ceiling, midden),
+                self.MAX_SLIPPAGE_SPREAD_MULTIPLE,
             )
             return ceiling
         return slippage

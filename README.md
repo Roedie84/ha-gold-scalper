@@ -121,7 +121,8 @@ Sleutels in `secrets.yaml` (standaardnamen `bitvavo_api_key` en
 **Bitvavo-mand** (2.18.0, standaard): één entry handelt op de meest liquide
 EUR-markten in plaats van op één markt. Elk uur worden de toppers op 24-uurs
 volume en spread gekozen (standaard 20, minimaal 250.000 EUR handel, spread
-hooguit 0,2 %, geen stablecoins); de gekozen markt zit er altijd in. Elke markt
+hooguit 0,03 % als mediaan over 24 uur - sinds 2.24.0, elk kwartier gemeten;
+met te weinig waarnemingen de actuele spread - geen stablecoins); de gekozen markt zit er altijd in. Elke markt
 heeft een eigen handelslus en database; samen hooguit het ingestelde aantal
 open posities (standaard 5), per koop hooguit de maximale inzet. Live gaat
 open op het papieren bewijs van de hele mand. Een markt die uit de mand valt
@@ -208,7 +209,7 @@ de vorige repository (`Roedie84/Goldscalper`); de geschiedenis staat in
 Nieuw werk verhoogt het tweede cijfer (1.1, 1.2, ...), correcties het derde
 (1.0.1).
 
-Huidige versie: **2.23.1** (zie `CHANGELOG.md`).
+Huidige versie: **2.24.0** (zie `CHANGELOG.md`).
 
 Sinds 2.0.0 is de standaardstrategie **daghandel** (trend op uurbasis, uiterlijk
 20:45 UTC dicht); scalpen blijft kiesbaar via de instelling *Strategie*, en sinds 2.1.0 ook

@@ -69,6 +69,7 @@ from .broker.stooq import StooqVenue
 from .broker.simulator import SimulatorVenue
 from .broker.paper import CONTRACT_SIZE, BrokerCosts, InsufficientMargin, PaperBroker
 from .broker.paper import Quote as PaperQuote
+from .broker.paper import prijs_en_bp
 from .broker.risk import RiskLimits, RiskManager, TradingState
 from .broker.saldosprong import SaldoSprongBewaker
 from .const import (
@@ -951,8 +952,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # Terugzetten, niet opnieuw uitvoeren: opnieuw uitvoeren logde
             # dezelfde NOODSTOP-regel als de oorspronkelijke, en dat leek een
             # nieuwe detectie. De opslag meldt al dat hij blijft staan.
+            from datetime import date as _hdate
+            try:
+                _halt_dag = (_hdate.fromisoformat(self._state.halt_day)
+                             if self._state.halt_day else None)
+            except ValueError:
+                _halt_dag = None
             self.risk.restore_halt(
-                self._state.halt_reason or "noodstop uit vorige sessie"
+                self._state.halt_reason or "noodstop uit vorige sessie", _halt_dag
             )
         self.risk.state.resumes_today = self._state.resumes_today
         self._partial_taken = set(self._state.partial_taken or [])
@@ -1325,8 +1332,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 )
                 if modelled > 0 and facts.measured_slippage > modelled * 2:
                     _LOGGER.warning(
-                        "Gemeten slippage %.3f is meer dan het dubbele van wat het "
-                        "model voorspelt (%.3f). Controleer of de kostenboeking "
+                        "Gemeten slippage %.4g is meer dan het dubbele van wat het "
+                        "model voorspelt (%.4g). Controleer of de kostenboeking "
                         "klopt voordat je hier conclusies aan verbindt.",
                         facts.measured_slippage, modelled,
                     )
@@ -2189,6 +2196,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         self._state.enabled = self._enabled
         self._state.halted = self.risk.state.state is TradingState.HALTED
         self._state.halt_reason = self.risk.state.halt_reason
+        # 2.24.0 (L-GS-029): de handelsdag van de noodstop (geen noodstop: leeg).
+        _hd = self.risk.state.halt_day if self._state.halted else None
+        self._state.halt_day = _hd.isoformat() if _hd else None
         self._state.consecutive_losses = self.risk.state.consecutive_losses
         self._state.day = self.risk.state.day.isoformat()
         self._state.day_start_balance = self.risk.state.day_start_balance
@@ -7270,8 +7280,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             )
 
         _LOGGER.info(
-            "Trade vastgelegd: %s %s @ %.2f (ticket %s, slippage %.3f)",
-            side, self.symbol, fill, result.ticket, slippage,
+            "Trade vastgelegd: %s %s @ %.6g (ticket %s, slippage %s)",
+            side, self.symbol, fill, result.ticket, prijs_en_bp(slippage, fill),
         )
 
     async def _record_broker_close(

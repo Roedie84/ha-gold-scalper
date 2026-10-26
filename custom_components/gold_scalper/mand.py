@@ -31,6 +31,12 @@ met ``markt``) of voor alles.
 Spreadgrens (2.22.0): een markt komt alleen in de mand bij een spread van
 hooguit ``BV_MAND_MAX_SPREAD_PCT`` (0,03 %), en een lid opent niets zolang zijn
 actuele spread daarboven ligt.
+
+2.24.0 (L-GS-025): de toelating toetst de mediane spread over 24 uur (elk
+kwartier een waarneming, bewaard in het bestand van de mand), niet één
+momentopname; PUMP-EUR en PEPE-EUR wisselden zo elk uur in en uit. Te weinig
+waarnemingen: de momentopname, zoals voorheen. Het openen blijft op de
+actuele spread: dat is wat een instap nu kost.
 """
 
 from __future__ import annotations
@@ -48,6 +54,7 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
     BV_MAND_HERZIEN_MINUTEN,
+    BV_MAND_SPREAD_MONSTER_MINUTEN,
     BV_MAND_MAX_SPREAD_PCT,
     CONF_BV_AANTAL,
     CONF_BV_MARKT,
@@ -63,6 +70,8 @@ from .const import (
     DOMAIN,
     VENUE_BITVAVO,
 )
+
+from .spreadhistorie import SpreadHistorie
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -331,6 +340,9 @@ class BitvavoMand:
         self._mand_stats: tuple[float, dict, tuple] | None = None
         #: 2.23.1 (L-GS-027): het archief is minstens één keer ingelezen.
         self._archief_geladen = False
+        #: 2.24.0 (L-GS-025): spreadwaarnemingen per markt (24 uur, bewaard).
+        self.spread_historie = SpreadHistorie()
+        self._monster_timer = None
 
     @property
     def boek_gereed(self) -> bool:
@@ -506,6 +518,11 @@ class BitvavoMand:
         except Exception:  # noqa: BLE001
             data = {}
         self.ooit |= {str(m).upper() for m in data.get("ooit") or []}
+        # 2.24.0 (L-GS-025): de spreadhistorie overleeft een herstart.
+        try:
+            self.spread_historie.herstel(data.get("spread_historie"), time.time())
+        except Exception:  # noqa: BLE001 - dan begint de historie leeg
+            _LOGGER.debug("Spreadhistorie van de mand onleesbaar", exc_info=True)
         return [str(m).upper() for m in data.get("met_positie") or []]
 
     async def _bewaar(self) -> None:
@@ -521,6 +538,8 @@ class BitvavoMand:
                 "selectie": [r["market"] for r in self.selectie],
                 # 2.22.2: elke markt die ooit meedeed (voor het grootboek).
                 "ooit": sorted(self.ooit | {c.symbol for c in self.alle()}),
+                # 2.24.0 (L-GS-025): spreadwaarnemingen van de laatste 24 uur.
+                "spread_historie": self.spread_historie.export(),
             })
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Mand niet bewaard", exc_info=True)
@@ -529,6 +548,7 @@ class BitvavoMand:
         """Bij het opstarten: eerst de markten met een open positie, dan de toppers."""
         bewaard = await self._bewaarde_markten()
         self._bewaard_met_positie = set(bewaard)
+        self._koppel_historie()
         try:
             await self._herzien(extra=bewaard)
         finally:
@@ -536,6 +556,50 @@ class BitvavoMand:
         await self._laad_archief()
         self._stop_timer = async_track_time_interval(
             self.hass, self._tik, timedelta(minutes=BV_MAND_HERZIEN_MINUTEN))
+        self._monster_timer = async_track_time_interval(
+            self.hass, self._monster_tik, timedelta(minutes=BV_MAND_SPREAD_MONSTER_MINUTEN))
+
+    def _koppel_historie(self) -> None:
+        """2.24.0 (L-GS-025): ``bv.mand_toppers`` legt elke herziening vast in
+        de historie en toetst op de mediaan; die vindt hem op de venue."""
+        venue = getattr(self.hoofd, "venue", None)
+        if venue is not None:
+            try:
+                venue.spread_historie = self.spread_historie
+            except Exception:  # noqa: BLE001
+                pass
+
+    @callback
+    def _monster_tik(self, _nu) -> None:
+        maak = getattr(self.entry, "async_create_background_task", None)
+        taak = self._neem_monster()
+        if maak is not None:
+            maak(self.hass, taak, "gold_scalper mand spread")
+        else:
+            self.hass.async_create_task(taak)
+
+    async def _neem_monster(self) -> None:
+        """2.24.0 (L-GS-025): elk kwartier de spreads vastleggen (publiek)."""
+        from .broker import bitvavo as bv
+
+        if self._gestopt:
+            return
+        try:
+            spreads = await bv.spread_monster(self.hoofd.venue, self.min_volume)
+        except Exception as err:  # noqa: BLE001 - volgende keer opnieuw
+            _LOGGER.debug("Bitvavo-mand: spreads niet opgehaald: %s", err)
+            return
+        self.spread_historie.waarneem(time.time(), spreads)
+        if not self._gestopt:
+            await self._bewaar()
+
+    def spread_info(self, markt: str) -> dict:
+        """2.24.0 (L-GS-025): mediane spread over 24 uur en het aantal
+        waarnemingen, voor het overzicht."""
+        nu = time.time()
+        med = self.spread_historie.mediaan(markt, nu)
+        return {"spread_mediaan_24u_pct": round(med, 4) if med is not None else None,
+                "spread_waarnemingen_24u": self.spread_historie.aantal(markt, nu)}
 
     @callback
     def _tik(self, _nu) -> None:
@@ -559,6 +623,7 @@ class BitvavoMand:
     async def _herzien_kern(self, extra: list[str] | None = None) -> None:
         from .broker import bitvavo as bv
 
+        self._koppel_historie()
         try:
             geweerd: list = []
             self.selectie = await bv.mand_toppers(
@@ -599,10 +664,11 @@ class BitvavoMand:
                 continue
             await self._stop_als_plat(markt, c)
         _LOGGER.info("Bitvavo-mand: %s markten (%s), %s posities open; spreadgrens "
-                     "%s %%, geweerd op spread: %s",
+                     "%s %% (mediaan 24 u), geweerd op spread: %s",
                      len(self.alle()), ", ".join([self.hoofd.symbol, *self.leden]),
                      self.aantal_open(), BV_MAND_MAX_SPREAD_PCT,
-                     ", ".join(f"{r['market']} ({r['spread_pct']} %)"
+                     ", ".join(f"{r['market']} ({r.get('spread_toelating_pct', r['spread_pct'])} %"
+                               f"{', mediaan' if r.get('spread_bron') == 'mediaan_24u' else ''})"
                                for r in self.geweerd_spread[:10]) or "geen")
 
     async def _stop_als_plat(self, markt: str, c) -> None:
@@ -724,6 +790,9 @@ class BitvavoMand:
         if self._stop_timer:
             self._stop_timer()
             self._stop_timer = None
+        if self._monster_timer:
+            self._monster_timer()
+            self._monster_timer = None
         for markt in list(self.leden):
             await self._stop_lid(markt)
 
@@ -931,8 +1000,18 @@ class BitvavoMand:
             "noodstop_markten": [r["markt"] for r in rijen if r.get("noodstop")],
             "max_spread_pct": BV_MAND_MAX_SPREAD_PCT,
             "geweerd_op_spread": [
-                {"markt": r["market"], "spread_pct": r["spread_pct"]}
+                {"markt": r["market"], "spread_pct": r["spread_pct"],
+                 **({"spread_mediaan_24u_pct": r["spread_mediaan_pct"]}
+                    if r.get("spread_mediaan_pct") is not None else {})}
                 for r in self.geweerd_spread[:20]],
+            # 2.24.0 (L-GS-025): toelating op de mediaan over 24 uur.
+            "spread_toelating": "mediaan_24u",
+            # Per lid de mediaan waarop toegelaten wordt (alleen bij genoeg
+            # waarnemingen; compact i.v.m. de 16 kB van de recorder).
+            "spread_mediaan_24u": {
+                r["markt"]: med for r in rijen
+                if (med := self.spread_info(r["markt"])["spread_mediaan_24u_pct"]) is not None},
+            "spread_historie_markten": len(self.spread_historie),
         }
 
     def saldosprongen(self) -> list[str]:

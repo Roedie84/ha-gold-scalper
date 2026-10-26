@@ -1016,17 +1016,9 @@ STABIEL = frozenset({
 })
 
 
-def kies_markten(markten: list[dict], tickers: list[dict], quote: str, aantal: int,
-                 min_volume: float, max_spread_pct: float,
-                 verplicht: list[str] | None = None,
-                 geweerd: list | None = None) -> list[dict]:
-    """2.18.0: de meest liquide markten voor de mand.
-
-    Alleen markten in ``quote`` (EUR) die nu handelen en een stoporder kennen,
-    geen stablecoins, met minstens ``min_volume`` handel in 24 uur en een
-    spread van hooguit ``max_spread_pct`` procent. Gesorteerd op volume, de
-    ``verplicht``-markten (de gekozen markt) altijd vooraan.
-    """
+def _toegestane_markten(markten: list[dict], quote: str) -> dict:
+    """Markten in ``quote`` die handelen, een stoporder kennen en geen
+    stablecoin zijn."""
     toegestaan = {}
     for m in markten:
         naam = str(m.get("market") or "").upper()
@@ -1038,6 +1030,10 @@ def kies_markten(markten: list[dict], tickers: list[dict], quote: str, aantal: i
         if naam.split("-")[0] in STABIEL:
             continue
         toegestaan[naam] = m
+    return toegestaan
+
+
+def _ticker_rijen(toegestaan: dict, tickers: list[dict]) -> list[dict]:
     rijen = []
     for t in tickers:
         naam = str(t.get("market") or "").upper()
@@ -1051,15 +1047,63 @@ def kies_markten(markten: list[dict], tickers: list[dict], quote: str, aantal: i
         if bid <= 0 or ask <= 0 or ask < bid:
             continue
         spread = (ask - bid) / ((ask + bid) / 2) * 100
-        rijen.append({"market": naam, "volume": volume, "spread_pct": round(spread, 4)})
+        rijen.append({"market": naam, "volume": volume, "spread_pct": round(spread, 4),
+                      "_spread": spread})
+    return rijen
+
+
+def spreads_uit_tickers(markten: list[dict], tickers: list[dict], quote: str,
+                        min_volume: float) -> dict[str, float]:
+    """2.24.0 (L-GS-025): de actuele spread (%) van elke markt die in de mand
+    zou kunnen (met de helft van het minimumvolume als marge: het volume
+    schommelt ook)."""
+    rijen = _ticker_rijen(_toegestane_markten(markten, quote), tickers)
+    return {r["market"]: r["_spread"] for r in rijen
+            if r["volume"] >= float(min_volume) / 2}
+
+
+def kies_markten(markten: list[dict], tickers: list[dict], quote: str, aantal: int,
+                 min_volume: float, max_spread_pct: float,
+                 verplicht: list[str] | None = None,
+                 geweerd: list | None = None, mediaan=None) -> list[dict]:
+    """2.18.0: de meest liquide markten voor de mand.
+
+    Alleen markten in ``quote`` (EUR) die nu handelen en een stoporder kennen,
+    geen stablecoins, met minstens ``min_volume`` handel in 24 uur en een
+    spread van hooguit ``max_spread_pct`` procent. Gesorteerd op volume, de
+    ``verplicht``-markten (de gekozen markt) altijd vooraan.
+
+    2.24.0 (L-GS-025): ``mediaan`` (markt -> mediane spread over 24 uur, of
+    ``None``) bepaalt de toelating als er genoeg waarnemingen zijn; anders
+    telt de momentopname, zoals voorheen. ``spread_pct`` blijft de actuele
+    spread; ``spread_toelating_pct`` en ``spread_bron`` zeggen waarop getoetst
+    is.
+    """
+    rijen = _ticker_rijen(_toegestane_markten(markten, quote), tickers)
+    for r in rijen:
+        r.pop("_spread", None)
+        med = None
+        if mediaan is not None:
+            try:
+                med = mediaan(r["market"])
+            except Exception:  # noqa: BLE001 - dan de momentopname
+                med = None
+        if med is not None:
+            r["spread_mediaan_pct"] = round(float(med), 4)
+            r["spread_toelating_pct"] = r["spread_mediaan_pct"]
+            r["spread_bron"] = "mediaan_24u"
+        else:
+            r["spread_toelating_pct"] = r["spread_pct"]
+            r["spread_bron"] = "moment"
     verplicht = [v.upper() for v in (verplicht or [])]
-    goed = [r for r in rijen if r["volume"] >= min_volume and r["spread_pct"] <= max_spread_pct
+    goed = [r for r in rijen if r["volume"] >= min_volume
+            and r["spread_toelating_pct"] <= max_spread_pct
             and r["market"] not in verplicht]
     goed.sort(key=lambda r: r["volume"], reverse=True)
     if geweerd is not None:
         # 2.22.0: genoeg volume maar een te brede spread: zichtbaar maken.
         weg = [r for r in rijen if r["volume"] >= min_volume
-               and r["spread_pct"] > max_spread_pct and r["market"] not in verplicht]
+               and r["spread_toelating_pct"] > max_spread_pct and r["market"] not in verplicht]
         weg.sort(key=lambda r: r["volume"], reverse=True)
         geweerd.extend(weg)
     vooraan = [next((r for r in rijen if r["market"] == v), {"market": v, "volume": None, "spread_pct": None})
@@ -1070,13 +1114,37 @@ def kies_markten(markten: list[dict], tickers: list[dict], quote: str, aantal: i
 async def mand_toppers(venue: "BitvavoVenue", aantal: int, min_volume: float,
                        max_spread_pct: float, verplicht: list[str] | None = None,
                        geweerd: list | None = None) -> list[dict]:
-    """De mand ophalen: twee publieke verzoeken (alle markten, alle tickers)."""
+    """De mand ophalen: twee publieke verzoeken (alle markten, alle tickers).
+
+    2.24.0 (L-GS-025): heeft de venue een ``spread_historie`` (door de mand
+    gezet), dan wordt deze momentopname daarin vastgelegd en toetst de keuze
+    op de mediaan over 24 uur.
+    """
+    import time as _time
+
     markten = await venue.markten()
     tickers = await venue._request("GET", "/ticker/24h")
     if not isinstance(tickers, list):
         raise VenueError("Bitvavo gaf geen 24-uurs tickers")
+    historie = getattr(venue, "spread_historie", None)
+    mediaan = None
+    if historie is not None:
+        nu = _time.time()
+        historie.waarneem(nu, spreads_uit_tickers(markten, tickers, venue.quote_valuta,
+                                                  min_volume))
+        mediaan = lambda markt: historie.mediaan(markt, nu)  # noqa: E731
     return kies_markten(markten, tickers, venue.quote_valuta, aantal, min_volume,
-                        max_spread_pct, verplicht, geweerd=geweerd)
+                        max_spread_pct, verplicht, geweerd=geweerd, mediaan=mediaan)
+
+
+async def spread_monster(venue: "BitvavoVenue", min_volume: float) -> dict[str, float]:
+    """2.24.0 (L-GS-025): één momentopname van de spreads (publiek, twee
+    verzoeken) voor de spreadhistorie van de mand."""
+    markten = await venue.markten()
+    tickers = await venue._request("GET", "/ticker/24h")
+    if not isinstance(tickers, list):
+        raise VenueError("Bitvavo gaf geen 24-uurs tickers")
+    return spreads_uit_tickers(markten, tickers, venue.quote_valuta, min_volume)
 
 
 def _tick(markt: dict) -> float | None:

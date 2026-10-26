@@ -152,6 +152,9 @@ DEFAULT_BV_MIN_VOLUME: Final = 250000.0
 BV_MAND_MAX_SPREAD_PCT: Final = 0.03
 #: Zo vaak wordt de mand opnieuw samengesteld.
 BV_MAND_HERZIEN_MINUTEN: Final = 60
+#: 2.24.0 (L-GS-025): zo vaak een waarneming van de spreads voor de mediaan
+#: over 24 uur waarop de mand toelaat.
+BV_MAND_SPREAD_MONSTER_MINUTEN: Final = 15
 
 #: 2.8.0: cTrader. De geheimen zelf staan in secrets.yaml; de entry bewaart
 #: de SLEUTELNAMEN plus een kopie van de tokens (die ververst de koppeling).
@@ -267,7 +270,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.23.1"
+INTEGRATION_VERSION: Final = "2.24.0"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
