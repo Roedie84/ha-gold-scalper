@@ -3449,7 +3449,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # eigen markt (BTC-EUR stond op 0 trades terwijl PEPE-EUR en PUMP-EUR
         # samen ruim 380 trades hadden).
         mand_stats = mand_boek = None
-        if getattr(self, "_mand", None) is not None and self._mand.hoofd is self:
+        # 2.23.1 (L-GS-027): tijdens het opstarten van de mand (leden en archief
+        # nog niet geladen) tonen de mandsensoren geen waarde in plaats van 0
+        # of een deelsom. Alleen weergave; de handel wacht al op ``_gereed``.
+        mand_wacht = False
+        if getattr(self, "_mand", None) is not None and self._mand.hoofd is self \
+                and not getattr(self._mand, "boek_gereed", True):
+            mand_wacht = True
+        elif getattr(self, "_mand", None) is not None and self._mand.hoofd is self:
             try:
                 mand_boek = self._mand.grootboek()
                 mand_stats = await self._mand.statistiek()
@@ -3512,6 +3519,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 2.18.0: de Bitvavo-mand (alleen bij de hoofdlus).
             "mand_boek": mand_boek,
             "mand_stats": mand_stats,
+            "mand_wacht": mand_wacht,
             "mand": (self._mand.overzicht()
                      if getattr(self, "_mand", None) is not None and self._mand.hoofd is self
                      else None),

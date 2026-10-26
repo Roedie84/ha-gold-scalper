@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.23.1 - 26-10-2026
+
+### Bitvavo-mand: sensoren pas na het opstarten, attributen weer in de recorder (meetfouten)
+- L-GS-027 - live 25-10 bij 5 starts (15:54, 16:09, 16:37, 17:25, 18:47): in de eerste ~25 s toonden *Trades* en *Nettoresultaat* van de mand eerst 0 (de eigen BTC-EUR-stats), dan een deelsom (152/163/376/316 trades) en pas daarna 564/-6340; *Noodstop* flapte 10 s aan (15:55, 17:25). Oorzaak: grootboek en statistiek liepen al vóór `_gereed` en vóór het inlezen van het archief (`async_start`). Nu: zolang de mand niet gereed is (alle leden gestart én archief ingelezen, `boek_gereed`) geven *Trades*, *Nettoresultaat*, *Kosten*, *Winstpercentage*, *Profit factor*, *t-statistiek*, *Max. drawdown*, *Oordeel* en *Equity* van de hoofdlus geen waarde (onbekend) in plaats van 0 of een deelsom; *Trades* heeft dan `mand_start: true`. De noodstop van mandleden telt pas mee als de mand gereed is; de eigen noodstop van de hoofdlus telt meteen. Nieuwe posities wachtten al op `_gereed` (ongewijzigd).
+- L-GS-028 - sinds 25-10 23:00:15 weigerde de recorder de attributen van *Mand* (18,0 kB > 16 kB, elke 10 s een WARNING; 1.683 regels tot 03:42). Grootste delen: `per_markt` 10,7 kB (19 leden met top-8 weigeringen), `buiten_mand` 5,5 kB (30 markten, waarvan 21 zonder trades). Nu: `per_markt[].weigeringen` top 3 (de mand als geheel houdt top 12), koers/equity/volume afgerond; `buiten_mand` alleen markten mét trades, kort (markt, trades, netto, laatste trade), hooguit 15, de rest in `buiten_mand_overig` (markten, trades, netto); `buiten_mand_zonder_trades` telt de rest. De volledige tabel blijft op *Trades* → `per_markt` en in de diagnostics. Toets: 20 leden + 80 vertrokken markten < 14 kB.
+- Logregel van de papierbroker: "Slippage van 0.000 begrensd op 0.000" bij munten met een kleine koers toont nu de echte bedragen (%.6g).
+- Alleen weergave en meting: raakt geen strategie, risicogrenzen, noodstoplogica, orders, mandkeuze of instellingen.
+- Test: `test_v2231_mand_opstart_en_attributen.py` (13).
+
 ## 2.23.0 - 25-10-2026
 
 ### Bitvavo-mand: long-opzetten op tijdvakken die het kostenfilter kunnen halen

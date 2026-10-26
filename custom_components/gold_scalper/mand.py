@@ -81,6 +81,45 @@ def _tijd(waarde) -> datetime:
         return datetime.min.replace(tzinfo=timezone.utc)
 
 
+#: 2.23.1 (L-GS-028): begrenzing van de attributen van de sensor *Mand*
+#: (de recorder bewaart attributen tot 16 kB).
+_TOP_WEIGERINGEN_LID = 3
+_MAX_BUITEN_MAND = 15
+
+
+def _rond(waarde, cijfers: int):
+    """Afronden voor de attributen; geen getal = ongewijzigd."""
+    if isinstance(waarde, bool) or not isinstance(waarde, (int, float)):
+        return waarde
+    if cijfers == 0:
+        return int(round(waarde))
+    if cijfers >= 6 and waarde != 0:
+        return float(f"{waarde:.{cijfers}g}")
+    return round(float(waarde), cijfers)
+
+
+def _buiten_mand(per_markt: list) -> dict:
+    """2.23.1 (L-GS-028): het deel ``buiten_mand`` van het mandoverzicht."""
+    buiten = [r for r in per_markt if r.get("bron") == "database"]
+    met = sorted((r for r in buiten if r.get("trades")),
+                 key=lambda r: (-(r.get("trades") or 0), r["markt"]))
+    rest = met[_MAX_BUITEN_MAND:]
+    uit = {
+        "buiten_mand": [
+            {"markt": r["markt"], "trades": r.get("trades"),
+             "netto": _rond(r.get("netto"), 2), "laatste_trade": r.get("laatste_trade")}
+            for r in met[:_MAX_BUITEN_MAND]],
+        "buiten_mand_zonder_trades": len(buiten) - len(met),
+    }
+    if rest:
+        uit["buiten_mand_overig"] = {
+            "markten": len(rest),
+            "trades": sum(int(r.get("trades") or 0) for r in rest),
+            "netto": round(sum(float(r.get("netto") or 0.0) for r in rest), 2),
+        }
+    return uit
+
+
 def _top(teller, n: int) -> dict:
     """2.23.0: de ``n`` grootste tellingen, aflopend."""
     if not isinstance(teller, dict):
@@ -175,11 +214,18 @@ def lees_markt(pad: str, markt: str, strategie_versie: str) -> tuple[dict, list]
 
 def sensor_stats(d: dict) -> dict:
     """De statistiek achter trades/netto/oordeel: bij de hoofdlus van de mand
-    die van de hele mand, anders die van de eigen markt."""
+    die van de hele mand, anders die van de eigen markt.
+
+    2.23.1 (L-GS-027): zolang de mand nog opstart (leden en archief nog niet
+    geladen) geen waarde - niet de eigen markt (0) en geen deelsom."""
+    if d.get("mand_wacht"):
+        return {}
     return d.get("mand_stats") or d.get("stats") or {}
 
 
 def sensor_equity(d: dict):
+    if d.get("mand_wacht"):
+        return None
     boek = d.get("mand_boek") or {}
     if boek.get("equity") is not None:
         return boek["equity"]
@@ -199,6 +245,8 @@ def sensor_equity_attrs(d: dict) -> dict:
 
 
 def sensor_trades_extra(d: dict) -> dict:
+    if d.get("mand_wacht"):
+        return {"mand_start": True}
     boek = d.get("mand_boek") or {}
     if not boek:
         return {}
@@ -281,6 +329,15 @@ class BitvavoMand:
         #: Statistiek over alle gesloten trades van de mand (hooguit eens per
         #: twee minuten berekend): (moment, stats, aantal trades).
         self._mand_stats: tuple[float, dict, tuple] | None = None
+        #: 2.23.1 (L-GS-027): het archief is minstens één keer ingelezen.
+        self._archief_geladen = False
+
+    @property
+    def boek_gereed(self) -> bool:
+        """2.23.1 (L-GS-027): alle leden gestart en het archief ingelezen. Pas
+        dan kloppen trades, netto en equity van de hele mand; daarvoor tonen
+        de mandsensoren geen waarde (eerder: 0, dan een deelsom)."""
+        return bool(self._gereed and self._archief_geladen)
 
     # -- gedeeld ---------------------------------------------------------------- #
 
@@ -705,6 +762,7 @@ class BitvavoMand:
             if uit is not None:
                 self._archief[markt] = uit
                 nieuw += 1
+        self._archief_geladen = True
         if nieuw:
             self._mand_stats = None
             _LOGGER.info(
@@ -824,24 +882,26 @@ class BitvavoMand:
             rijen.append({
                 "markt": markt,
                 "open": self._open_bij(c),
-                "volume_24u": (info.get(markt) or {}).get("volume"),
+                "volume_24u": _rond((info.get(markt) or {}).get("volume"), 0),
                 "spread_pct": (info.get(markt) or {}).get("spread_pct"),
                 "uitfaseren": markt in self.uitfaseren,
-                "koers": data.get("price"),
+                "koers": _rond(data.get("price"), 6),
                 "netto": (data.get("stats") or {}).get("net_pnl"),
                 "trades": (data.get("stats") or {}).get("trades"),
                 "weigering": getattr(c, "_laatste_weigering", None),
                 # 2.23.0: alle weigeringen sinds de start, per richting en
                 # reden (de laatste alleen liet zien wat toevallig het laatst
                 # gebeurde - meestal een short, die spot niet kan).
-                "weigeringen": _top(getattr(c, "weigeringen", None), 8),
+                # 2.23.1 (L-GS-028): top 3 (was 8) - de attributen van de mand
+                # werden > 16 kB en de recorder bewaarde ze niet meer.
+                "weigeringen": _top(getattr(c, "weigeringen", None), _TOP_WEIGERINGEN_LID),
                 "opzet_tijdvakken": list(getattr(c, "vp_tijdvakken", ()) or ()),
                 # 2.21.3 (L-GS-022): staat dit lid zelf in een noodstop?
                 "noodstop": bool(self._gestopt_door_risico(c)),
                 # 2.21.0: equity en een actieve saldosprong per markt. De leden
                 # hebben geen eigen sensoren; zonder dit was een sprong bij
                 # een lid nergens te zien (22-10 23:47).
-                "equity": data.get("equity"),
+                "equity": _rond(data.get("equity"), 2),
                 "saldosprong": (data.get("saldosprong") or {}).get("reden")
                 if (data.get("saldosprong") or {}).get("actief") else None,
             })
@@ -858,7 +918,11 @@ class BitvavoMand:
             # niet meer in zitten.
             "totaal": {k: boek[k] for k in ("trades", "wins", "losses", "netto",
                                             "kosten", "equity", "balans")},
-            "buiten_mand": [r for r in boek["per_markt"] if r.get("bron") == "database"],
+            # 2.23.1 (L-GS-028): alleen markten buiten de mand mét trades, kort
+            # (markt, trades, netto, laatste trade) en hooguit
+            # ``_MAX_BUITEN_MAND``; de rest samengeteld. De volledige tabel
+            # staat op *Trades* (``per_markt``) en in de diagnostics.
+            **_buiten_mand(boek["per_markt"]),
             "max_posities": self.max_posities, "doel_aantal": self.aantal,
             "min_volume": self.min_volume, "herzien_om": self.herzien_om,
             "fout": self.laatste_fout, "per_markt": rijen,

@@ -214,7 +214,7 @@ class PaperBroker:
         ceiling = quote.spread * self.MAX_SLIPPAGE_SPREAD_MULTIPLE
         if ceiling > 0 and slippage > ceiling:
             _LOGGER.warning(
-                "Slippage van %.3f begrensd op %.3f (%.1fx de spread). Zo'n hoge "
+                "Slippage van %.6g begrensd op %.6g (%.1fx de spread). Zo'n hoge "
                 "waarde wijst op een fout in het kostenmodel, niet op de markt.",
                 slippage, ceiling, self.MAX_SLIPPAGE_SPREAD_MULTIPLE,
             )

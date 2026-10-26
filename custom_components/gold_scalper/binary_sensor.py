@@ -93,6 +93,13 @@ def _mand_gestopt(c) -> list[tuple[str, str | None]]:
     mand = getattr(c, "_mand", None)
     if mand is None or getattr(mand, "hoofd", None) is not c:
         return []
+    # 2.23.1 (L-GS-027): tijdens het opstarten van de mand niet. Een lid dat
+    # met een oude noodstop opstart en bij de eerste herziening de mand weer
+    # verlaat, liet de noodstop 10 s aan- en uitflappen. De eigen noodstop
+    # van de hoofdlus telt wel meteen; nieuwe posities wachten sowieso tot
+    # de mand gereed is.
+    if not getattr(mand, "boek_gereed", True):
+        return []
     gestopt = []
     for lid in list(getattr(mand, "leden", {}).values()):
         try:
