@@ -401,3 +401,14 @@ laatste ronde: 26-10 03:40, gemeten t/m 26-10 03:45
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency, normaal), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release (tussenronde).
 
 laatste ronde: 26-10 07:40, gemeten t/m 26-10 07:45
+
+## 26-10 11:40 · tussenronde
+- 2.24.0 actief (herstart 10:27/10:28). Demo/papier; geen knoppen, geen instellingen.
+- Goud: IG 89 → **94 trades** (−104,25; run netto −13,24, PF 0,992, t −0,04); Pepperstone 168 → **176** (−45,28; run 65,95, PF 1,017, t 0,05). Beide 1 positie open, afstemming `in_orde`. n IG ~14 / PP ~12 clusters (nodig ≥ 30 over ≥ 5 handelsdagen): **geen toets**; beide runs schuiven naar nul.
+- Mand: 0 trades (569, netto −6.418, PF 0,12, t −1,32), 0 open; noodstop-markten leeg (L-GS-029 houdt na herstart 10:28 ✓).
+- **L-GS-025 (2.24.0) eerste toets:** `spread_toelating` = mediaan_24u, 95 markten met historie, 20 geweerd op de mediaan (o.a. PUMP 0,036 / PEPE 0,043 / NEAR 0,032 boven de grens 0,03 %, ook als de momentspread eronder lag: PEPE 0,023, NEAR 0,027). In/uit-wissels per markt per dag → dagafsluiting.
+- **L-GS-030 n=3:** herstart 10:28 weer *Trades* **0** (10:28:10, 25 s) → onbekend → 569 (10:28:58); netto alleen onbekend, noodstop geen flap; *Mand* 5 → 17 → 20 (opbouw).
+- **H-GS-12 (latency):** p99 IG 0,96 / PP 0,85 / mand 0,54 s - normaal.
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release.
+
+laatste ronde: 26-10 11:40, gemeten t/m 26-10 11:45
