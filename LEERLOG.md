@@ -397,6 +397,7 @@ laatste ronde: 26-10 03:40, gemeten t/m 26-10 03:45
 - Goud: IG 83 → **89 trades** (−88,81; run netto 91,01, PF 1,056, t 0,37); Pepperstone 162 → **168** (−33,51; run 111,23, PF 1,031, t 0,09). n IG ~13 / PP ~11 clusters (nodig ≥ 30 over ≥ 5 handelsdagen): **geen toets**. IG 1 positie open.
 - Mand: +1 trade (+9,27) → 569, netto −6.418, PF 0,12, t −1,32. Na de herstart weer "Noodstop uit een eerdere sessie" voor BILL-EUR (10,11 %) → 2.24.0 (L-GS-029) ruimt dat op.
 - **H-GS-12 (latency):** p99 IG 0,91 / PP 0,78 / mand 0,59 s - normaal.
+- **Herstart 07:47 → 2.24.0 actief.** Zelfde artefact opnieuw: *Trades* 07:47:06 **0** (22 s) → onbekend → 569 (07:48:00); noodstop geen flap → L-GS-030 n=2, bouwen in de dagafsluiting 27-10 03:40 (2.24.0 staat er nu op).
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency, normaal), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release (tussenronde).
 
 laatste ronde: 26-10 07:40, gemeten t/m 26-10 07:45

@@ -149,7 +149,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Meten: week-kosten = kosten-sensor binnen 0,01.
 
 ## L-GS-025 · mand: spreadgrens op de gewone spread, niet op één herzieningsmoment (strategie → Ruud)
-- Status: **gebouwd 2.24.0** (andere sessie 26-10 07:42; gedownload, actief na de volgende herstart): toelating op de mediane spread over 24 u (waarneming elk kwartier, bewaard; < 12 waarnemingen: momentopname), grens 0,03 % ongewijzigd, openen op de actuele spread. Toets na installatie: aantal in/uit-wissels per markt per dag (PUMP/PEPE) tegen 24/25-10; `spread_mediaan_24u` gevuld na ~3 u. Was: **open** (raakt de marktkeuze van de mand → Ruud beslist; papier, geen live handel).
+- Status: **gebouwd 2.24.0** (andere sessie 26-10 07:42; actief sinds de herstart van 07:47): toelating op de mediane spread over 24 u (waarneming elk kwartier, bewaard; < 12 waarnemingen: momentopname), grens 0,03 % ongewijzigd, openen op de actuele spread. Toets na installatie: aantal in/uit-wissels per markt per dag (PUMP/PEPE) tegen 24/25-10; `spread_mediaan_24u` gevuld na ~3 u. Was: **open** (raakt de marktkeuze van de mand → Ruud beslist; papier, geen live handel).
 - Onderbouwing (24-10 11:40): 2.22.0 weert 20 markten op de grens 0,03 %. PUMP-EUR, in 2.22.0 als verliezer met ~0,04 % genoemd, stond bij de herziening van 11:17 op 0,0295 % en bleef in de mand. Het is het enige lid dat handelt (de rest: spot geen short / kostenfilter): sinds 10:16 3 trades, equity 7.610 → 7.518; run 175 trades, netto −2.460,68 (−14,1 per trade). Of PUMP meedoet hangt nu af van de spread op één moment.
 - Voorstel: toelating op de mediane spread over 24 u (grens 0,03 % ongewijzigd), of een lagere toelatingsgrens dan de opengrens (bijv. 0,02 % / 0,03 %), zodat een markt rond de grens niet in en uit valt.
 - Verwacht effect: PUMP-EUR valt uit de mand zoals in 2.22.0 bedoeld; minder papierverlies, mand meet alleen markten met lage kosten.
@@ -177,7 +177,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Meten na installatie: 0 recorder-waarschuwingen voor de mandsensor; attributen weer in de historie.
 
 ## L-GS-030 · mandsensoren ook in de allereerste verversing onbekend (rest van L-GS-027)
-- Status: **gepland** (zelf bouwen: rapportage/meetfout; handel, risico, noodstop en mandkeuze ongewijzigd). Eerstvolgende dagafsluiting nadat 2.24.0 geïnstalleerd is (niet stapelen).
+- Status: **gepland** (zelf bouwen: rapportage/meetfout; handel, risico, noodstop en mandkeuze ongewijzigd). 2.24.0 is sinds 07:47 actief → dagafsluiting 27-10 03:40. Herhaald bij de herstart van 07:47 (0 gedurende 22 s), n=2.
 - Onderbouwing (26-10 07:40): herstart 07:12 met 2.23.1: `sensor.gold_scalper_btc_eur_trades` 569 → **0** (07:12:17) → onbekend (07:12:30) → 569 (07:13:02). In `__init__.py` lopen `async_config_entry_first_refresh` en `async_forward_entry_setups` vóór `coordinator._mand = mand`; in die eerste cyclus is `self._mand` None, dus `mand_wacht` False en gaan de eigen BTC-EUR-stats (0 trades) naar de sensor. Netto bleef onbekend (geen trades → None), noodstop flapte niet.
 - Bouw: de coördinator weet al bij aanmaken dat hij hoofd van een mand wordt (`is_mand(options)`) en toont tot `boek_gereed` geen mandwaarden, ook als `_mand` nog None is. Test: eerste verversing zonder `_mand` bij een mand-entry → trades/netto/equity None.
 - Meten na installatie: bij elke herstart 0 keer 0/deelsom op *Trades*.
