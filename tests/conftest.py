@@ -182,6 +182,28 @@ def _install_stubs() -> None:
 
     ha_storage.Store = _Store
 
+    # 2.24.2: ``sensor.py`` erft met een frozen kw_only-dataclass van
+    # SensorEntityDescription; op een _Anything-basis heeft die geen ``key``
+    # en faalt het importeren van ``SENSORS`` (test_v2241).
+    import dataclasses as _dc
+    import homeassistant.components.sensor as ha_sensor  # type: ignore
+
+    @_dc.dataclass(frozen=True, kw_only=True)
+    class _SensorEntityDescription:
+        key: str
+        name: object = None
+        translation_key: str | None = None
+        icon: str | None = None
+        device_class: object = None
+        state_class: object = None
+        native_unit_of_measurement: str | None = None
+        suggested_display_precision: int | None = None
+        entity_category: object = None
+        entity_registry_enabled_default: bool = True
+        options: list | None = None
+
+    ha_sensor.SensorEntityDescription = _SensorEntityDescription
+
 
 _install_stubs()
 

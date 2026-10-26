@@ -4204,7 +4204,14 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # 2.12.0: kostenfilter voor de veldproef - geen trade als de kosten
         # een te groot deel van het risico tot de stop zijn.
         vp_naam = (getattr(signal, "components", None) or {}).get("strategie")
-        if veldproef_mod.is_veldproef(vp_naam):
+        # 2.24.2: op een spot-venue (Bitvavo, 0,25 % taker per zijde) geldt het
+        # filter ook voor de daghandel (stops in ATR(15m), ver onder de
+        # rondreiskosten). Goud/CFD: alleen de veldproef, ongewijzigd.
+        if spot and not vp_naam:
+            vp_naam = getattr(self, "primaire_strategie", None)
+        if veldproef_mod.is_veldproef(vp_naam) or (
+                spot and vp_naam == STRATEGIE_DAGHANDEL
+                and getattr(signal, "stop_loss", None) is not None):
             instap = quote.ask if side == "buy" else quote.bid
             kosten = self._kosten_per_oz(quote)
             if veldproef_mod.stop_te_krap(instap, signal.stop_loss, kosten):

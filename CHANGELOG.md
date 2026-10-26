@@ -1,5 +1,16 @@
 # Changelog — Gold Scalper
 
+## 2.24.2 - 26-10-2026
+
+### Bitvavo-mand: kostenfilter geldt ook voor de daghandel (bug)
+- Live 26-10 15:00 en 15:15: HYPE-EUR opende twee daghandeltrades op papier. Samen bruto +0,70, kosten 12,39 (0,51 % rondreis), netto -11,70; dicht na 11 s en 111 s. De stops van de daghandel liggen in ATR(15m), ver onder de rondreiskosten van 0,5 %.
+- Oorzaak: in `_open_position` gold het kostenfilter (stop >= 8 x rondreiskosten) alleen voor de veldproef (`vp:*`). 2.23.0 zette de opzetten op spot daarom op 1h/4h/1d, maar de daghandel op 15m liep buiten het filter om.
+- Nu: op een spot-venue (`alleen_long`) geldt hetzelfde filter ook voor de daghandel (ook als het signaal geen strategienaam draagt en de daghandel de primaire strategie is). Regel en factor ongewijzigd. Verwacht: de daghandel op de mand opent vrijwel nooit meer; weigeringen tellen als "long: kostenfilter: stop #, minimaal #" en in `kostenfilter.per_opzet["daghandel"]`.
+- Goud (IG, Pepperstone) en andere CFD-venues: ongewijzigd (alleen de veldproef). Scalp op spot: ongewijzigd (staat op de mand uit).
+- Raakt geen strategieversie, signaalregels, risicogrenzen, noodstop of instellingen.
+- Testopzet: de nep-`homeassistant` kent nu een echte `SensorEntityDescription`-dataclass, zodat `test_v2241_open_posities_mand.py` ook zonder Home Assistant importeert (faalde bij het verzamelen).
+- Test: `test_v2242_kostenfilter_daghandel_spot.py` (8).
+
 ## 2.24.1 - 26-10-2026
 
 ### Bitvavo-mand: *Open posities* telt de hele mand (meetfout)
