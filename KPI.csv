@@ -502,3 +502,8 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-26 11:40,TUSSEN,gs_latency_p99_s,0.96,3,"IG 0.96, PP 0.85, mand 0.54"
 2026-10-26 11:40,TUSSEN,gs_opstart_tussenwaarden,1,1,"herstart 10:28 (2.24.0): Trades 0 om 10:28:10 (25 s) -> onbekend -> 569 om 10:28:58; noodstop geen flap (L-GS-030 n=3)"
 2026-10-26 11:40,TUSSEN,gs_mand_geweerd_spread,20,95,"spread_toelating mediaan_24u (L-GS-025, 2.24.0); 95 markten met historie"
+2026-10-26 15:40,TUSSEN,gs_ig_trades,15,15,"11:45-15:45: 94 -> 109 trades, netto -13.24 -> -166.95 (-153.71); run PF 0.923, t -0.39, 11 clusters; cluster 11 (02:15-14:36 UTC, 26 trades) netto -346.77, bruto -177.84"
+2026-10-26 15:40,TUSSEN,gs_pp_trades,14,14,"11:45-15:45: 176 -> 190 trades, netto 65.95 -> -92.93 (-158.88); run PF 0.978, t -0.07, 15 clusters; cluster 15 (08:57-14:37 UTC, 15 trades) netto -261.64, bruto -222.96"
+2026-10-26 15:40,TUSSEN,gs_kosten_per_trade_usd,5.69,109,"IG 5.69 (kosten/bruto 1.37), PP 2.60 (1.23); gemeten 99.1/98.9%"
+2026-10-26 15:40,TUSSEN,gs_mand_trades,0,0,"569, netto -6418.39; 21 open posities (equity 3646 / balans 3582); noodstop leeg; 20 geweerd op spread (mediaan_24u)"
+2026-10-26 15:40,TUSSEN,gs_latency_p99_s,1.38,3,"IG 1.38 (deelstappen 0.78), PP 1.11, mand 0.61; incl. 3 HA-herstarts 13:32/15:00/15:13"

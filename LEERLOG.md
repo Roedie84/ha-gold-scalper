@@ -412,3 +412,14 @@ laatste ronde: 26-10 07:40, gemeten t/m 26-10 07:45
 - Hypotheses: H-GS-11 (kosten), H-GS-12 (latency), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release.
 
 laatste ronde: 26-10 11:40, gemeten t/m 26-10 11:45
+
+## 26-10 15:40 · tussenronde
+- 2.24.0 actief (HA-herstarts 13:32, 15:00, 15:13). Na 15:13: 1 trade bij de broker al gesloten (stop tijdens herstart) → administratie bijgewerkt (lifecycle-waarschuwing, geen fout). Demo/papier; geen knoppen, geen instellingen.
+- Goud: IG 94 → **109 trades** (−153,71; run netto −166,95, PF 0,923, t −0,39, 11 clusters); Pepperstone 176 → **190** (−158,88; run −92,93, PF 0,978, t −0,07, 15 clusters). **Beide runs nu negatief.** Afstemming beide `in_orde`.
+- **Verlies van vandaag is één regime, bij beide brokers tegelijk:** IG cluster 11 (02:15-14:36 UTC, 26 trades) netto −346,77 / **bruto −177,84**; PP cluster 15 (08:57-14:37 UTC) netto −261,64 / **bruto −222,96**. Bruto negatief → niet alleen kosten. Les voor de toets: clusters van beide brokers zijn niet onafhankelijk (zelfde markt, zelfde moment); voor een edge-toets ≥ 30 clusters **per broker** over ≥ 5 handelsdagen, en één doorlopende 'cluster' van 12 u (herinstap < 10 min) telt als 1. Nu IG 11 / PP 15: **geen toets**.
+- Kosten per trade IG 5,69 USD (kosten/bruto 1,37), PP 2,60 (1,23); gemeten 99 %. H-GS-11 (kosten > bruto) blijft staan.
+- **Mand:** 0 gesloten trades (569, netto −6.418), maar **21 open posities** (equity 3.646 / balans 3.582). Correctie op 11:40 ("0 open"): de sensor *Open posities* op het mandapparaat telt alleen BTC-EUR; het mand-attribuut `open_posities` = 21 stond er al om 11:40. → meetbaarheid, voorstel in de dagafsluiting na code-check (bewuste keuze of fout?).
+- **H-GS-12 (latency):** p99 IG **1,38** s (deelstappen 0,78) / PP 1,11 / mand 0,61 - hoger dan 11:40 (0,96/0,85), binnen de herstarts (max 15,7 s). Na een rustige periode opnieuw meten.
+- Hypotheses: H-GS-11 (kosten), H-GS-12 (latency, herstarts), H-GS-13 (IG rooster 23-24 u; vanavond avond 2 van 3). Geen release.
+
+laatste ronde: 26-10 15:40, gemeten t/m 26-10 15:45
