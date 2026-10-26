@@ -94,6 +94,9 @@ def _tijd(waarde) -> datetime:
 #: (de recorder bewaart attributen tot 16 kB).
 _TOP_WEIGERINGEN_LID = 3
 _MAX_BUITEN_MAND = 15
+#: 2.24.1: zoveel posities staan per stuk op *Open posities* van de mand (de
+#: rest geteld in ``posities_overig``), zodat de attributen onder 16 kB blijven.
+_MAX_POSITIES_SENSOR = 40
 
 
 def _rond(waarde, cijfers: int):
@@ -253,6 +256,53 @@ def sensor_equity_attrs(d: dict) -> dict:
     }
 
 
+def sensor_open_posities(d: dict):
+    """2.24.1: waarde van *Open posities*. Bij de hoofdlus van de mand alle
+    open posities van de hele mand (eerder alleen BTC-EUR, 26-10: 0 terwijl de
+    mand er 20 had); zolang de mand opstart geen waarde (zoals L-GS-027)."""
+    if d.get("mand_posities") is None:
+        return len(d.get("open_positions") or [])
+    if d.get("mand_wacht"):
+        return None
+    return len(d["mand_posities"])
+
+
+def sensor_open_posities_attrs(d: dict, eigen: list) -> dict:
+    """2.24.1: attributen van *Open posities*. ``eigen`` zijn de regels van de
+    eigen markt (``posities.positie_regels``); buiten een mand ongewijzigd."""
+    pr = d.get("posities_per_richting") or {}
+    basis = {
+        "limiet_per_richting": pr.get("limiet"),
+        "netting_gedetecteerd": d.get("netting"),
+    }
+    regels = d.get("mand_posities")
+    if regels is None:
+        return {"positions": eigen, "long": pr.get("long"), "short": pr.get("short"), **basis}
+    if d.get("mand_wacht"):
+        return {"positions": [], "long": None, "short": None, "mand_start": True, **basis}
+    from .strategy.posities import richting_van
+
+    long_ = sum(1 for r in regels if richting_van(r.get("side")) == 1)
+    per_markt: dict[str, int] = {}
+    for r in regels:
+        per_markt[r["markt"]] = per_markt.get(r["markt"], 0) + 1
+    uit = {
+        "positions": [
+            {k: (_rond(v, 6) if k in ("units", "open_price", "stop_loss", "take_profit") else v)
+             for k, v in r.items()}
+            for r in regels[:_MAX_POSITIES_SENSOR]],
+        "long": long_, "short": len(regels) - long_,
+        "per_markt": dict(sorted(per_markt.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "markten": len(per_markt),
+        "eigen_markt": len(eigen),
+        "bereik": "mand",
+        **basis,
+    }
+    if len(regels) > _MAX_POSITIES_SENSOR:
+        uit["posities_overig"] = len(regels) - _MAX_POSITIES_SENSOR
+    return uit
+
+
 def sensor_trades_extra(d: dict) -> dict:
     if d.get("mand_wacht"):
         return {"mand_start": True}
@@ -405,6 +455,27 @@ class BitvavoMand:
                 open_c += 1
             totaal += open_c
         return totaal
+
+    def posities(self, eigen=None, eigen_strategie=None) -> list[dict]:
+        """2.24.1: alle open posities van de mand, één regel per positie met
+        de markt erbij. ``eigen``/``eigen_strategie``: de verse posities van de
+        hoofdlus (zijn ``data`` is nog die van de vorige cyclus)."""
+        from .posities import positie_regels
+
+        regels: list[dict] = []
+        for c in self.alle():
+            if c is self.hoofd and eigen is not None:
+                posities, strat = eigen, eigen_strategie
+            else:
+                data = getattr(c, "data", None) or {}
+                posities, strat = data.get("open_positions"), data.get("strategie_per_positie")
+            try:
+                for r in positie_regels(posities, strat):
+                    regels.append({"markt": c.symbol, **r})
+            except Exception:  # noqa: BLE001 - weergave
+                _LOGGER.debug("Posities van %s niet te lezen", getattr(c, "symbol", "?"),
+                              exc_info=True)
+        return regels
 
     def mag_openen(self, c) -> tuple[bool, str | None]:
         """Mag dit lid een nieuwe positie openen? Zo ja, dan is de plek

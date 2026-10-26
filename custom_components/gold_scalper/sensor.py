@@ -19,7 +19,14 @@ from .entity import GoldScalperEntity
 from .modes import TradingMode
 from .posities import positie_regels
 from .meetkwaliteit import SPECS
-from .mand import sensor_equity, sensor_equity_attrs, sensor_stats, sensor_trades_extra
+from .mand import (
+    sensor_equity,
+    sensor_equity_attrs,
+    sensor_open_posities,
+    sensor_open_posities_attrs,
+    sensor_stats,
+    sensor_trades_extra,
+)
 from .status import build_status
 
 
@@ -275,17 +282,12 @@ SENSORS: tuple[ScalperSensor, ...] = (
     ScalperSensor(
         key="open_positions", name="Open posities", icon="mdi:briefcase",
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda d: len(d.get("open_positions") or []),
-        attrs_fn=lambda d: {
+        # 2.24.1: bij de Bitvavo-mand alle posities van de mand (was BTC-EUR).
+        value_fn=sensor_open_posities,
+        attrs_fn=lambda d: sensor_open_posities_attrs(
             # 2.21.2 (L-GS-019): per positie ook de strategie/opzet.
-            "positions": positie_regels(
-                d.get("open_positions"), d.get("strategie_per_positie")),
-            # 1.9.0: telling per richting en de limiet.
-            "long": (d.get("posities_per_richting") or {}).get("long"),
-            "short": (d.get("posities_per_richting") or {}).get("short"),
-            "limiet_per_richting": (d.get("posities_per_richting") or {}).get("limiet"),
-            "netting_gedetecteerd": d.get("netting"),
-        },
+            d, positie_regels(
+                d.get("open_positions"), d.get("strategie_per_positie"))),
     ),
     ScalperSensor(
         # 1.9.0: gesimuleerde trades van geldige signalen die niet werden

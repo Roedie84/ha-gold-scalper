@@ -3530,6 +3530,11 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "mand_boek": mand_boek,
             "mand_stats": mand_stats,
             "mand_wacht": mand_wacht,
+            # 2.24.1: open posities van de hele mand (sensor *Open posities*).
+            "mand_posities": (self._mand.posities(
+                open_positions, self._strategie_per_positie(open_positions))
+                if getattr(self, "_mand", None) is not None and self._mand.hoofd is self
+                else None),
             "mand": (self._mand.overzicht()
                      if getattr(self, "_mand", None) is not None and self._mand.hoofd is self
                      else None),

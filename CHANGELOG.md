@@ -1,5 +1,16 @@
 # Changelog — Gold Scalper
 
+## 2.24.1 - 26-10-2026
+
+### Bitvavo-mand: *Open posities* telt de hele mand (meetfout)
+- Live 26-10 15:40: `sensor.gold_scalper_btc_eur_open_posities` stond op 0 (`positions: []`), terwijl *Mand* 20 open posities over 17 markten had. De sensor las alleen de posities van de hoofdlus (BTC-EUR).
+- Nu: bij de hoofdlus van de mand is de waarde het aantal open posities van **alle** markten van de mand. `positions` heeft per regel ook `markt` (hooguit 40 regels; de rest in `posities_overig`, zodat de attributen onder 16 kB blijven), `long`/`short` tellen over de hele mand, plus `per_markt` (markt -> aantal), `markten`, `eigen_markt` (posities van BTC-EUR zelf) en `bereik: mand`. `limiet_per_richting` blijft de limiet per markt.
+- Zolang de mand opstart (zoals L-GS-027) geen waarde en `mand_start: true`, in plaats van 0 of een deelsom.
+- De posities van de hoofdlus komen uit de lopende cyclus; die van de leden uit hun laatste cyclus. Telling kan een paar seconden afwijken van `Mand.open_posities` (die telt ook onbevestigde orders en toezeggingen).
+- Buiten een mand (IG, Pepperstone, losse markt) ongewijzigd.
+- Alleen weergave: raakt geen strategie, risicogrenzen, limieten, orders of instellingen.
+- Test: `test_v2241_open_posities_mand.py` (6), o.a. 50 posities < 14 kB.
+
 ## 2.24.0 - 26-10-2026
 
 ### Bitvavo-mand: toelating op de mediane spread over 24 uur (L-GS-025)
