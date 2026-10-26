@@ -325,3 +325,13 @@ laatste ronde: 25-10 19:50
 - Volgende ronde: Pep 3m bij n ≥ 100 en bruto < 0 → `vp_tijdvakken_uit` + 3m; IG rsi_rev:15m bij n ≥ 40; mand: eerste `vp:*:1h|4h|1d` gesloten.
 
 laatste ronde: 26-10 07:55
+
+## 26-10 ~20:00 · ronde 23 (geplande controle; 2.24.0 actief, 2.24.1 + 2.24.2 gedownload → herstart = Ruud)
+- **Gebouwd 2.24.2** (bug; suite 2086 groen + 7 skip; release via workflow, in HACS gedownload): kostenfilter gold op spot alleen voor `vp:*`; de daghandel (stops in ATR(15m)) liep erbuiten. HYPE-EUR 26-10 15:00/15:15: 2 daghandeltrades, bruto +0,70, kosten 12,39 (0,51 % rondreis), netto −11,70. Nu ook daghandel op spot door het filter; goud ongewijzigd. Plus testopzet: `test_v2241` importeerde niet zonder HA (stub SensorEntityDescription).
+- **Pepperstone** run 5 n=198 netto −90 (bruto 429, kosten 519). 3m: 81 regels / 66 posities, netto −783, bruto −483 (bruto t −0,87) → nog < 100 posities, wachten. vp:inside:3m 36 posities bruto −232 < 0,5 × kosten 201 → kostregel grijpt zelf bij n=40. 15m n=76 +583 (t 1,43), 30m n=32 +203: geen Bonferroni.
+- **IG** run 136 n=116 netto −244 (bruto 413, kosten 657 = 159 %); vandaag −425 (bruto −204). rsi_rev:15m alle runs 152 posities bruto 1.074 ≈ kosten 1.103 → kostregel (0,5×) niet geraakt.
+- **Mand**: eerste 2.23.0-trade NEAR vp:rsi_rev:4h +10,50 (bruto 13,38, kosten 2,88); 19 open. n=1: niets te zeggen.
+- Instellingen: niets. Logs: DNS-storing 19:33 (extern, afgevangen). Let op: 2 losse branches `claude-test-push`/`release-2.24.2` op GitHub (verwijderen lukte hier niet; mogen weg).
+- Volgende ronde: na herstart 2.24.2: mand weigert daghandel op "kostenfilter" (HYPE); Pep 3m bij ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m.
+
+laatste ronde: 26-10 20:00
