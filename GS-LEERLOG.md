@@ -335,3 +335,14 @@ laatste ronde: 26-10 07:55
 - Volgende ronde: na herstart 2.24.2: mand weigert daghandel op "kostenfilter" (HYPE); Pep 3m bij ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m.
 
 laatste ronde: 26-10 20:00
+
+## 27-10 ~07:55 · ronde 24 (geplande controle; 2.24.3 actief sinds herstart 06:04, update-entiteit off)
+- 2.24.3 en tussenronde 07:40 uit andere sessies; L-GS-033 gepland voor dagafsluiting 28-10 → niet dubbel gebouwd, geen code.
+- **Pepperstone** run 5: 227 posities, netto −879 (bruto −301, kosten 578), PF 0,84, t −1,05. 3m n=85 netto −1.110, bruto −799 (bruto t −1,38); 15m n=89 +169, 30m n=43 +229: geen Bonferroni. Vandaag 24 pos −522.
+- vp:inside:3m run 5 n=40 bruto −475, maar kostregel telt alle runs (n=137, bruto 485 > 0,5 × 555) → terecht nog aan; geen bug.
+- **IG** run 136: 130 trades, netto −376, PF 0,86, t −0,59 (gelijk aan 07:40).
+- Logs: losse koersfouten (IG time-out, gekruist BTC-EUR-orderboek, ANIME-EUR), afgevangen. Afstemming beide in_orde, geen noodstop.
+- Instellingen: niets (Pep 3m n=85 < 100).
+- Volgende ronde: Pep 3m bij ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m.
+
+laatste ronde: 27-10 07:55
