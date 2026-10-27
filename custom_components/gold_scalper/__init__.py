@@ -54,6 +54,9 @@ def _anonimiseer(waarde):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = GoldScalperCoordinator(hass, entry)
+    # 2.24.3 (L-GS-030): weet vóór de eerste verversing al dat deze lus het
+    # hoofd van een mand wordt; de mandsensoren tonen dan nog niets.
+    coordinator._mand_verwacht = is_mand({**entry.data, **entry.options})
     try:
         await coordinator.async_setup()
         await coordinator.async_config_entry_first_refresh()

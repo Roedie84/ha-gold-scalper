@@ -224,6 +224,22 @@ def lees_markt(pad: str, markt: str, strategie_versie: str) -> tuple[dict, list]
 
 # -- sensorwaarden (2.22.2; los van Home Assistant, zodat ze testbaar zijn) ---- #
 
+def mand_wacht_voor(c) -> bool:
+    """Toont deze lus (nog) geen mandwaarden? (2.23.1 L-GS-027, 2.24.3 L-GS-030)
+
+    Waar zolang de mand opstart (leden en archief nog niet geladen), én in de
+    allereerste verversing vóórdat ``_mand`` gekoppeld is, als de lus wel het
+    hoofd van een mand wordt (``_mand_verwacht``). Die eerste verversing liep
+    tot 2.24.3 met de eigen BTC-EUR-stats: *Trades* 12-30 s op 0 bij elke
+    herstart (26-10, n=8)."""
+    mand = getattr(c, "_mand", None)
+    if mand is None:
+        return bool(getattr(c, "_mand_verwacht", False))
+    if getattr(mand, "hoofd", None) is not c:
+        return False
+    return not getattr(mand, "boek_gereed", True)
+
+
 def sensor_stats(d: dict) -> dict:
     """De statistiek achter trades/netto/oordeel: bij de hoofdlus van de mand
     die van de hele mand, anders die van de eigen markt.
@@ -260,10 +276,12 @@ def sensor_open_posities(d: dict):
     """2.24.1: waarde van *Open posities*. Bij de hoofdlus van de mand alle
     open posities van de hele mand (eerder alleen BTC-EUR, 26-10: 0 terwijl de
     mand er 20 had); zolang de mand opstart geen waarde (zoals L-GS-027)."""
-    if d.get("mand_posities") is None:
-        return len(d.get("open_positions") or [])
+    # 2.24.3 (L-GS-030): eerst de opstartvlag; in de eerste verversing is
+    # ``mand_posities`` nog None en kwam hier 0 (alleen BTC-EUR) uit.
     if d.get("mand_wacht"):
         return None
+    if d.get("mand_posities") is None:
+        return len(d.get("open_positions") or [])
     return len(d["mand_posities"])
 
 
@@ -276,10 +294,10 @@ def sensor_open_posities_attrs(d: dict, eigen: list) -> dict:
         "netting_gedetecteerd": d.get("netting"),
     }
     regels = d.get("mand_posities")
-    if regels is None:
-        return {"positions": eigen, "long": pr.get("long"), "short": pr.get("short"), **basis}
     if d.get("mand_wacht"):
         return {"positions": [], "long": None, "short": None, "mand_start": True, **basis}
+    if regels is None:
+        return {"positions": eigen, "long": pr.get("long"), "short": pr.get("short"), **basis}
     from .strategy.posities import richting_van
 
     long_ = sum(1 for r in regels if richting_van(r.get("side")) == 1)

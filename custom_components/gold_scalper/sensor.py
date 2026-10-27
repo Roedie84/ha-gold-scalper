@@ -332,6 +332,8 @@ SENSORS: tuple[ScalperSensor, ...] = (
             for k in (
                 "oordeel", "volledige_trades", "open", "vervallen",
                 "per_variant", "gepaard_tegen_240", "overeenkomst", "let_op",
+                # 2.24.3 (L-GS-032)
+                "van_toepassing",
             )
         },
     ),

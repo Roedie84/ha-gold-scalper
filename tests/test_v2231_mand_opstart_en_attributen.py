@@ -136,7 +136,8 @@ def test_coordinator_zet_de_vlag_en_slaat_het_boek_over():
     bron = open(os.path.join(os.path.dirname(mand_mod.__file__), "coordinator.py"),
                 encoding="utf-8").read()
     assert '"mand_wacht": mand_wacht' in bron
-    assert 'getattr(self._mand, "boek_gereed", True)' in bron
+    # 2.24.3 (L-GS-030): de vlag komt uit ``mand.mand_wacht_voor``.
+    assert "mand_wacht = mand_wacht_voor(self)" in bron
 
 
 # -- L-GS-028 ------------------------------------------------------------------ #

@@ -192,7 +192,9 @@ def test_broker_opens_and_partials_carry_the_regime():
             ast.get_source_segment(bron, node) or ""
         )):
             gevonden[node.name] = ast.get_source_segment(bron, node)
-    assert "exit_regime=EXIT_REGIME_HUIDIG" in gevonden["_record_broker_open"]
+    # 2.24.3 (L-GS-032): het huidige regime via ``exit_regime_voor`` (veldproef
+    # krijgt "veldproef", al het andere nog steeds EXIT_REGIME_HUIDIG).
+    assert "exit_regime=exit_regime_voor(" in gevonden["_record_broker_open"]
     deel = [s for s in gevonden.values() if "part = Trade(" in s]
     assert deel and "exit_regime=trade.exit_regime" in deel[0]
 

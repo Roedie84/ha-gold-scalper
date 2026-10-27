@@ -414,3 +414,29 @@ def oordeel(n_blokken: int, gepaard: dict) -> str:
             f"met t ≤ -{T_DREMPEL:.0f} over {n_blokken} blokken"
         )
     return f"geen duidelijk verschil over {n_blokken} uurblokken"
+
+
+#: 2.24.3 (L-GS-032): tekst als de varianten niets kúnnen meten.
+NIET_VAN_TOEPASSING = (
+    "niet van toepassing: deze run heeft geen scalp-trades; de veldproef en "
+    "de daghandel hebben geen tijdstop, dus er valt niets na te spelen"
+)
+
+
+def weergave(stats: dict | None, scalp_trades: int | None, run_trades: int | None) -> dict:
+    """Wat de sensor *Tijdstopvarianten* toont (2.24.3, L-GS-032).
+
+    Alleen scalp heeft een tijdstop; alleen scalp-trades worden nagespeeld
+    (``_open_varianten``). Draait de run wel maar zonder een enkele
+    scalp-trade, dan komt "te weinig blokken" nooit binnen bereik en is het
+    oordeel "niet van toepassing". Zodra er scalp-trades of blokken zijn,
+    ongewijzigd. Alleen weergave; meet en stuurt verder niets.
+    """
+    uit = dict(stats or {})
+    if (uit.get("blokken") or 0) == 0 and not (scalp_trades or 0) \
+            and (run_trades or 0) > 0:
+        uit["oordeel"] = NIET_VAN_TOEPASSING
+        uit["van_toepassing"] = False
+    else:
+        uit.setdefault("van_toepassing", True)
+    return uit

@@ -91,6 +91,7 @@ from .const import (
     STRATEGY_WINDOW_BARS,
     EXECUTION_SEMANTICS_VERSION,
     EXIT_REGIME_HUIDIG,
+    exit_regime_voor,
     INTEGRATION_VERSION,
     ARCHIVE_FILENAME,
     CONF_ACCOUNT_ID, CONF_API_KEY, CONF_ASSUMED_SPREAD, CONF_BUILD_FROM_QUOTES,
@@ -153,6 +154,7 @@ from .strategy.posities import (
     tel_per_richting,
 )
 from .strategy.tijdstopvarianten import VariantenBoek, VariantTrade
+from .strategy.tijdstopvarianten import weergave as tijdstop_weergave
 from .strategy.schaduw import (
     SCHADUW_REDENEN, SchaduwBoek, SchaduwKosten, SchaduwTrade,
 )
@@ -160,6 +162,7 @@ from .learning.robustness import evaluate_robustness
 from .learning.sessions import build_news_impact, build_sessions
 from .strategy.aggregator import BAR_SECONDS, QuoteAggregator, closed_only
 from .strategy import veldproef as veldproef_mod
+from .mand import mand_wacht_voor
 from .strategy import schaal as schaal_mod
 from .strategy import uitgezet_schaduw as uitgezet_mod
 from .strategy import bevestiging as bevestiging_mod
@@ -3462,11 +3465,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         # 2.23.1 (L-GS-027): tijdens het opstarten van de mand (leden en archief
         # nog niet geladen) tonen de mandsensoren geen waarde in plaats van 0
         # of een deelsom. Alleen weergave; de handel wacht al op ``_gereed``.
-        mand_wacht = False
-        if getattr(self, "_mand", None) is not None and self._mand.hoofd is self \
-                and not getattr(self._mand, "boek_gereed", True):
-            mand_wacht = True
-        elif getattr(self, "_mand", None) is not None and self._mand.hoofd is self:
+        # 2.24.3 (L-GS-030): ook in de allereerste verversing, als ``_mand``
+        # nog niet gekoppeld is maar deze lus wel het hoofd van een mand wordt
+        # (``_mand_verwacht``, gezet in ``__init__.py`` vóór de eerste
+        # verversing). Anders gingen de eigen BTC-EUR-stats (0 trades) door.
+        mand_wacht = mand_wacht_voor(self)
+        if not mand_wacht and getattr(self, "_mand", None) is not None and self._mand.hoofd is self:
             try:
                 mand_boek = self._mand.grootboek()
                 mand_stats = await self._mand.statistiek()
@@ -3513,7 +3517,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             "netting": self.netting,
             "schaduw": self._schaduw_stats,
             # 1.9.5: tijdstopvarianten (gesimuleerd, alleen meting).
-            "tijdstopvarianten": self._varianten_stats,
+            # 2.24.3 (L-GS-032): "niet van toepassing" zonder scalp-trades.
+            "tijdstopvarianten": tijdstop_weergave(
+                self._varianten_stats, self._scalp_trades(stats), (stats or {}).get("trades")),
             "stats": {**stats, "per_strategie": self._per_strategie} if self.combinatie else stats,
             # 2.1.0: strategiekeuze (paneel: markers, uitstap per positie).
             "strategie_keuze": self._strategie,
@@ -4375,6 +4381,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 )
                 trade.gelijktijdig_open = gelijktijdig_open
                 trade.strategie = strategie if self.combinatie else None
+                # 2.24.3 (L-GS-032): uitstapregime naar de strategie.
+                trade.exit_regime = exit_regime_voor(trade.strategie)
                 geopend_ticket = f"id:{trade.id}" if getattr(trade, "id", None) else None
                 await self.hass.async_add_executor_job(self.db.update_trade, trade)
                 # 1.9.5: tijdstopvarianten van deze positie (alleen meting).
@@ -4963,6 +4971,16 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 self._varianten_vuil = True
         except Exception as err:  # noqa: BLE001 - meting mag de handel niet raken
             _LOGGER.debug("Tijdstopvarianten niet bijgewerkt: %s", err)
+
+    def _scalp_trades(self, stats: dict | None) -> int:
+        """2.24.3 (L-GS-032): gesloten scalp-trades in deze run (scalp is de
+        enige strategie met een tijdstop, dus de enige die de
+        tijdstopvarianten voedt)."""
+        if self.combinatie:
+            return int(((self._per_strategie or {}).get(STRATEGIE_SCALP) or {}).get("trades") or 0)
+        if self.primaire_strategie == STRATEGIE_SCALP:
+            return int((stats or {}).get("trades") or 0)
+        return 0
 
     async def _ververs_varianten_stats(self, forceer: bool = False) -> None:
         """Na een gesloten variant, en elke 30 cycli (latere correcties van
@@ -7246,7 +7264,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             signal_confidence=signal.confidence,
             execution_semantics=EXECUTION_SEMANTICS_VERSION,
             # 1.7.6: alleen statistiek, zit niet in de vingerafdruk.
-            exit_regime=EXIT_REGIME_HUIDIG,
+            # 2.24.3 (L-GS-032): veldproeftrades hebben geen tijdstop.
+            exit_regime=exit_regime_voor(
+                (signal.components or {}).get("strategie") if self.combinatie else None
+            ),
             regime=(signal.components or {}).get("regime"),
             # Indicatorwaarden op het instapmoment vastleggen.
             #

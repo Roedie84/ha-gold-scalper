@@ -1,5 +1,19 @@
 # Changelog — Gold Scalper
 
+## 2.24.3 - 27-10-2026
+
+### Bitvavo-mand: ook de allereerste verversing toont geen 0 (L-GS-030, meetfout)
+- Live 26-10 (8 herstarts): *Trades* van de mand stond na elke herstart 12-30 s op **0** (de eigen BTC-EUR-stats), daarna onbekend en pas dan 573. 2.23.1 (L-GS-027) dekte het opstarten van de mand, maar niet de eerste verversing: die loopt in `__init__.py` vóórdat `coordinator._mand` gekoppeld is.
+- Nu weet de lus al vóór de eerste verversing dat hij het hoofd van een mand wordt (`_mand_verwacht`); `mand.mand_wacht_voor()` geeft dan "wachten", dus *Trades*, *Nettoresultaat*, *Equity*, het oordeel en *Open posities* zijn onbekend tot de mand gereed is. *Open posities* keek eerst of er mandposities waren en gaf in die eerste verversing 0; de opstartvlag gaat nu voor.
+- Buiten een mand (IG, Pepperstone, losse markt) en voor de leden van de mand ongewijzigd.
+
+### Tijdstopvarianten en uitstapregime bij de veldproef (L-GS-032, rapportage)
+- Live ≥ 10 dagen: *Tijdstopvarianten* IG en Pepperstone op 0 met "te weinig blokken (0 van 20 uurblokken)", terwijl de runs 120 en 220 trades hebben. Alleen scalp heeft een tijdstop en alleen scalp-trades worden nagespeeld; de veldproef (`vp:*`) en de daghandel hebben er geen. De drempel kwam zo nooit binnen bereik.
+- Nu: zonder blokken en zonder één scalp-trade in een run met trades zegt het oordeel "niet van toepassing: deze run heeft geen scalp-trades ..." en is `van_toepassing` false. Met scalp-trades of blokken ongewijzigd. De waarde (aantal blokken) blijft.
+- Nieuw geopende veldproeftrades krijgen uitstapregime `veldproef` in plaats van `tijdstop`, zodat `per_exitregime` ze apart toont (Pepperstone: `tijdstop` was de hele veldproefrun). Oude trades ongewijzigd. Het regime is alleen statistiek: de afwikkeling kijkt alleen naar `zonder_tijdstop`, de tijdstop zelf hangt aan de uitstapregels van de strategie.
+- Raakt geen strategie, signaalregels, exits, risicogrenzen, noodstop, orders of instellingen.
+- Test: `test_v2243_mandstart_en_tijdstop_nvt.py` (16); `test_v2231_mand_opstart_en_attributen.py` kijkt nu naar `mand_wacht_voor`, `test_release_176.py` naar `exit_regime_voor`.
+
 ## 2.24.2 - 26-10-2026
 
 ### Bitvavo-mand: kostenfilter geldt ook voor de daghandel (bug)

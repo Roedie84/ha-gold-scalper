@@ -270,7 +270,7 @@ DISCLAIMER: Final = (
 
 
 #: Versie van deze integratie. Gelijk aan manifest.json; een test bewaakt dat.
-INTEGRATION_VERSION: Final = "2.24.2"
+INTEGRATION_VERSION: Final = "2.24.3"
 
 #: Versie van het uitvoeringsgedrag: hoe posities worden gevolgd, afgerekend
 #: en beheerd. Gaat omhoog bij elke wijziging die dat gedrag verandert, ook als
@@ -300,6 +300,21 @@ EXIT_REGIME_ZONDER_TIJDSTOP: Final = "zonder_tijdstop"
 EXIT_REGIME_TIJDSTOP: Final = "tijdstop"
 #: Het regime waaronder nu geopende trades vallen.
 EXIT_REGIME_HUIDIG: Final = EXIT_REGIME_TIJDSTOP
+#: 2.24.3 (L-GS-032): veldproeftrades (``vp:*``) hebben geen tijdstop (eigen
+#: maximale duur per opzet). Ze kregen toch "tijdstop" mee, waardoor
+#: ``per_exitregime.tijdstop`` de hele veldproefrun bevatte.
+EXIT_REGIME_VELDPROEF: Final = "veldproef"
+
+
+def exit_regime_voor(strategie: str | None) -> str:
+    """Het uitstapregime van een nieuw geopende trade (2.24.3, L-GS-032).
+
+    Alleen statistiek: het regime zit niet in de vingerafdruk en verandert
+    geen beslissing (de tijdstop hangt aan de uitstapregels van de strategie).
+    """
+    if isinstance(strategie, str) and strategie.startswith("vp:"):
+        return EXIT_REGIME_VELDPROEF
+    return EXIT_REGIME_HUIDIG
 #: Moment waarop 1.7.4 (samen met 1.7.5) is geïnstalleerd: de herstart van
 #: Home Assistant op 8 oktober 2026 om 12:16 lokale tijd. Brokertrades die
 #: daarvóór openden, liepen zonder werkende tijdstop. Papertrades hadden
