@@ -415,3 +415,14 @@ laatste ronde: 27-10 03:40, gemeten t/m 27-10 03:50
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10), H-GS-14. Geen release.
 
 laatste ronde: 27-10 07:40, gemeten t/m 27-10 07:40
+
+## 27-10 11:40 · tussenronde
+- Herstarts 08:00 en 11:34; **2.24.3 actief**. Demo/papier; geen knoppen, geen instellingen. Geen release.
+- **L-GS-030 geverifieerd:** 3 herstarts (06:04, 08:00, 11:34) mand *Trades*/*Open posities* 574/18 → onbekend → 574/18, nooit 0 (was 4 van 4 keer 0).
+- **Goud 07:40-11:40:** Pepperstone 14 trades, **+140,53** → run 241, −738,19, PF 0,866, t −0,537; IG 8 trades, **−65,96** → 138, −442,15, PF 0,842, t −0,688. Clusters ~21 PP / ~14 IG; nodig ≥ 30 per broker over ≥ 5 handelsdagen → **geen toets**.
+- **H-GS-14:** tweede venster op rij met tegengestelde uitkomst PP/IG (ochtend −334/−14, nu +141/−66) → "beide brokers tegelijk" houdt binnen de dag niet; toets blijft op dagniveau (n=3 dagen).
+- Mand: 574 trades, netto −6.410,57 (geen nieuwe trade), 18 open; *Resultaat per periode* unknown (L-GS-033, dagafsluiting 28-10).
+- Latency p99: IG 1,28 / PP 0,90 / mand 0,60 s - IG hoger na 2 herstarts (zelfde patroon als 26-10), geen nieuwe hypothese.
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10), H-GS-14.
+
+laatste ronde: 27-10 11:40, gemeten t/m 27-10 11:43
