@@ -437,3 +437,14 @@ laatste ronde: 27-10 11:40, gemeten t/m 27-10 11:43
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10), H-GS-14.
 
 laatste ronde: 27-10 15:58, gemeten t/m 27-10 15:58
+
+## 27-10 19:41 · tussenronde
+- Geen herstart sinds 12:32; **2.24.3 actief**. Demo/papier; geen knoppen, geen instellingen. Geen release. Logs: Bitvavo-koersopvragingen (geen bied/laat, AVAX onbruikbaar boek) 7×, telkens 1 van max. 3, afgevangen.
+- **Goud 15:58-19:41:** Pepperstone 7 trades, **−36,95** → run 259, −477,51, PF 0,917, t −0,344; IG 9 trades, **+45,69** → 160, −763,48, PF 0,771, t −1,139 (stop 46,9 %). Clusters nog < 30 per broker → **geen toets**.
+- **H-GS-14:** vierde venster op rij tegengesteld (PP −37 / IG +46). Binnen de dag nooit 'beide tegelijk'; toets op dagniveau (n=3 dagen).
+- Mand: 576 trades, netto −6.435,69 (geen nieuwe trade), 16 open; *Resultaat per periode* unknown (L-GS-033, dagafsluiting 28-10).
+- **Latency p99 PP 0,90 → 1,51 → 1,72 s** (11:40/15:58/19:41), IG 1,38, mand 0,59. Stijgt sinds de herstart van 12:32 zonder nieuwe herstart; volgen in de dagafsluiting (p99 per dag, n=1 dag).
+- Stilstand: alleen mand *Resultaat per periode* (L-GS-033, gepland).
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10), H-GS-14.
+
+laatste ronde: 27-10 19:41, gemeten t/m 27-10 19:41

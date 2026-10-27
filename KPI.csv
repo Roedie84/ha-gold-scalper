@@ -542,3 +542,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-27 15:58,TUSSEN,gs_ig_venster_netto,-367.02,13,"11:40-15:58; run 151 trades, netto -809.17, PF 0.750, t -1.182"
 2026-10-27 15:58,TUSSEN,gs_mand_venster_netto,-25.12,2,"576 trades, netto -6435.69, 16 open"
 2026-10-27 15:58,TUSSEN,gs_latency_p99_ms,1509,3,"IG 1264 / PP 1509 / mand 653 ms"
+2026-10-27 19:41,TUSSEN,gs_pp_trades_venster,7,7,"15:58-19:41; -36.95; run 259, -477.51, PF 0.917, t -0.344"
+2026-10-27 19:41,TUSSEN,gs_ig_trades_venster,9,9,"15:58-19:41; +45.69; run 160, -763.48, PF 0.771, t -1.139"
+2026-10-27 19:41,TUSSEN,gs_mand_netto,-6435.69,576,"geen nieuwe trade; 16 open; resultaat per periode unknown (L-GS-033)"
+2026-10-27 19:41,TUSSEN,gs_latency_p99_ms_pp,1723,0,"was 1510 (15:58), 900 (11:40); IG 1382, mand 588"
