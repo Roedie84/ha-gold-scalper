@@ -1533,7 +1533,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         }
 
         risk_state = self.risk.state.state.value
-        if risk_state == "halted" and self._previous_risk_state != "halted":
+        mand = getattr(self, "_mand", None)
+        # 2.25.0: de vloer van de hele mand raakt alle leden tegelijk; alleen
+        # de hoofdlus meldt dat (één melding, niet twintig).
+        mandvloer_lid = (
+            mand is not None and getattr(mand, "hoofd", None) is not self
+            and str(self.risk.state.halt_reason or "").startswith("equity van de mand")
+        )
+        if (risk_state == "halted" and self._previous_risk_state != "halted"
+                and not mandvloer_lid):
             used = self.risk.state.resumes_today
             allowed = self.risk.limits.max_resumes_per_day
             await self.notifier.alert(
@@ -3061,6 +3069,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                 saldo_onbekend = str(err)[:120] or "geen antwoord"
 
         self._deel.mark("saldo")
+        # 2.25.0 (akkoord Ruud 27-10): Bitvavo-mand op papier - de
+        # vermogensvloer toetst de equity van de hele mand, elke cyclus (niet
+        # pas bij een signaal; op 1h/4h/1d komt dat zelden). Live doet
+        # ``bitvavo.account()`` dit al vanzelf. Onder de vloer: noodstop.
+        vloer_mand = self._mand_vloer(equity)
+        if vloer_mand is not None and saldo_onbekend is None:
+            self.risk.toets_mandvloer(vloer_mand)
         # Eerst onbevestigde orders terugzoeken: vóór de telling, zodat een
         # teruggevonden positie meetelt en vastgelegd is voordat de strategie
         # opnieuw beslist.
@@ -3206,6 +3221,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         market_open=tradeable,
                         atr=self.state.atr.value,
                         opening_equity=self.opening_equity,
+                        vloer_mand=vloer_mand,
                     )
                     r_reject = None if allowed else f"risico: {why}"
                     if not allowed:
@@ -3592,8 +3608,12 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # Meetkwaliteit, voor sensoren en overzicht: zonder dit stond alles
             # wat 5.4 meet alleen in de diagnostiek.
             "balances": {
-                **self.risk.floor_breakdown(
-                    self.starting_balance, self.opening_equity, equity,
+                **(
+                    # 2.25.0: bij de mand op papier de vloer van de hele mand.
+                    self.risk.mandvloer(vloer_mand) if vloer_mand is not None
+                    else self.risk.floor_breakdown(
+                        self.starting_balance, self.opening_equity, equity,
+                    )
                 ),
                 "account_currency": self.conversion.account,
             },
@@ -6858,6 +6878,19 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             return None
         return uit if isinstance(uit, bool) else None
 
+    def _mand_vloer(self, equity) -> tuple[float, float] | None:
+        """2.25.0 (akkoord Ruud 27-10): (equity, startbalans) van de hele
+        Bitvavo-mand voor de vermogensvloer, alleen op papier en zodra de mand
+        gereed is; anders None (de vloer toetst dan de eigen equity)."""
+        mand = getattr(self, "_mand", None)
+        if mand is None or not getattr(self, "paper", None):
+            return None
+        try:
+            return mand.vloer_equity(self, equity)
+        except Exception:  # noqa: BLE001 - nooit de cyclus breken
+            _LOGGER.debug("Vloer van de mand niet te bepalen", exc_info=True)
+            return None
+
     def _minuten_tot_sluiting(self, now: datetime) -> float | None:
         """2.9.5: eerst het rooster van de venue, anders het eigen (IG) rooster."""
         if self._venue_rooster(now) is not None:
@@ -7127,6 +7160,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             volume=self.units / CONTRACT_SIZE, spread=quote.spread,
             last_tick_age=0.0, market_open=True, atr=self.state.atr.value,
             opening_equity=self.opening_equity,
+            vloer_mand=self._mand_vloer(ctx["equity"]),
         )
         if not allowed:
             return False

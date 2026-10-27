@@ -16,8 +16,13 @@ dient dus als *vangnet* en niet als vervanging - vandaar dat een afwijking
 gemeld wordt in plaats van stil gecorrigeerd. Blijft die afwijking bestaan, dan
 klopt het rooster niet meer en moet het bijgesteld.
 
-Alle tijden in Europe/Amsterdam, want dat is hoe IG ze publiceert voor
-Nederlandse klanten en hoe jij ernaar kijkt.
+Elk rooster rekent in zijn eigen tijdzone (``Session.tz``). Spot goud volgt
+de Amerikaanse markt en staat sinds 2.25.0 (L-GS-031) in America/New_York:
+week open zondag 18:00, dagpauze 17:00-18:00, week dicht vrijdag 17:00. Zo
+schuift het rooster mee met de Amerikaanse zomertijd; in de weken waarin
+Europa en de VS niet tegelijk omschakelen (~3 weken in maart, ~1 week eind
+oktober) valt de pauze een uur eerder in Nederlandse tijd (22:00-23:00).
+Meldingen tonen de tijden in Europe/Amsterdam, want zo kijk jij ernaar.
 """
 
 from __future__ import annotations
@@ -30,6 +35,11 @@ from zoneinfo import ZoneInfo
 _LOGGER = logging.getLogger(__name__)
 
 MARKET_TZ = ZoneInfo("Europe/Amsterdam")
+#: 2.25.0 (L-GS-031): de tijdzone van de Amerikaanse goudmarkt.
+NEW_YORK_TZ = ZoneInfo("America/New_York")
+
+_DAG_S = 86400
+_WEEK_S = 7 * _DAG_S
 
 #: Zo dicht bij een opening of sluiting is een verschil tussen broker en
 #: rooster een klokrand, geen afwijking om te melden (1.7.10).
@@ -47,34 +57,33 @@ class Session:
     #: Weekdag en tijd waarop de week sluit.
     closes_weekday: int
     closes_at: time
-    #: Dagelijkse onderbreking, of None.
+    #: Dagelijkse onderbreking (begin, einde; het einde is het eerste moment
+    #: dat de markt weer open is), of None.
     daily_break: tuple[time, time] | None = None
+    #: 2.25.0: de tijdzone waarin de tijden hierboven gelden.
+    tz: ZoneInfo = MARKET_TZ
 
 
-#: Spot goud bij IG: maandag 00:00 tot vrijdag 23:00, Nederlandse tijd.
+#: Spot goud bij IG: zondag 18:00 tot vrijdag 17:00 New Yorkse tijd, met een
+#: dagelijkse pauze van 17:00 tot 18:00 New York.
 #:
-#: De dagelijkse pauze van 23:00 tot 24:00 geldt bij IG voor de futures; voor
-#: spot is die er in de praktijk ook, omdat de onderliggende markt dan sluit.
-#: Hij staat er daarom in - een uur niet handelen kost je weinig, handelen in
-#: een markt zonder liquiditeit kost je de spread.
-#: Het rooster is een *vermoeden*, geen waarheid.
+#: Tot 2.24.3 stond dit vast in Nederlandse tijd (maandag 00:00 tot vrijdag
+#: 23:00, pauze 23:00-24:00). Dat klopt alleen als Europa en de VS allebei
+#: zomer- of allebei wintertijd hebben. Gemeten 24-26/10 (L-GS-031, 3 van 3
+#: avonden): beide brokers dicht 22:00 en weer open 23:01 CET (= 17:00-18:00
+#: New York; de VS houden zomertijd tot 1-11). Het oude rooster hield IG dan
+#: tot 24:00 dicht terwijl Pepperstone om 23:01 weer handelde.
 #:
-#: Twee bronnen geven verschillende tijden voor spot goud bij IG: de
-#: Nederlandse publicatie zegt een pauze van 23:00 tot 24:00 lokale tijd, een
-#: andere bron zegt 22:00 tot 23:00 UTC - dat scheelt een uur in zomertijd.
-#:
-#: Welke klopt valt van buitenaf niet vast te stellen, en het hoeft ook niet:
-#: bij onenigheid wint altijd 'gesloten', dus er wordt nooit tegen de broker in
-#: gehandeld. Het rooster dient alleen om te merken wanneer het veld
-#: ``marketState`` zelf niet deugt.
-#:
-#: Wat wél helpt is meten wanneer de broker de markt werkelijk sluit; zie
-#: ``observed_closures`` hieronder.
+#: Het rooster blijft een *vermoeden*, geen waarheid: feestdagen en vervroegde
+#: sluitingen staan er niet in, en bij onenigheid wint altijd 'gesloten', dus
+#: er wordt nooit tegen de broker in gehandeld. Het dient om te merken wanneer
+#: het veld ``marketState`` zelf niet deugt; zie ook ``observed_closures``.
 SPOT_GOLD = Session(
     name="spot goud",
-    opens_weekday=0, opens_at=time(0, 0),
-    closes_weekday=4, closes_at=time(23, 0),
-    daily_break=(time(23, 0), time(23, 59, 59)),
+    opens_weekday=6, opens_at=time(18, 0),
+    closes_weekday=4, closes_at=time(17, 0),
+    daily_break=(time(17, 0), time(18, 0)),
+    tz=NEW_YORK_TZ,
 )
 
 #: Weekendhandel bij IG: zaterdag 09:00 tot zondag 23:40. Een apart instrument
@@ -86,38 +95,84 @@ WEEKEND_GOLD = Session(
 )
 
 
+def _week_seconde(weekday: int, klok: time) -> int:
+    return weekday * _DAG_S + klok.hour * 3600 + klok.minute * 60 + klok.second
+
+
+def _lokaal(session: Session, moment: datetime, klok: time, dagen: int = 0) -> str:
+    """Een tijd van het rooster (in ``session.tz``) als Nederlandse kloktijd,
+    op de dag van ``moment`` (in ``session.tz``) plus ``dagen``."""
+    dag = moment.astimezone(session.tz).date() + timedelta(days=dagen)
+    lokaal = datetime.combine(dag, klok, tzinfo=session.tz).astimezone(MARKET_TZ)
+    return f"{lokaal:%H:%M}"
+
+
+def _in_pauze(session: Session, klok: time) -> bool:
+    if not session.daily_break:
+        return False
+    start, eind = session.daily_break
+    if start < eind:
+        return start <= klok < eind
+    # Over middernacht heen (bijv. 23:00 tot 00:00).
+    return klok >= start or klok < eind
+
+
 def is_open(session: Session, moment: datetime | None = None) -> tuple[bool, str]:
-    """Zou de markt volgens het rooster open moeten zijn?"""
-    moment = (moment or datetime.now(timezone.utc)).astimezone(MARKET_TZ)
+    """Zou de markt volgens het rooster open moeten zijn?
+
+    2.25.0: gerekend in de tijdzone van het rooster (spot goud: New York), de
+    reden noemt de Nederlandse kloktijden.
+    """
+    moment = (moment or datetime.now(timezone.utc)).astimezone(session.tz)
     weekday = moment.weekday()
-    # 1.7.10: hele seconden. De pauze loopt tot en met 23:59:59; om
-    # 23:59:59,06 zei het rooster 'open' terwijl de broker (terecht) nog
-    # dicht was - elke nacht een valse waarschuwing (leerronde 9 oktober).
+    # 1.7.10: hele seconden. Om 23:59:59,06 zei het rooster 'open' terwijl de
+    # broker (terecht) nog dicht was - elke nacht een valse waarschuwing
+    # (leerronde 9 oktober). Het einde van de pauze is het eerste open moment.
     clock = moment.time().replace(microsecond=0)
+    pos = _week_seconde(weekday, clock)
+    opent = _week_seconde(session.opens_weekday, session.opens_at)
+    sluit = _week_seconde(session.closes_weekday, session.closes_at)
 
-    if session.daily_break:
-        start, end = session.daily_break
-        if start <= clock <= end:
-            return False, (
-                f"dagelijkse onderbreking van {start:%H:%M} tot 24:00"
-            )
-
-    if session.opens_weekday <= session.closes_weekday:
-        # Binnen één week, bijvoorbeeld maandag tot vrijdag.
-        if weekday < session.opens_weekday or weekday > session.closes_weekday:
-            return False, "buiten de handelsweek"
-        if weekday == session.opens_weekday and clock < session.opens_at:
-            return False, f"opent om {session.opens_at:%H:%M}"
+    if opent <= sluit:
+        in_week = opent <= pos < sluit
+    else:
+        # Loopt over het einde van de week (zondag tot vrijdag in New York,
+        # of zaterdag tot zondag).
+        in_week = pos >= opent or pos < sluit
+    if not in_week:
         if weekday == session.closes_weekday and clock >= session.closes_at:
-            return False, f"gesloten sinds {session.closes_at:%H:%M}"
-        return True, "binnen de handelstijden"
+            return False, f"gesloten sinds {_lokaal(session, moment, session.closes_at)}"
+        if weekday == session.opens_weekday and clock < session.opens_at:
+            return False, f"opent om {_lokaal(session, moment, session.opens_at)}"
+        return False, "buiten de handelsweek"
 
-    # Loopt over het weekeinde heen, bijvoorbeeld zaterdag tot zondag.
-    if weekday == session.opens_weekday:
-        return (clock >= session.opens_at), "weekendsessie"
-    if weekday == session.closes_weekday:
-        return (clock < session.closes_at), "weekendsessie"
-    return False, "buiten de weekendsessie"
+    if _in_pauze(session, clock):
+        start, eind = session.daily_break
+        extra = 1 if eind <= start and clock >= start else 0
+        return False, (
+            f"dagelijkse onderbreking van {_lokaal(session, moment, start, 0 if clock >= start else -1)} "
+            f"tot {_lokaal(session, moment, eind, extra)}"
+        )
+    return True, "binnen de handelstijden"
+
+
+def _seconden_tot_sluiting(session: Session, moment: datetime) -> tuple[float | None, float | None]:
+    """(tot de eerstvolgende sluiting, tot de weeksluiting) in seconden vanaf
+    ``moment`` (in ``session.tz``); de eerste is de pauze of de weeksluiting,
+    wat het eerst komt. Alleen zinvol als de markt open is."""
+    lokaal = moment.astimezone(session.tz)
+    pos = _week_seconde(lokaal.weekday(), lokaal.time()) + lokaal.microsecond / 1e6
+    sluit = _week_seconde(session.closes_weekday, session.closes_at)
+    tot_week = (sluit - pos) % _WEEK_S
+    kandidaten = [tot_week] if tot_week > 0 else []
+    if session.daily_break:
+        start = session.daily_break[0]
+        start_s = start.hour * 3600 + start.minute * 60 + start.second
+        dag_s = pos % _DAG_S
+        tot_pauze = (start_s - dag_s) % _DAG_S
+        if tot_pauze > 0:
+            kandidaten.append(tot_pauze)
+    return (min(kandidaten) if kandidaten else None), (tot_week if tot_week > 0 else None)
 
 
 def bij_roostergrens(
@@ -147,27 +202,16 @@ def minutes_until_close(
     Een trade met een tijdslimiet van vijf minuten die om 22:58 opengaat, wordt
     door de sluiting overvallen: je zit dan met een positie in een markt die
     niet meer beweegt en pas de volgende sessie weer opent - met een gat.
+
+    2.25.0: gerekend in de tijdzone van het rooster (dagpauze of weeksluiting,
+    wat het eerst komt).
     """
-    moment = (moment or datetime.now(timezone.utc)).astimezone(MARKET_TZ)
+    moment = moment or datetime.now(timezone.utc)
     open_now, _ = is_open(session, moment)
     if not open_now:
         return None
-
-    clock = moment.time()
-    grenzen = []
-    if session.daily_break:
-        grenzen.append(session.daily_break[0])
-    if moment.weekday() == session.closes_weekday:
-        grenzen.append(session.closes_at)
-    if not grenzen:
-        return None
-
-    nu = clock.hour * 60 + clock.minute + clock.second / 60
-    resterend = [
-        (g.hour * 60 + g.minute) - nu for g in grenzen
-        if (g.hour * 60 + g.minute) > nu
-    ]
-    return min(resterend) if resterend else None
+    eerst, _week = _seconden_tot_sluiting(session, moment)
+    return eerst / 60.0 if eerst is not None else None
 
 
 #: 2.22.0: een sluiting met minstens zoveel uur tot de volgende opening is een
@@ -180,20 +224,23 @@ def minuten_tot_weekendsluiting(
 ) -> float | None:
     """2.22.0: minuten tot de sluiting van de handelsweek, of None.
 
-    Alleen op de sluitdag van de week en zolang de markt open is; de
-    dagelijkse onderbreking telt niet. Sessies die over het weekend lopen
-    (weekendgoud) hebben geen weekendsluiting in deze zin: None.
+    Alleen op de sluitdag van de week (in de tijdzone van het rooster) en
+    zolang de markt open is; de dagelijkse onderbreking telt niet. 2.25.0:
+    spot goud sluit vrijdag 17:00 New York, dus 23:00 CET normaal en 22:00 CET
+    in de week waarin de VS nog zomertijd hebben (vr 30-10-2026). De grendels
+    van 2.22.0 (geen instap in het laatste uur, sluiten vanaf 30 minuten
+    ervoor) schuiven daarmee vanzelf mee.
     """
-    moment = (moment or datetime.now(timezone.utc)).astimezone(MARKET_TZ)
-    if session.opens_weekday > session.closes_weekday:
-        return None
+    moment = moment or datetime.now(timezone.utc)
     open_now, _ = is_open(session, moment)
-    if not open_now or moment.weekday() != session.closes_weekday:
+    if not open_now:
         return None
-    klok = moment.time()
-    nu = klok.hour * 60 + klok.minute + klok.second / 60
-    sluit = session.closes_at.hour * 60 + session.closes_at.minute
-    return sluit - nu if sluit > nu else None
+    if moment.astimezone(session.tz).weekday() != session.closes_weekday:
+        return None
+    _eerst, tot_week = _seconden_tot_sluiting(session, moment)
+    if tot_week is None or tot_week >= _DAG_S:
+        return None
+    return tot_week / 60.0
 
 
 def cross_check(

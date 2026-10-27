@@ -87,6 +87,9 @@ SPECS: tuple[dict, ...] = (
                 if _floor(d).get("current_equity_account") is not None else None
             ),
             "percentage": _floor(d).get("equity_floor_pct"),
+            # 2.25.0: "mand" als de vloer de equity van de hele Bitvavo-mand
+            # op papier toetst, anders "markt" (eigen saldo of account).
+            "bereik": _floor(d).get("bereik") or "markt",
         },
     ),
     dict(

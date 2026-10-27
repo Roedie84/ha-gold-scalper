@@ -1,5 +1,28 @@
 # Changelog — Gold Scalper
 
+## 2.25.0 - 27-10-2026
+
+Twee punten, elk door Ruud goedgekeurd (27-10 20:16).
+
+### Bitvavo-mand op papier: vermogensvloer over de hele mand (punt 4)
+- Live werkt de vloer al over de hele mand: `bitvavo.account()` telt de munten van alle leden mee. Op papier had elk lid een eigen saldo van 10.000 en toetste de vloer per markt; daardoor handelde de papiermand door bij een equity van 3.632 (vloer 5.000).
+- Nu toetst de vloer op papier de **equity van de hele mand** (startbalans plus het resultaat van alle markten, ook die uit het archief; dezelfde waarde als de sensor *Equity* van de mand). Zelfde percentage en dezelfde strengste-vloerregel; de opening van de mand is op papier de startbalans van de hoofdlus.
+- De toets loopt **elke cyclus** van elk lid (niet pas bij een signaal; op 1h/4h/1d komt dat zelden) en bij elke instap (cyclus en turbo). Onder de vloer: noodstop "equity van de mand ... onder de ondergrens van ... (...; geldt voor de hele mand)". Pas zodra de mand gereed is (leden gestart, archief ingelezen); daarvoor de eigen equity, zoals voorheen.
+- Eén melding: alleen de hoofdlus meldt de noodstop, niet elk lid.
+- *Vermogensvloer* van de mand toont nu de vloer en `huidige_equity` van de hele mand, met `bereik: mand` (elders `markt`).
+- **Gevolg (geaccepteerd):** met de huidige stand (~3.630 tegen 5.000) gaat de papiermand direct na de herstart in noodstop en opent geen nieuwe posities meer. Hervatten helpt pas als de mand weer boven de vloer zit (de toets slaat bij de volgende cyclus opnieuw aan, net als live); een nieuwe run begint weer op 10.000.
+- Live, IG, Pepperstone en losse markten: ongewijzigd. Raakt geen strategie, signaalregels, exits of instellingen.
+
+### Handelsrooster op New Yorkse tijd (L-GS-031, punt 7)
+- 3 van 3 avonden (24-26/10): beide brokers dicht 22:00 en weer open 23:01 CET = 17:00-18:00 New York (Europa ging 25-10 naar wintertijd, de VS gaan pas 1-11). Het rooster had de pauze vast op 23:00-24:00 Amsterdam: IG wachtte tot 24:00 (`rooster_wijkt_af`) terwijl Pepperstone om 23:01 weer handelde.
+- Nu staat het rooster van spot goud (`broker/schedule.py` `SPOT_GOLD`) in **America/New_York** (zoneinfo): week open zondag 18:00, dagpauze 17:00-18:00, week dicht vrijdag 17:00. Normaal is dat in Nederland maandag 00:00 / 23:00-24:00 / vrijdag 23:00 (ongewijzigd); in de weken waarin de VS al of nog zomertijd hebben en Europa niet (~3 weken in maart, ~1 week eind oktober) een uur eerder.
+- De weekendsluiting van 2.22.0 schuift mee: geen nieuwe posities in het laatste uur, sluiten vanaf 30 minuten ervoor. Vrijdag 30-10 dus geen instap vanaf 21:00 en sluiten vanaf 21:30 CET; vanaf 06-11 weer 22:00/22:30.
+- `Session` heeft een tijdzone (`tz`); `is_open`, `minutes_until_close`, `minuten_tot_weekendsluiting` en `bij_roostergrens` rekenen daarin. Meldingen noemen de Nederlandse kloktijden. Het weekendgoud van IG blijft in Amsterdamse tijd. De gesimuleerde broker sluit het weekend nu ook op New Yorkse tijd.
+- 'Bij onenigheid wint gesloten' blijft. Pepperstone (cTrader) gebruikt het eigen rooster van de broker: ongewijzigd. De daghandel sluit nog steeds om 20:45 UTC (vóór 17:00 New York in zomer- en wintertijd). Crypto (Bitvavo): ongewijzigd.
+- Verwacht: in de DST-weken ~1 handelsuur per avond extra op IG (23:00-24:00 CET) en 0 rooster-afwijkingswaarschuwingen per dag (was 2).
+
+- Test: `test_v2250_mandvloer_en_ny_rooster.py` (27).
+
 ## 2.24.3 - 27-10-2026
 
 ### Bitvavo-mand: ook de allereerste verversing toont geen 0 (L-GS-030, meetfout)

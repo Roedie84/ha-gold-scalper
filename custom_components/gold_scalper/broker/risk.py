@@ -164,6 +164,34 @@ class RiskManager:
         worst = min(balance, equity)
         return (self.state.day_start_balance - worst) / basis * 100.0
 
+    def mandvloer(self, vloer_mand: tuple[float, float]) -> dict:
+        """2.25.0, akkoord Ruud 27-10: de vermogensvloer van de hele Bitvavo-mand op
+        papier. Elk lid heeft een eigen papiersaldo; de mand als geheel start
+        op de startbalans van de hoofdlus en rekent ook vanaf die equity (de
+        opening van de mand is op papier de startbalans). Zelfde percentage en
+        dezelfde strengste-vloer-regel als :meth:`floor_breakdown`.
+        ``vloer_mand``: (equity, startbalans) van de mand."""
+        mand_equity, mand_start = vloer_mand
+        uit = self.floor_breakdown(mand_start, mand_start, mand_equity)
+        uit["bereik"] = "mand"
+        return uit
+
+    def toets_mandvloer(self, vloer_mand: tuple[float | None, float | None] | None) -> bool:
+        """2.25.0, akkoord Ruud 27-10: noodstop als de equity van de hele mand onder de
+        vloer ligt. Geeft True als de vloer geraakt is (de noodstop staat dan).
+        Onbekende waarden: geen toets."""
+        mand_equity, mand_start = vloer_mand or (None, None)
+        if mand_equity is None or not mand_start:
+            return False
+        vloer = self.mandvloer((float(mand_equity), float(mand_start)))
+        if float(mand_equity) >= vloer["effective_equity_floor"]:
+            return False
+        self.halt(
+            f"equity van de mand {float(mand_equity):.2f} onder de ondergrens van "
+            f"{vloer['effective_equity_floor']:.2f} ({vloer['applied']}; geldt voor de hele mand)"
+        )
+        return True
+
     def floor_breakdown(
         self, starting_balance: float, opening_equity: float | None,
         current_equity: float | None = None,
@@ -271,8 +299,14 @@ class RiskManager:
         market_open: bool = True,
         atr: float | None = None,
         opening_equity: float | None = None,
+        vloer_mand: tuple[float, float] | None = None,
     ) -> tuple[bool, str | None]:
-        """Mag er nu een positie open? Geeft (toegestaan, reden bij weigering)."""
+        """Mag er nu een positie open? Geeft (toegestaan, reden bij weigering).
+
+        ``vloer_mand`` (2.25.0, akkoord Ruud 27-10): (equity, startbalans) van de hele
+        Bitvavo-mand op papier. Dan toetst de vermogensvloer die equity in
+        plaats van het eigen papiersaldo van deze markt, net als live (daar
+        telt ``bitvavo.account()`` de munten van alle leden mee)."""
         self.startbalans = starting_balance
         self._roll_day(now, balance)
 
@@ -300,9 +334,14 @@ class RiskManager:
             self.halt(f"geen tickdata gedurende {last_tick_age:.0f}s tijdens handelsuren")
             return False, "dataverbinding dood"
 
-        vloer = self.floor_breakdown(starting_balance, opening_equity, equity)
         sprong = self.saldosprong is not None and self.saldosprong.actief
-        if equity < vloer["effective_equity_floor"]:
+        if vloer_mand is not None:
+            if not sprong and self.toets_mandvloer(vloer_mand):
+                return False, "equity van de mand onder de ondergrens"
+            vloer = None
+        else:
+            vloer = self.floor_breakdown(starting_balance, opening_equity, equity)
+        if vloer is not None and equity < vloer["effective_equity_floor"]:
             if sprong:
                 # 1.9.4: een onverklaarde saldosprong (bijv. een reset van het
                 # demosaldo) is een dataprobleem, geen verlies. Niet openen,

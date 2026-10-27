@@ -175,13 +175,18 @@ class SimulatorVenue(ExecutionVenue):
         return round(self.spread * widening * jitter * spike, 4)
 
     def _is_market_open(self, moment: datetime) -> bool:
-        """Goud handelt niet in het weekend. Vrijdag 21:00 tot zondag 22:00 UTC dicht."""
-        weekday, hour = moment.weekday(), moment.hour
+        """Goud handelt niet in het weekend: vrijdag 17:00 tot zondag 18:00
+        New Yorkse tijd dicht (2.25.0, L-GS-031: was vast 21:00/22:00 UTC, wat
+        alleen in de Amerikaanse zomertijd klopt)."""
+        from zoneinfo import ZoneInfo
+
+        ny = moment.astimezone(ZoneInfo("America/New_York"))
+        weekday, hour = ny.weekday(), ny.hour
         if weekday == 5:
             return False
-        if weekday == 4 and hour >= 21:
+        if weekday == 4 and hour >= 17:
             return False
-        if weekday == 6 and hour < 22:
+        if weekday == 6 and hour < 18:
             return False
         return True
 

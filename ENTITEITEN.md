@@ -438,14 +438,19 @@ De integratie leunde eerst volledig op het veld `marketState` dat IG meestuurt.
 Dat werkt, maar het is één bron: klopt dat veld niet, dan handelt de bot op
 verouderde koersen zonder dat iets het merkt.
 
-Er zit nu een rooster naast, met de gepubliceerde tijden voor spot goud in
-Nederlandse tijd:
+Er zit nu een rooster naast, met de tijden voor spot goud. Sinds 2.25.0
+(L-GS-031) rekent het in New Yorkse tijd, zodat het meeschuift met de
+Amerikaanse zomertijd:
 
-| | |
-|---|---|
-| Opent | maandag 00:00 |
-| Sluit | vrijdag 23:00 |
-| Dagelijkse onderbreking | 23:00 tot 24:00 |
+| | New York | Nederland (normaal) | Nederland (VS al/nog zomertijd, EU niet) |
+|---|---|---|---|
+| Opent | zondag 18:00 | maandag 00:00 | zondag 23:00 |
+| Sluit | vrijdag 17:00 | vrijdag 23:00 | vrijdag 22:00 |
+| Dagelijkse onderbreking | 17:00 tot 18:00 | 23:00 tot 24:00 | 22:00 tot 23:00 |
+
+De afwijkende kolom geldt ~3 weken in maart en ~1 week eind oktober. De
+weekendgrendels (geen instap in het laatste uur, sluiten vanaf 30 minuten
+vóór de sluiting) schuiven mee.
 
 **Bij onenigheid wint 'gesloten'.** Zegt de broker open en het rooster dicht,
 of andersom, dan wordt er niet gehandeld. Dat is geen voorzichtigheid maar

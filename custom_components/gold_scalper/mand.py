@@ -984,6 +984,30 @@ class BitvavoMand:
                 key=lambda r: (-(r.get("trades") or 0), r["markt"])),
         }
 
+    def vloer_equity(self, c=None, eigen_equity: float | None = None) -> tuple[float, float] | None:
+        """2.25.0 (akkoord Ruud 27-10): (equity, startbalans) van de hele mand
+        voor de vermogensvloer op papier, of None zolang de mand niet gereed is.
+
+        Live telt ``bitvavo.account()`` de munten van alle leden al mee; op
+        papier heeft elk lid een eigen saldo van 10.000 en toetste de vloer per
+        markt (mand op 3.632 bij een vloer van 5.000, toch doorhandelen). Dit is
+        dezelfde equity als de sensor *Equity* van de mand (startbalans plus
+        het resultaat van alle markten, ook die uit het archief). ``eigen_equity``:
+        de verse equity van lid ``c`` deze cyclus (zijn ``data`` is nog die van
+        de vorige)."""
+        if not self.boek_gereed:
+            return None
+        boek = self.grootboek()
+        equity, start = boek.get("equity"), boek.get("startbalans")
+        if equity is None or not start:
+            return None
+        equity = float(equity)
+        if c is not None and eigen_equity is not None and getattr(c, "starting_balance", None):
+            oud = (getattr(c, "data", None) or {}).get("equity")
+            if oud is not None:
+                equity += float(eigen_equity) - float(oud)
+        return round(equity, 2), float(start)
+
     async def alle_gesloten_trades(self) -> list:
         """Alle gesloten trades van de mand: de draaiende markten (laatste
         papieren run) en de markten in het archief."""
