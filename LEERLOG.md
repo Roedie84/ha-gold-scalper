@@ -448,3 +448,15 @@ laatste ronde: 27-10 15:58, gemeten t/m 27-10 15:58
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10), H-GS-14.
 
 laatste ronde: 27-10 19:41, gemeten t/m 27-10 19:41
+
+## 27-10 23:41 · tussenronde
+- Herstarts 20:40 (installatie) en 21:01; **2.25.0 actief** (andere sessie 20:31, akkoord Ruud). Demo/papier; geen knoppen, geen instellingen. Geen release. DNS-storing 21:02-21:44 (extern): koersopvragingen mislukt (110×), entiteiten kort onbeschikbaar, afgevangen.
+- **Goud 19:41-23:45:** Pepperstone 2 trades, **−133,62** → run 261, −611,13, PF 0,896, t −0,442; IG 3 trades, **+132,29** → 163, −631,19, PF 0,811, t −0,977 (stop 47,9 %). Clusters < 30 per broker → **geen toets**.
+- **H-GS-14:** vijfde venster op rij tegengesteld (PP −134 / IG +132). Toets op dagniveau (dagafsluiting).
+- **2.25.0 punt 4:** mand in noodstop sinds 21:03 (equity mand 3.653 < vloer 5.000; "geldt voor de hele mand") - zoals verwacht en geaccepteerd. Geen nieuwe mandtrades (576, −6.435,69), 16 open.
+- **L-GS-031 eerste avond voldaan:** IG markt dicht 22:00, weer open 23:01 (was 24:00); 0 roosterwaarschuwingen op 27-10 (26-10: 2). Nog te toetsen: vr 30-10 sluiting 22:00.
+- **Latency p99 PP 1,72 → 1,15 s** na de herstart van 21:01 (IG 1,26, mand 0,59): de stijging van vandaag hing aan de looptijd sinds de herstart (n=1 dag; dagafsluiting p99 per dag).
+- Stilstand: alleen mand *Resultaat per periode* (L-GS-033, dagafsluiting 28-10).
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10), H-GS-14.
+
+laatste ronde: 27-10 23:41, gemeten t/m 27-10 23:45
