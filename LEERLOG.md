@@ -403,3 +403,15 @@ laatste ronde: 26-10 23:40, gemeten t/m 26-10 23:45
 - Hypotheses: H-GS-11 (kosten > bruto; 26-10 ook bruto negatief), H-GS-13 (→ L-GS-031, toets 30-10), **H-GS-14** (nieuw: het dagverlies komt uit één doorlopend regime-cluster per dag, bij beide brokers tegelijk; n=2 dagen).
 
 laatste ronde: 27-10 03:40, gemeten t/m 27-10 03:50
+
+## 27-10 07:40 · tussenronde
+- HA herstartte 06:04 → **2.24.3 actief**. Demo/papier; geen knoppen, geen instellingen. Logs: 1 koersopvraging IG time-out (07:22, afgevangen), 1 trade bij controle afgerekend (07:10, gesloten op stop).
+- **L-GS-030 toets 1 OK:** bij de herstart 06:04 mand *Trades* 574 → onbekend → 574 (06:05:34), **geen 0**; netto idem (n=1; was 4 van 4 keer 0).
+- **L-GS-032 OK:** *Tijdstopvarianten* IG/PP "niet van toepassing", `van_toepassing` false; PP `per_exitregime` heeft sinds 07:10 een groep `veldproef` (2 trades, −198,44; oudere open trades houden 'tijdstop').
+- **Goud 03:50-07:40:** Pepperstone 7 trades, **−333,53** (3 stops van ~−100: 05:56, 07:10, 07:21) → run 227, −878,72, PF 0,837, t −0,643; IG 8 trades, −13,68 (twee winsten +55/+53 om 04:40-04:45, stops −100 om 05:51 en 06:30) → 130, −376,19, PF 0,861, t −0,585. ~20 clusters PP / ~13 IG: nodig ≥ 30 per broker over ≥ 5 handelsdagen → **geen toets**.
+- **H-GS-14** (dagverlies uit één regime-cluster, beide brokers tegelijk): vanochtend PP −334 tegen IG −14 in hetzelfde venster → 'tegelijk' houdt hier niet; hypothese blijft open (n=3 dagen nodig).
+- Mand: +1 trade (574, netto −6.410,57), 18 open; *Resultaat per periode* nog unknown (L-GS-033, kan nu in de dagafsluiting: 2.24.3 staat erop).
+- Latency p99: IG 0,91 / PP 0,90 / mand 0,45 s - normaal.
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10), H-GS-14. Geen release.
+
+laatste ronde: 27-10 07:40, gemeten t/m 27-10 07:40
