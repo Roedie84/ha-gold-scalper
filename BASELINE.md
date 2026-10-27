@@ -39,3 +39,5 @@
 | Pepperstone week 43 (19..25-10) | 145 trades: netto −34,89 · bruto 334,39 · kosten 369,28 (110 % van bruto) | week 43 | 26-10 03:40 |
 | Bitvavo-mand totaal | 568 trades: netto −6.428, PF 0,12, t −1,33; 2.23.0-opzetten 0 gesloten | t/m 26-10 03:41 | 26-10 03:40 |
 | Latency p99 buiten storing | PP 0,71-0,84 s · mand 0,48-0,74 s (IG alleen actueel, 0,76 s) | 25-10 | 26-10 03:40 |
+| Run IG / Pepperstone (veldproef) | 122 tr / 12 cl, netto −362,51, PF 0,855, t −0,59 · 220 tr / 19 cl, −545,19, PF 0,892, t −0,41 | t/m 27-10 03:40 | 27-10 03:40 |
+| Latency p99 rustige nacht | IG 0,86 · PP 0,87 · mand 0,39 s | 27-10 nacht | 27-10 03:40 |

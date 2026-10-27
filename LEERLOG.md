@@ -40,67 +40,11 @@ Onderzoeksproject op IG-demo: edge van ruis onderscheiden. Alleen gemeten getall
 - ~40 HA-herstarts: afstemming `in_orde`, drawdown 0,0 %, sluitreden onbekend 0,0 % → 1.10.0/1.10.1 houden. 0 Gold Scalper-fouten; latency p99 253-830 ms (gesloten markt + herstarts).
 - L-GS-010 (1.10.2, voorcheck-time-out) eerst als patch (push geweigerd), gereleased 21:00, actief 23:31. H-GS-7 (bruto < kosten) houdt; H-GS-9 gesloten; H-GS-10 toets 16-10.
 
-## 12-10 03:40 · dagafsluiting 11-10
-- Zondag 11-10 (lokaal): markt dicht, 0 trades, 40 HA-herstarts; afstemming `in_orde`, drawdown 0,0 %, sluitreden onbekend 0,0 % over alle herstarts. 0 Gold Scalper-fouten. Geen knoppen gebruikt. Geïnstalleerd nu **1.10.3** (03:33; release van een andere sessie 03:31).
-- **Eerste handelsnacht (ma 00:15-02:19):** 14 trades, netto −17,28 = bruto +8,21 − kosten 25,49 → per trade −1,23 / +0,59 / 1,82 (7d: −1,13 / +0,37 / 1,50). Run 101: 78 trades / 8 clusters, netto −97,38, PF 0,472, t_cluster −2,86 (bruto +0,99); 10 uurblokken t_netto −2,08, t_bruto +0,70 → ~83 blokken voor een bruto-toets.
-- **Storing 02:21:52-03:21:44:** 360× "Unexpected error" (TypeError in `sort()` bij twee transacties met gelijk openLevel, terwijl het overzicht trade 78 nog niet had). Integratie 60 min onbeschikbaar: geen instap, geen positiebeheer. Enige open positie (78) was al door IG gesloten → geen onbewaakte positie. Hield op toen IG de transactie toonde; fix 1.10.3 (andere sessie).
-- **Gevonden (meetfout):** trade 78 kreeg als sluittijd het moment van ontdekken (03:21:54) i.p.v. de brokertijd (~02:21:50): looptijd ~62 min i.p.v. ~2,5 min, cluster 8 66,9 min. `_settle_vanished_positions` → `_record_broker_close` gebruikt `now`; `dateUtc` uit het transactieoverzicht wordt alleen bij latere correcties gebruikt. → **L-GS-011** gebouwd en getest (suite 2036 groen, 4 nieuwe tests), niet gereleased (al een release vandaag; niet acuut). Patch `analyse/2026-10-12-L-GS-011/sluitmoment.patch`; bewerken van de main-checkout werd door de toestemmingscontrole geweigerd → gebouwd in een kopie.
-- L-GS-010: 0 voorcheck-time-outs in de nacht → nog niet getoetst. Nieuw voorstel **L-GS-012** (open): een fout in de afwikkeling van één trade legt nu de hele cyclus stil (zoals 02:21-03:21).
-- Tijdstopvarianten: 4 blokken, 240-overeenkomst 92,9 %; 720 s +1,10/trade (t 0,94) → geen oordeel (<20). Latency p99 667 / p50 188 ms (handel + herstart).
-- H-GS-7 (bruto < kosten) houdt (0,59 tegen 1,82). H-GS-10 (vrijdagsluiting) toets 16-10. Geen release.
-
-laatste ronde: 12-10 03:40, gemeten t/m 12-10 03:45
-
-## 12-10 07:40 · tussenronde
-- Maandag, markt open; demo, handel aan, 1 open positie, noodstop/dataprobleem uit, afstemming `in_orde`, drawdown 0,0 %, sluitreden onbekend 0,0 %. Geen knoppen gebruikt. 1.10.3 actief; 2 HA-herstarts (06:14, 06:48) met open-positie-afsluitmelding, daarna netjes verder. 0 Gold Scalper-fouten sinds 03:21:44 (storing L-GS-012 niet herhaald).
-- **Sinds 03:45: 14 trades** (uurblokken 04 en 05 UTC): netto −35,56 = bruto −18,15 − kosten 17,41 → per trade −2,54 / −1,30 / 1,24. Ook bruto negatief deze ochtend.
-- Run 101: **92 trades / 9 clusters**, netto −132,94, PF 0,412, winst 34,8 %, **t_cluster −3,24**; 12 uurblokken t_netto −2,73, bruto +8,15 (+0,68/blok, t_bruto 0,20). Per sessie bruto/blok: Azië −0,35, Londen +1,89, New York +0,78 (n=3-5, geen oordeel).
-- n-toets: netto is al duidelijk negatief (t −3,2 bij 9 clusters). Of er bruto een edge is: bij het huidige gemiddelde (+0,68/blok, sd ~12) zijn ~1200 uurblokken nodig voor t = 2 → bruto niet van ruis te onderscheiden; H-GS-7 (bruto < kosten) houdt.
-- L-GS-010: 0 voorcheck-time-outs (log) → nog niet getoetst. Latency p99 658 ms (herstarts). L-GS-011 klaar als patch voor 13-10.
-- Hypotheses H-GS-7 (bruto < kosten), H-GS-10 (vrijdagsluiting, toets 16-10). Geen release.
-
-laatste ronde: 12-10 07:40, gemeten t/m 12-10 07:42
-
-## 12-10 11:40 · tussenronde
-- Demo, handel aan, 1 open positie, noodstop/dataprobleem uit, afstemming `in_orde`, sluitreden onbekend 0,0 %. Geen knoppen gebruikt. 1.10.3 actief. 7 HA-herstarts (08:26-10:53) netjes afgesloten (administratie weggeschreven), 0 Gold Scalper-fouten.
-- **Sinds 07:42: 22 trades** (5 nog in cluster 9, cluster 10 = Londen 10:15-11:35 lokaal, 17 trades): netto −23,00 = bruto +9,33 − kosten 32,32 (1,47/trade). Cluster 10 bruto +11,39, netto −13,73.
-- Run 101: **114 trades / 10 clusters**, netto −155,94, PF 0,407, winst 33,3 %, **t_cluster −3,34**. Bruto per cluster +1,75 (sd 11,6, t 0,47) → ~177 clusters nodig om een bruto-edge van deze grootte aan te tonen; netto is al duidelijk negatief. H-GS-7 (bruto < kosten) houdt: bruto 17,48 tegen kosten 173,41.
-- Tijdstopvarianten 8/20 blokken, overeenkomst 96,9 %; 240 s blijft het beste (720 −0,19/trade, geen tijdstop −0,69) → geen oordeel.
-- Latency p99 791 ms (p50 215, max 5,6 s) door de herstarts. L-GS-010: 0 voorcheck-time-outs → nog niet getoetst. L-GS-011 klaar voor 13-10.
-- Hypotheses H-GS-7 (bruto < kosten), H-GS-10 (vrijdagsluiting, toets 16-10). Geen release.
-
-laatste ronde: 12-10 11:40, gemeten t/m 12-10 11:45
-
-## 12-10 15:40 · tussenronde
-- **Strategiewissel (chatsessie, besluit Ruud):** 2.0.0 daghandel (L-GS-014) 14:43, 2.0.1 15:00, **2.1.0 combinatie daghandel + scalpen** (L-GS-015) 15:42, 2.1.1 15:56 (nog niet actief). Run 101 afgesloten 15:04 → runs 102-104 → **run 105 sinds 15:46**. Hervatten-knop om 15:09 gebruikt (niet door deze ronde); logregel "Handmatige hervatting na: None" mist de reden.
-- **Slot run 101 (scalpen):** 128 trades, netto −196,66 (−1,54/trade); 11:45-14:41 nog 14 trades, netto −40,72 (−2,91/trade). H-GS-7 (bruto < kosten) bevestigd en gesloten met de strategie.
-- Run 105 t/m 15:55: 3 scalptrades (netto −0,99, bruto +1,10, kosten 2,09), 0 daghandeltrades, 1 scalppositie open. Geen oordeel. Toetsregel daghandel: ≥ 100 trades en t ≥ 2 over handelsdagen → bij 1-3 per dag ~35-100 handelsdagen. De oordeeltekst noemt nog "sub-minuut handel" (scalpwoorden).
-- **Gevonden:** de optie *Piramide* staat aan (WARNING bij elke start, ook 15:46). Bij daghandel genegeerd, bij de combinatie weer actief voor scalpposities, terwijl bijkopen niet in administratie/afstemming komt → **L-GS-016 (open)**: optie uit.
-- Afstemming `in_orde`, drawdown 0,0 %, noodstop/dataprobleem uit, demo. Latency p99 736 ms (herstarts). 0 Gold Scalper-fouten.
-- **L-GS-011** opnieuw op 2.1.1 gezet (conflict met 1.11.0 opgelost); volledige suite 2077 groen, 5 skipped; release als 2.1.2 in de dagafsluiting van 13-10.
-- Hypotheses: H-GS-10 (vrijdagsluiting, toets 16-10); nieuw **H-GS-11**: daghandelkosten ≈ 20 % van de beweging (backtest) → per daghandeltrade kosten/ATR meten. Geen release (chatsessie releaset vandaag al 4×).
-
-laatste ronde: 12-10 15:40, gemeten t/m 12-10 15:55
-
-## 12-10 19:40 · tussenronde
-- **2.2.0 (16:10) en 2.2.1 (18:31) door de chatsessie**, geïnstalleerd (actief 2.2.1, herstarts 16:12 en 18:35). 2.2.0 legt bijkopen vast als eigen trade ("pyramide van <ticket>", besluit Ruud: "moet actief zijn"); WARNING "Piramide staat aan…" sinds 16:11 weg → **L-GS-016 vervallen** (Ruud koos vastleggen i.p.v. uitzetten).
-- Run 105 (combinatie) t/m 19:46: **35 trades, alle scalp, 0 daghandel** ("wachten op een uitbraak in de richting van de uurtrend"). Sinds 15:55 32 trades: netto −19,67. Run 105: netto −20,66 = bruto +1,14 − kosten 21,80 → per trade −0,59 / +0,03 / **0,62** (run 101: 1,36/trade; kleinere scalpgrootte 1 oz). PF 0,459, winst 34,3 %, t per trade −1,52, t_cluster −1,76 (3 clusters), 4 uurblokken t_netto −1,92 / t_bruto 0,21. Geen oordeel (n te klein); ook met de halve kosten blijft bruto ≈ 0 → hetzelfde beeld als H-GS-7.
-- Sluitredenen: tijdstop 29, take-profit 2, stop 2, broker gemeten 2; sluitreden onbekend 0,0 %, afstemming `in_orde`, drawdown 0,0 %, noodstop/dataprobleem uit, demo. Geen knoppen gebruikt.
-- Broker: 2× HTTP 403 `api-key-invalid` (17:22 positie-opvraging, 19:06 koers), elk 1 van 3 en direct hersteld → IG-demo-hapering, geen actie. 19:00 broker meldt markt gesloten binnen het rooster (één keer; 12-10 = Columbus Day) → rooster kent de Amerikaanse kalender niet, de code volgt terecht de broker.
-- Latency p99 702 ms (2 herstarts). 0 Gold Scalper-fouten (ERROR).
-- H-GS-11 (daghandelkosten ≈ 20 % van de beweging): 0 daghandeltrades → nog niet meetbaar. H-GS-10 (vrijdagsluiting) toets 16-10. L-GS-011 klaar voor 13-10 (rebase op 2.2.1 nodig). Geen release.
-
-laatste ronde: 12-10 19:40, gemeten t/m 12-10 19:46
-
-## 12-10 23:40 · tussenronde
-- Chatsessie: **2.3.0** (19:51, `export_data`, L-GS-017), **2.4.0** (20:36, veldproef 45 opzetten op 1m-30m met echte demo-orders, L-GS-018, opdracht Ruud), **2.4.1** (21:15 UTC = 23:15, minimale stop 1 USD, afgewezen order niet elke cyclus herhalen). Actief 2.4.1 (herstart 23:18). Run 105 → 106 (22:38) → **run 107 sinds 22:41**.
-- **Slot run 105** (combinatie): 19:46-22:39 0 nieuwe trades (Columbus Day; broker meldde 19:00 markt dicht). Eind: 35 trades, alle scalp, netto −20,55 = bruto +1,25 − kosten 21,79 (0,62/trade), winst 34,3 %, t/trade −1,51, 0 daghandeltrades. Geen oordeel (n te klein); beeld = H-GS-7.
-- **Run 107 (veldproef):** 39 acties, 7 posities open (4 long/3 short, elk 1 oz, broker-stops aanwezig), 0 gesloten trades. 4 long boven `limiet_per_richting` 3 is volgens ontwerp (2.4.0: één positie per opzet bovenop de scalplimiet; `max_open_positions` + 1 + aantal opzetten, coordinator r. 341-348). Gelijke stop/doel bij twee posities past bij twee opzetten op dezelfde signaalbar (stop uit de bar, niet uit de vulprijs); niet te toetsen: het attribuut `positions` noemt geen opzet → **L-GS-019** (meetbaarheid).
-- **Orderafwijzingen:** 41× ATTACHED_ORDER_LEVEL_ERROR 22:40-22:50, ~2 per 10-s-cyclus (1m-stop 0,56 USD, elke cyclus opnieuw) = wat 2.4.1 oplost; sinds 23:18 0, maar markt dicht 23:00-00:00 → toets in de ronde van 03:40.
-- 1× HTTP 403 api-key-invalid (22:29, 1 van 3, hersteld). Latency p99 895 ms (6 herstarts, p50 208). Afstemming `in_orde`, noodstop/dataprobleem uit, demo. Geen knoppen gebruikt.
-- Hypotheses: H-GS-10 (vrijdagsluiting, toets 16-10), H-GS-11 (daghandelkosten ≈ 20 % van de beweging: nog 0 daghandeltrades). Nieuw meetdoel veldproef: per opzet en tijdvak trades, bruto/kosten; per opzet zijn ≥ 30 trades nodig voor een ruwe toets, bij 45 opzetten dus ≥ 1.350 trades vóór een eerste vergelijking. Geen release. L-GS-011 moet nu op 2.4.1 worden gezet (dagafsluiting 13-10).
-
-laatste ronde: 12-10 23:40, gemeten t/m 12-10 23:43
+## 12-10 · samenvatting dag (6 rondes; ingekort na 14 dagen)
+- Zondag 11-10 0 trades. Run 101 (scalp) slot: 128 trades, netto −196,66 (−1,54/trade), t_cluster −3,34 → H-GS-7 (bruto < kosten) bevestigd en gesloten met de strategie.
+- Storing 12-10 02:21-03:21 (TypeError in sort, 360×) → L-GS-012; meetfout sluittijd verdwenen positie (L-GS-011). Piramide stond aan → L-GS-016.
+- Strategiewissels (chatsessie, Ruud): 2.0.0 daghandel, 2.1.0 combinatie (run 105: 35 scalptrades, netto −20,55, 0 daghandel), 2.2.x bijkopen vastgelegd, 2.3.0 export, 2.4.0/2.4.1 veldproef 45 opzetten (run 107).
+- Columbus Day: broker 19:00 dicht binnen het rooster. Latency p99 0,66-0,90 s (herstarts). Hypotheses: H-GS-10 (vrijdagsluiting), H-GS-11 (daghandelkosten).
 
 ## 21-10 19:40 · dagafsluiting (inhaalronde na gat 13-10 20:15 → 21-10)
 - Gat 13..20-10: geen leerrondes. Intussen 2.6.2 → **2.19.0** (actief; o.a. Pepperstone 14-10, Bitvavo-mand papier 20-10, daghandel op kwartierbars 21-10). IG-runhistorie vóór 19-10 niet meer in de sensoren (alleen lopende run) → 13..18-10 IG niet per dag meetbaar; 12-10 uit `analyse/` overgenomen in KPI.csv.
@@ -446,3 +390,16 @@ laatste ronde: 26-10 19:40, gemeten t/m 26-10 19:45
 - Hypotheses: H-GS-11 (kosten; bruto vandaag ook negatief), H-GS-12 (latency), H-GS-13 (→ verklaard, L-GS-031). Geen release (tussenronde; 2.24.2 vandaag al gereleased).
 
 laatste ronde: 26-10 23:40, gemeten t/m 26-10 23:45
+
+## 27-10 03:40 · dagafsluiting 26-10
+- 2.24.2 actief; **release 2.24.3** (04:03; L-GS-030 + L-GS-032, alleen weergave/statistiek; suite 2102 groen, workflow groen, HACS ververst; wacht op installatie). Demo/papier; geen knoppen, geen instellingen. DNS-storing ~02:12 (Bitvavo/cTrader 1-2 op rij mislukt, afgevangen).
+- **Goud 26-10 (UTC-dag):** Pepperstone 56 trades, netto **−361,76** (bruto −198,67, kosten 163,09); IG 40 trades, **−562,03** (bruto −313,38, kosten 248,65). Bruto bij beide negatief → niet alleen kosten. IG-verlies zit in één cluster (nr. 11: 37 trades 02:15-19:42 UTC, −560,21; zonder dat cluster run +197,68).
+- **Runs:** IG 122 trades / 12 clusters, netto −362,51, PF 0,855, t −0,585; PP 220 / 19 clusters, −545,19, PF 0,892, t −0,408 (nacht 27-10 cluster 19: 14 trades 00:30-02:45 UTC, −383,16). Nodig ≥ 30 clusters per broker over ≥ 5 handelsdagen: **geen toets**. Clusters van beide brokers vallen samen (zelfde markt, zelfde moment) → niet onafhankelijk.
+- 03:16 zette de eigen regel `vp:pullback:30m` uit (n=40 in de database, netto −548,3) - bestaande regel 2.5.6/2.14.0, geen ingreep.
+- **H-GS-13 avond 3 van 3:** brokers dicht 22:00-23:01 CET; IG volgens rooster dicht tot 24:00, PP handelde 23:01-01:09 (6 trades +129,16) → L-GS-031 (open). Toets vr 30-10 sluiting 22:00 CET.
+- **Mand:** 26-10 +5 trades (568 → 573, netto +20,02), 19 open, 19 markten. L-GS-025: PUMP-EUR en PEPE-EUR blijven geweerd op de mediaan (0,036/0,048 % > 0,03 %); wissels per dag niet meetbaar uit de attributen (alleen `herzien_om`).
+- **Latency (H-GS-12) na een rustige nacht normaal:** p99 IG 0,86 / PP 0,87 / mand 0,39 s → hypothese gesloten.
+- Stilstand: *Tijdstopvarianten* (L-GS-032 → 2.24.3); nieuw: mand *Resultaat per periode* unknown sinds 20-10 → **L-GS-033** (gepland). *Kosten gemeten*/*Afstemming* mand bewust leeg (papier).
+- Hypotheses: H-GS-11 (kosten > bruto; 26-10 ook bruto negatief), H-GS-13 (→ L-GS-031, toets 30-10), **H-GS-14** (nieuw: het dagverlies komt uit één doorlopend regime-cluster per dag, bij beide brokers tegelijk; n=2 dagen).
+
+laatste ronde: 27-10 03:40, gemeten t/m 27-10 03:50
