@@ -357,3 +357,9 @@ laatste ronde: 27-10 07:55
 - Volgende ronde: Pep 3m bij ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m; L-GS-033 na dagafsluiting 28-10.
 
 laatste ronde: 27-10 19:55
+
+## 27-10 ~20:35 · akkoord Ruud 20:16, gebouwd 2.25.0
+- Punt 4 (mand-vermogensvloer op papier): akkoord 27-10, gebouwd in 2.25.0 - de vloer toetst op papier elke cyclus de equity van de hele mand (som van alle leden + archief), net als live; verwacht: papiermand direct na herstart in noodstop (~3.630 < 5.000).
+- Punt 7 (L-GS-031, rooster op New Yorkse tijd): akkoord 27-10, gebouwd in 2.25.0 - `SPOT_GOLD` in America/New_York, weekendgrendels schuiven mee; L-GS-031 afgehandeld. Suite 2131 groen + 5 skip; release v2.25.0, in HACS gedownload, herstart door Ruud.
+
+laatste ronde: 27-10 20:35
