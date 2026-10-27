@@ -346,3 +346,14 @@ laatste ronde: 26-10 20:00
 - Volgende ronde: Pep 3m bij ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m.
 
 laatste ronde: 27-10 07:55
+
+## 27-10 ~19:55 · ronde 25 (geplande controle; 2.24.3 actief, update-entiteit off)
+- Sinds ronde 24 alleen tussenrondes 11:40/15:58/19:41 (LEERLOG.md); geen nieuwe commits op main → geen code, niets dubbel.
+- **Pepperstone** run 5: 259 regels / 209 posities, netto −478 (bruto +213, kosten 691), PF 0,92, t −0,54. 3m 81 posities netto −928, bruto −534 (bruto t −0,78) → nog < 100. 15m 78 pos +343, 30m 37 pos +214, daghandel 4 pos +17: geen Bonferroni.
+- 3m over alle runs: 595 posities bruto +1.187, kosten 3.439 → kosten > bruto (H-GS-11), automatische regels (inside/structuur_hl:3m bruto > 0,5 × kosten) terecht niet geraakt.
+- **IG** run 136: 161 trades, netto −719 (bruto +170, kosten 889 = 5,2 × bruto), PF 0,78, t −1,15. rsi_rev:15m run 82 trades bruto −112; alle runs n=323 bruto 2.108 > 0,5 × 3.183 → kostregel niet geraakt, t −0,7.
+- Status: geen noodstop, afstemming IG/Pep in_orde, logs alleen afgevangen Bitvavo-koersfouten (7×). Mand 576 trades −6.436, 16 open.
+- Instellingen: niets (Pep 3m n=81 < 100).
+- Volgende ronde: Pep 3m bij ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m; L-GS-033 na dagafsluiting 28-10.
+
+laatste ronde: 27-10 19:55
