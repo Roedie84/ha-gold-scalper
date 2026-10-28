@@ -363,3 +363,12 @@ laatste ronde: 27-10 19:55
 - Punt 7 (L-GS-031, rooster op New Yorkse tijd): akkoord 27-10, gebouwd in 2.25.0 - `SPOT_GOLD` in America/New_York, weekendgrendels schuiven mee; L-GS-031 afgehandeld. Suite 2131 groen + 5 skip; release v2.25.0, in HACS gedownload, herstart door Ruud.
 
 laatste ronde: 27-10 20:35
+
+## 28-10 ~07:55 · ronde 26 (geplande controle; 2.25.1 actief, 2.25.2 gedownload → herstart = Ruud)
+- 2.25.1/2.25.2 en tussenronde 07:41 uit andere sessies → geen code, niets dubbel.
+- **Pepperstone** run 5: 278 posities, netto −509 (bruto +232, kosten 741), t −0,56. 3m **99 posities**, netto −928, bruto −534 (bruto t −0,88); 15m 112 pos +309, 30m 48 pos +223, daghandel 5 pos +17: geen Bonferroni. vp:structuur_hl:3m 41 pos bruto −337, vp:inside:3m 48 pos bruto −135.
+- Status: logs alleen één Bitvavo-time-out (afgevangen) en de verwachte mandnoodstop (equity 3.652 < 5.000). IG ongewijzigd t.o.v. 07:41 (170 tr, −732).
+- Instellingen: niets (Pep 3m n=99, één onder de vooraf vastgelegde 100).
+- Volgende ronde: Pep 3m ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m (laatste instellingenwijziging > 48 u geleden).
+
+laatste ronde: 28-10 07:55
