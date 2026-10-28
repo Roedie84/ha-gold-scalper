@@ -3551,6 +3551,8 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             # 2.18.0: de Bitvavo-mand (alleen bij de hoofdlus).
             "mand_boek": mand_boek,
             "mand_stats": mand_stats,
+            # 2.25.1 (L-GS-033): dag/week/maand van de hele mand.
+            "mand_periods": (self._mand.perioden() if mand_stats is not None else None),
             "mand_wacht": mand_wacht,
             # 2.24.1: open posities van de hele mand (sensor *Open posities*).
             "mand_posities": (self._mand.posities(

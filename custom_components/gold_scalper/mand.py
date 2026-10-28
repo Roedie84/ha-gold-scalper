@@ -251,6 +251,20 @@ def sensor_stats(d: dict) -> dict:
     return d.get("mand_stats") or d.get("stats") or {}
 
 
+def sensor_periods(d: dict) -> dict:
+    """*Resultaat per periode*: bij de hoofdlus van de mand de dagen/weken/
+    maanden van de hele mand, anders die van de eigen markt.
+
+    2.25.1 (L-GS-033): de mand toonde de periodes van BTC-EUR zelf (0 trades)
+    en stond daardoor sinds 20-10 op onbekend, terwijl de mand 573 trades had.
+    Tijdens het opstarten van de mand geen waarde (zoals L-GS-027/030)."""
+    if d.get("mand_wacht"):
+        return {}
+    if d.get("mand_periods") is not None:
+        return d["mand_periods"]
+    return d.get("periods") or {}
+
+
 def sensor_equity(d: dict):
     if d.get("mand_wacht"):
         return None
@@ -406,6 +420,8 @@ class BitvavoMand:
         #: Statistiek over alle gesloten trades van de mand (hooguit eens per
         #: twee minuten berekend): (moment, stats, aantal trades).
         self._mand_stats: tuple[float, dict, tuple] | None = None
+        # 2.25.1 (L-GS-033): periodes (dag/week/maand) van de hele mand.
+        self._mand_perioden: dict | None = None
         #: 2.23.1 (L-GS-027): het archief is minstens één keer ingelezen.
         self._archief_geladen = False
         #: 2.24.0 (L-GS-025): spreadwaarnemingen per markt (24 uur, bewaard).
@@ -1051,8 +1067,21 @@ class BitvavoMand:
         stats = await self.hass.async_add_executor_job(
             performance.compute_for_run, h.db, h.run_id, trades)
         stats["over_hele_mand"] = True
+        # 2.25.1 (L-GS-033): dezelfde trades per dag/week/maand. Alleen
+        # weergave; handel, risico en mandkeuze lezen dit niet.
+        try:
+            from .storage.periods import build_periods
+            self._mand_perioden = build_periods(trades).as_dict()
+        except Exception:  # noqa: BLE001 - weergave
+            _LOGGER.debug("Periodes van de mand niet op te bouwen", exc_info=True)
+            self._mand_perioden = None
         self._mand_stats = (time.monotonic(), stats, sleutel)
         return stats
+
+    def perioden(self) -> dict | None:
+        """2.25.1 (L-GS-033): *Resultaat per periode* van de hele mand, bijgewerkt
+        samen met :meth:`statistiek`."""
+        return self._mand_perioden
 
     def overzicht(self) -> dict:
         """Voor de sensor en het dashboard."""

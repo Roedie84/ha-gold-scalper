@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.25.1 - 28-10-2026
+
+### Bitvavo-mand: *Resultaat per periode* over de hele mand (L-GS-033, meetbaarheid)
+- Gemeten 27-10 (leerronde, stilstandcontrole): *Resultaat per periode* van de mand stond **sinds 20-10 op onbekend**, terwijl de mand 573 trades had. De sensor las de dag-/week-/maandcijfers van de hoofdlus (BTC-EUR zelf, 0 trades); 2.22.2 maakte *Trades*, *Nettoresultaat* en *Equity* al mandbreed, de periodes niet.
+- Nu bouwt de mand de periodes uit dezelfde gesloten trades als de mandstatistiek (alle leden plus het archief), op hetzelfde moment (`BitvavoMand.perioden()`, data-sleutel `mand_periods`). De sensor toont bij de hoofdlus die periodes; bij IG, Pepperstone en losse markten verandert niets. Tijdens het opstarten van de mand onbekend, zoals de andere mandsensoren (L-GS-027/030). Eenheid EUR (zoals de andere mandsensoren).
+- Alleen weergave: handel, risico, vermogensvloer en mandkeuze lezen dit niet.
+- Verwacht na installatie: *Resultaat per periode* van de mand gevuld; som van de dagen = *Nettoresultaat* van de mand (± 0,02).
+- Test: `test_v2251_mand_resultaat_per_periode.py` (5).
+
 ## 2.25.0 - 27-10-2026
 
 Twee punten, elk door Ruud goedgekeurd (27-10 20:16).

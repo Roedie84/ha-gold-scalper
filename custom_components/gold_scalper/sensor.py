@@ -24,6 +24,7 @@ from .mand import (
     sensor_equity_attrs,
     sensor_open_posities,
     sensor_open_posities_attrs,
+    sensor_periods,
     sensor_stats,
     sensor_trades_extra,
 )
@@ -190,17 +191,18 @@ SENSORS: tuple[ScalperSensor, ...] = (
         # De waarde is vandaag; dag, week en maand staan in de attributen.
         # Een totaalcijfer verbergt of de winst gespreid is of uit één periode
         # komt, en dat is juist wat je wilt weten.
+        # 2.25.1 (L-GS-033): bij de mand de periodes van de hele mand.
         value_fn=lambda d: (
-            ((d.get("periods") or {}).get("daily") or [{}])[-1].get("net")
+            (sensor_periods(d).get("daily") or [{}])[-1].get("net")
         ),
         attrs_fn=lambda d: {
-            "vandaag": ((d.get("periods") or {}).get("daily") or [{}])[-1],
-            "deze_week": ((d.get("periods") or {}).get("weekly") or [{}])[-1],
-            "deze_maand": ((d.get("periods") or {}).get("monthly") or [{}])[-1],
-            "dagen": (d.get("periods") or {}).get("daily", [])[-14:],
-            "weken": (d.get("periods") or {}).get("weekly", [])[-8:],
-            "maanden": (d.get("periods") or {}).get("monthly", []),
-            "reeksen": (d.get("periods") or {}).get("streaks", {}),
+            "vandaag": (sensor_periods(d).get("daily") or [{}])[-1],
+            "deze_week": (sensor_periods(d).get("weekly") or [{}])[-1],
+            "deze_maand": (sensor_periods(d).get("monthly") or [{}])[-1],
+            "dagen": sensor_periods(d).get("daily", [])[-14:],
+            "weken": sensor_periods(d).get("weekly", [])[-8:],
+            "maanden": sensor_periods(d).get("monthly", []),
+            "reeksen": sensor_periods(d).get("streaks", {}),
             "backtest": d.get("backtest", {}),
         },
     ),
