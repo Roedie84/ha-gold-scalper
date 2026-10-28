@@ -564,3 +564,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-27,DAG,gs_rooster_afwijkingen,0,1,"L-GS-031: geen 'rooster_wijkt_af' in de log; IG open 23:01 CET (avond 2 van 2)"
 2026-10-28 03:40,DAG,gs_l024_kostenverschil_usd,0.00,2,"periodes = kosten-sensor bij PP (731.65) en IG (923.79) -> L-GS-024 vervalt"
 2026-10-28 03:40,DAG,gs_stilstand_functies,1,1,"mand Resultaat per periode unknown sinds 20-10 -> gebouwd 2.25.1 (wacht op installatie)"
+2026-10-28 07:41,TUSSEN,gs_pp_run_trades,278,27,"03:45-07:45 +3 trades, +150.63 (run -509.10, PF 0.917, t -0.367); grootste cluster +724.19, zonder -1233.29"
+2026-10-28 07:41,TUSSEN,gs_ig_run_trades,170,18,"03:45-07:45 +5 trades, -12.88 (run -732.48, PF 0.792, t -1.129, stop 47.6 %)"
+2026-10-28 07:41,TUSSEN,gs_latency_p99_ms_pp,1112,0,"na herstarts 06:10/06:52; IG 1092, mand 514"
+2026-10-28 07:41,TUSSEN,gs_mand_resultaat_per_periode_eur,50.57,4,"2.25.1 actief: mand vandaag 28-10 4 trades +50.57 (sluitingen 01:00), week 44 16 trades -45.08 -> L-GS-033 geverifieerd; correctie: de 4 sluitingen vielen op 28-10 01:00, niet op 27-10"

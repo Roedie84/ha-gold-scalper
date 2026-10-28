@@ -473,3 +473,15 @@ laatste ronde: 27-10 23:41, gemeten t/m 27-10 23:45
 - Hypotheses: H-GS-11 (kosten > bruto; deze week ook bruto negatief), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting gelijk 3/4; 'één cluster' verworpen als regel).
 
 laatste ronde: 28-10 03:40, gemeten t/m 28-10 03:45
+
+## 28-10 07:41 · tussenronde
+- Herstarts 06:10 en 06:52 → **2.25.1 actief**. 2.25.2 (L-GS-011, andere sessie 07:13) workflow groen, maar HACS toonde nog 2.25.1 → HACS-informatie ververst (wacht op installatie). Demo/papier; geen knoppen, geen instellingen. Geen release.
+- **Goud 03:45-07:45:** Pepperstone 3 trades, **+150,63** → run 278, −509,10, PF 0,917, t −0,37 (27 clusters); IG 5 trades, **−12,88** → 170, −732,48, PF 0,792, t −1,13 (18 clusters). Clusters < 30 per broker → **geen toets**. PP-run steunt op één cluster (+724; zonder: −1.233).
+- **H-GS-14:** dit venster tegengesteld (PP + / IG −); toets op dagniveau in de dagafsluiting.
+- **L-GS-033 geverifieerd:** mand *Resultaat per periode* gevuld (vandaag 4 trades +50,57; week 44 16 trades −45,08). Correctie op de dagafsluiting: de 4 sluitingen (576 → 580) vielen op **28-10 01:00**, niet op 27-10.
+- Mand: noodstop blijft (equity 3.652-3.698 < vloer 5.000, zoals verwacht), 12 open. Logs: één Bitvavo-time-out (afgevangen).
+- Latency p99: PP 1,11 s, IG 1,09, mand 0,51.
+- Stilstand: **geen** (mand-periodes opgelost).
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14.
+
+laatste ronde: 28-10 07:41, gemeten t/m 28-10 07:45
