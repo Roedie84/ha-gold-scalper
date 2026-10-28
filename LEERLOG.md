@@ -460,3 +460,16 @@ laatste ronde: 27-10 19:41, gemeten t/m 27-10 19:41
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10), H-GS-14.
 
 laatste ronde: 27-10 23:41, gemeten t/m 27-10 23:45
+
+## 28-10 03:40 · dagafsluiting 27-10
+- 2.25.0 actief; **release 2.25.1** (03:59; L-GS-033: *Resultaat per periode* van de mand over de hele mand - alleen weergave; suite 2134 groen + 7 skip, workflow groen, HACS ververst; wacht op installatie). Demo/papier; geen knoppen, geen instellingen.
+- **Goud 27-10 (handelsdag):** Pepperstone 60 trades, netto **−209,82** (bruto −47,17, kosten 162,65); IG 43 trades, **−250,80** (bruto −27,73, kosten 223,07). Bruto bij beide opnieuw negatief (26-10 ook); week 44 bruto PP −262 / IG −413.
+- **Runs:** IG 165 tr / 18 cl, −719,60, PF 0,791, t −1,11; PP 275 tr / 27 cl, −659,73, PF 0,892, t −0,48. Nodig ≥ 30 cl per broker over ≥ 5 handelsdagen → **geen toets** (PP morgen mogelijk 30). Bij het huidige clustergemiddelde (−24, sd 267) zou PP ~480 clusters nodig hebben om het verschil van 0 te onderscheiden.
+- **H-GS-14 op dagniveau:** zelfde teken PP/IG op 3 van 4 gezamenlijke dagen (22, 26, 27-10; 23-10 tegengesteld). 'Eén verliescluster per dag' 2 van 4 broker-dagen (IG 26-10, PP 27-10 = 2 nachtclusters 00:30-06:21 UTC −717); IG 27-10 verlies verdeeld over 4 clusters. → richting houdt, 'één cluster' niet; n=4 dagen.
+- **L-GS-024 vervalt:** periodes-kosten = kosten-sensor (PP 731,65, IG 923,79; verschil 0,00).
+- Mand: noodstop sinds 21:03 (vloer 5.000, equity 3.653-3.697) zoals verwacht; 4 open posities gesloten (576 → 580, +50,57), 12 open. Afstemming PP 1052/1052 (2 bedragen van de broker overgenomen), IG 456/456. L-GS-031: 0 roosterafwijkingen, IG 23:01 open.
+- Latency p99 27-10: PP mediaan 0,97 s (max 1,76), mand 0,56, IG 0,81 (alleen actueel). Logs: DNS-storing 21:02-21:44 en losse cTrader/Bitvavo time-outs, afgevangen.
+- Stilstand: alleen mand *Resultaat per periode* (→ 2.25.1). L-GS-011 (sluitmoment verdwenen positie) staat sinds 21-10 op gepland → volgende vrije dagafsluiting.
+- Hypotheses: H-GS-11 (kosten > bruto; deze week ook bruto negatief), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting gelijk 3/4; 'één cluster' verworpen als regel).
+
+laatste ronde: 28-10 03:40, gemeten t/m 28-10 03:45

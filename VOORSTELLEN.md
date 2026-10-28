@@ -143,7 +143,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 
 
 ## L-GS-024 · resultaat per periode volgt de kostencorrectie van de broker (rapportage)
-- Status: **gepland** (zelf bouwen: alleen rapportage; strategie, risico en orders ongewijzigd). Eerstvolgende dagafsluiting met een handelsdag.
+- Status: **vervallen 28-10 03:40 (reproduceert niet)** - *Resultaat per periode* maandkosten = kosten-sensor: Pepperstone 731,65 = 731,65, IG 923,79 = 923,79 (verschil 0,00), na 150/11 brokercorrecties (afstemming 28-10). De periodes lezen dus al de gecorrigeerde bedragen. Was: **gepland** (zelf bouwen: alleen rapportage).
 - Onderbouwing: 23-10 22:18 daalden de Pepperstone-kosten 300,88 → 294,16 zonder nieuwe trade (afstemming met de broker). *Resultaat per periode* (week/maand/dagen) blijft op 296,92 (−2,76 verschil), netto −137,03 in beide → de periodes tellen de kosten per trade van vóór de correctie.
 - Bouw: de periodes uit dezelfde gecorrigeerde trades halen als de kosten-sensor; test met een gecorrigeerde trade.
 - Meten: week-kosten = kosten-sensor binnen 0,01.
@@ -196,7 +196,7 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Meten na installatie: sensor toont "n.v.t." in plaats van "te weinig"; `per_exitregime` splitst veldproef en tijdstop.
 
 ## L-GS-033 · mand: *Resultaat per periode* voor de hele mand (meetbaarheid, zit vast)
-- Status: **gepland** (zelf bouwen: alleen weergave; handel, risico en mandkeuze ongewijzigd). 2.24.3 geïnstalleerd 27-10 06:04 → dagafsluiting 28-10 03:40.
+- Status: **gebouwd 2.25.1** (28-10 03:59, dagafsluiting; suite 2134 groen + 7 skip, 5 nieuwe tests falen op 2.25.0; workflow groen, HACS ververst; wacht op installatie). `BitvavoMand.perioden()` uit dezelfde trades als `statistiek()`, data-sleutel `mand_periods`, sensor via `mand.sensor_periods()`; opstarten → onbekend. Toets na installatie: sensor gevuld; som dagen = *Nettoresultaat* mand (± 0,02). Was: **gepland** (zelf bouwen: alleen weergave; handel, risico en mandkeuze ongewijzigd).
 - Onderbouwing (27-10 03:40, stilstandcontrole): `sensor.gold_scalper_btc_eur_resultaat_per_periode` is **unknown sinds 20-10** terwijl de mand 573 trades heeft (26-10 +5, netto +20,02). De sensor leest `periods` van de hoofdlus (BTC-EUR zelf, 0 trades → geen dagregel); 2.22.2 maakte *Trades*/*Nettoresultaat*/*Equity* mandbreed, de periodes niet. Eenheid staat bovendien vast op USD (mand rekent in EUR). *Kosten gemeten* (unknown) en *Afstemming* (`nog_niet`) zijn bij papier zonder broker bewust leeg - geen fout.
 - Bouw: bij de hoofdlus van de mand `periods` uit de gesloten trades van alle leden (zoals `mand_stats`), eenheid EUR; tijdens het opstarten onbekend (L-GS-030). Test: twee leden met trades op twee dagen → dagregels met de som.
 - Meten na installatie: *Resultaat per periode* van de mand gevuld; dagnetto = verschil in *Nettoresultaat* over die dag (± 0,01).

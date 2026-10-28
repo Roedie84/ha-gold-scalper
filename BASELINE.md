@@ -41,3 +41,5 @@
 | Latency p99 buiten storing | PP 0,71-0,84 s · mand 0,48-0,74 s (IG alleen actueel, 0,76 s) | 25-10 | 26-10 03:40 |
 | Run IG / Pepperstone (veldproef) | 122 tr / 12 cl, netto −362,51, PF 0,855, t −0,59 · 220 tr / 19 cl, −545,19, PF 0,892, t −0,41 | t/m 27-10 03:40 | 27-10 03:40 |
 | Latency p99 rustige nacht | IG 0,86 · PP 0,87 · mand 0,39 s | 27-10 nacht | 27-10 03:40 |
+| Run IG / Pepperstone (veldproef) | 165 tr / 18 cl, netto −719,60, PF 0,791, t −1,11 · 275 tr / 27 cl, −659,73, PF 0,892, t −0,48; clustergemiddelde −40 / −24 USD (sd 153 / 267) | t/m 28-10 03:30 | 28-10 03:40 |
+| Latency p99 per dag (27-10) | PP mediaan 0,97 s (max 1,76) · mand 0,56 s (max 0,75) · IG 0,81 s (alleen actueel) | 27-10 | 28-10 03:40 |
