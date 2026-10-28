@@ -372,3 +372,14 @@ laatste ronde: 27-10 20:35
 - Volgende ronde: Pep 3m ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m (laatste instellingenwijziging > 48 u geleden).
 
 laatste ronde: 28-10 07:55
+
+## 28-10 ~19:50 · ronde 27 (geplande controle; 2.25.2 actief sinds herstart 19:18, update-entiteit off)
+- Sinds ronde 26 alleen tussenrondes 11:42/15:43/19:43 (LEERLOG.md), geen nieuwe commits op main → geen code, niets dubbel.
+- **Telcorrectie:** ronde 26 "3m 99 posities" waren regels (incl. partial_close). Posities (zelfde open_time+opzet samengevoegd): Pep run 5 = 248 (309 regels).
+- **Pepperstone** run 5: netto −598 (bruto +331, kosten 929), PF 0,91, t −0,60. 3m **90 posities** netto −840, bruto −307 (bruto t −0,42); 15m 101 pos +149, 30m 41 pos +206, 5m 12 pos −130, daghandel 4 pos +17. Geen Bonferroni.
+- **IG** run 136: 194 regels, netto −1.146, bruto −0,5, kosten 1.145 (H-GS-11: verlies = kosten), PF 0,73, t −1,65 (niet significant).
+- Status: geen noodstop IG/Pep; mand noodstop blijft (equity 3.652 < 5.000, verwacht). Logs: DNS-time-outs Bitvavo/IG (afgevangen), vp:donchian:15m door kostenregel uit.
+- Instellingen: niets (Pep 3m 90 posities < vooraf vastgelegde 100).
+- Volgende ronde: Pep 3m ≥ 100 **posities** (niet regels) en bruto < 0 → `vp_tijdvakken_uit` + 3m.
+
+laatste ronde: 28-10 19:50
