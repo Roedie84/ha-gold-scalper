@@ -508,3 +508,16 @@ laatste ronde: 28-10 11:42, gemeten t/m 28-10 11:45
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting; vandaag tegengesteld).
 
 laatste ronde: 28-10 15:43, gemeten t/m 28-10 15:45
+
+## 28-10 19:43 · tussenronde
+- **2.25.2 actief** (herstart 19:18). Demo/papier; geen knoppen, geen instellingen. Geen release.
+- **Goud 15:45-19:45:** Pepperstone 9 trades, **−275,17** → run 309, −597,61, PF 0,915, t −0,43 (37 clusters: gem −16,2, sd 230, 17/37 positief; zonder grootste −1.321,80); IG 7 trades, **−22,08** → 192, −1.118,40, PF 0,733, t −1,37 (22 clusters, < 30 → geen toets).
+- **Toets PP:** niet van 0 te onderscheiden; ~810 clusters nodig voor |t| = 2 bij dit gemiddelde. IG: ~47 clusters voor een negatieve uitslag (nu 22).
+- **H-GS-11:** cluster 35 PP bruto +69,78 → netto −50,87 (9 trades, kosten 120,65). 19:33 zette de kostenregel `vp:donchian:15m` uit (n=40, netto −683,92; bruto dekt de kosten niet). De logregel toont dan `t=None` zonder de reden → kandidaat rapportageverbetering dagafsluiting (bruto/kosten in de logregel).
+- **H-GS-14:** dag tot nu PP **−40,70** en IG **−497,90** → nu zelfde richting (15:43 nog tegengesteld). 18:15Z zelfde instapmoment: PP 1 trade −8,71, IG 3 trades −134,82.
+- Mand: noodstop blijft (equity 3.685 < vloer 5.000), 582 trades, 10 open. Logs ~19:32 DNS-time-outs Bitvavo/IG (extern, afgevangen).
+- Latency p99: PP 1,38 s, IG 1,36, mand 0,79 (↑ na de herstart van 19:18).
+- Stilstand: **geen**.
+- Hypotheses: H-GS-11 (kosten > bruto; kostenregel zet opzet uit), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting; vandaag eerst tegengesteld, nu gelijk).
+
+laatste ronde: 28-10 19:43, gemeten t/m 28-10 19:45
