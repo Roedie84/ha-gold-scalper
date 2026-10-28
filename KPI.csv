@@ -583,3 +583,8 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-28 19:43,TUSSEN,gs_h14_vandaag_pp_ig,1,2,"28-10 tot nu PP -40.70 (cl 27-37) en IG -497.90 (cl 18-22): nu zelfde richting (15:43 tegengesteld); 18:15Z zelfde instap: PP 1 trade -8.71, IG 3 trades -134.82"
 2026-10-28 19:43,TUSSEN,gs_vp_kostenregel_uitgezet,1,40,"19:33 vp:donchian:15m uit door kostenregel (bruto dekt kosten niet): n=40, netto -683.92; log toont t=None zonder reden"
 2026-10-28 19:43,TUSSEN,gs_latency_p99_ms_pp,1380,0,"IG 1360, mand 785 (15:43: 1034/1210/698); herstart 19:18, DNS-time-outs Bitvavo/IG ~19:32"
+2026-10-28 23:40,TUSSEN,gs_pp_run_trades,320,39,"19:45-23:45 +11 trades, -188.19 (bruto -168.68, kosten 19.51); run -785.81, PF 0.892, t -0.561; 39 clusters gem -20.1, sd 224.5, 17/39 positief"
+2026-10-28 23:40,TUSSEN,gs_ig_run_trades,200,24,"19:45-23:45 +8 trades, -40.48; run -1158.88, PF 0.732, t -1.421; 24 clusters gem -48.3, sd 166.5 (< 30, geen toets)"
+2026-10-28 23:40,TUSSEN,gs_pp_cluster_t,-0.561,39,"niet van 0 te onderscheiden; ~500 clusters nodig voor |t|=2 bij gem -20.1/sd 224.5; IG ~48 clusters voor negatieve uitslag"
+2026-10-28 23:40,TUSSEN,gs_h14_vandaag_pp_ig,1,2,"28-10 tot nu PP -228.90 (cl 27-39) en IG -538.40 (cl 18-24): zelfde richting"
+2026-10-28 23:40,TUSSEN,gs_latency_p99_ms_pp,1509,0,"IG 1753, mand 790 (19:43: 1380/1360/785); DNS-storing ~23:25 (cTrader/Bitvavo time-outs, afgevangen)"

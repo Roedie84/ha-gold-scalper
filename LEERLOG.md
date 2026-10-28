@@ -521,3 +521,16 @@ laatste ronde: 28-10 15:43, gemeten t/m 28-10 15:45
 - Hypotheses: H-GS-11 (kosten > bruto; kostenregel zet opzet uit), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting; vandaag eerst tegengesteld, nu gelijk).
 
 laatste ronde: 28-10 19:43, gemeten t/m 28-10 19:45
+
+## 28-10 23:40 · tussenronde
+- **2.25.2 actief**, geen herstart sinds 19:18. Demo/papier; geen knoppen, geen instellingen. Geen release.
+- **Goud 19:45-23:45:** Pepperstone 11 trades, **−188,19** (bruto −168,68, kosten 19,51) → run 320, −785,81, PF 0,892, t −0,56 (39 clusters: gem −20,1, sd 224,5, 17/39 positief); IG 8 trades, **−40,48** → 200, −1.158,88, PF 0,732, t −1,42 (24 clusters, < 30 → geen toets).
+- **Toets PP:** niet van 0 te onderscheiden; ~500 clusters nodig voor |t| = 2 bij dit gemiddelde. IG: ~48 clusters voor een negatieve uitslag (nu 24).
+- **H-GS-11:** dit venster is het verlies bij PP bruto (kosten 10 %), anders dan cluster 35; over de run blijft bruto PP +204 tegen kosten 990, IG bruto +16 tegen kosten 1.175.
+- **H-GS-14:** dag tot nu PP **−228,90** (cl. 27-39) en IG **−538,40** (cl. 18-24) → zelfde richting.
+- Mand: noodstop blijft (equity 3.707 < vloer 5.000, verwacht), 582 trades, 10 open. Logs ~23:25 DNS-storing (cTrader/Bitvavo time-outs; geen nieuwe posities tijdens de storing - afgevangen).
+- Latency p99: PP 1,51 s, IG 1,75, mand 0,79 (↑ door de DNS-storing).
+- Stilstand: **geen** (unknown = knoppen/wisselkoers, normaal).
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting; vandaag eerst tegengesteld, nu gelijk).
+
+laatste ronde: 28-10 23:40, gemeten t/m 28-10 23:45
