@@ -568,3 +568,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-28 07:41,TUSSEN,gs_ig_run_trades,170,18,"03:45-07:45 +5 trades, -12.88 (run -732.48, PF 0.792, t -1.129, stop 47.6 %)"
 2026-10-28 07:41,TUSSEN,gs_latency_p99_ms_pp,1112,0,"na herstarts 06:10/06:52; IG 1092, mand 514"
 2026-10-28 07:41,TUSSEN,gs_mand_resultaat_per_periode_eur,50.57,4,"2.25.1 actief: mand vandaag 28-10 4 trades +50.57 (sluitingen 01:00), week 44 16 trades -45.08 -> L-GS-033 geverifieerd; correctie: de 4 sluitingen vielen op 28-10 01:00, niet op 27-10"
+2026-10-28 11:42,TUSSEN,gs_pp_run_trades,287,30,"07:45-11:45 +9 trades, +34.24 (run -474.86, PF 0.925, t -0.342); 30 clusters: gem -15.8, sd 253.7, 14/30 positief; zonder grootste -1199.05"
+2026-10-28 11:42,TUSSEN,gs_ig_run_trades,181,19,"07:45-11:45 +11 trades, -335.29 (run -1067.77, PF 0.729, t -1.471); cluster 19 (07:30-10:30Z) 10 trades -373.15"
+2026-10-28 11:42,TUSSEN,gs_pp_cluster_t,-0.342,30,"eerste toetsbare run (30 cl, 5 handelsdagen): niet van 0 te onderscheiden; bij gem -15.8/sd 254 zijn ~1030 clusters nodig voor |t|=2"
+2026-10-28 11:42,TUSSEN,gs_latency_p99_ms_pp,1296,0,"na herstart 10:25 (1.3 u); IG 1471, mand 706 (07:41: 1112/1092/514)"
