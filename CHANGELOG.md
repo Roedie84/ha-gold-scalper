@@ -1,5 +1,14 @@
 # Changelog — Gold Scalper
 
+## 2.25.2 - 28-10-2026
+
+### Verdwenen positie: sluitmoment van de broker (L-GS-011, meetfout)
+- Sloot de broker een positie zelf (stop, doel), dan boekte de afwikkeling het moment waarop de lus dat merkte als sluitmoment, ook als het transactie- of activiteitenoverzicht het echte moment al gaf. De uitstapprijs kwam al wel van de broker; de tijd niet. Looptijd en de tijdsanalyses (per uur, per sessie) liepen daardoor achter. Pas de latere afstemming zette het goed, en alleen als het transactieoverzicht de trade vond.
+- Nu neemt `_settle_vanished_positions` het sluitmoment over uit `closed_at` (transactieoverzicht) of `activity_date` (activiteit; ook in de IG-vorm `2026/10/12 02:21:52`). Een datum zonder tijd of een onleesbare waarde telt niet. Het moment wordt begrensd tussen opening en nu. Zonder brokertijd, of bij een schatting, blijft het zoals het was (`now`).
+- Alleen sluittijd en looptijd veranderen. Daglimiet en verliesreeks blijven op het moment van afwikkelen. Uitstapprijs, resultaat, strategie, signalen, exits en instellingen: ongewijzigd.
+- Verwacht na installatie: bij broker-sluitingen ligt het sluitmoment binnen enkele seconden van het overzicht van de broker (was tot een cyclus plus de vertraging van het overzicht).
+- Test: `test_v2252_sluitmoment_verdwenen_positie.py` (5).
+
 ## 2.25.1 - 28-10-2026
 
 ### Bitvavo-mand: *Resultaat per periode* over de hele mand (L-GS-033, meetbaarheid)

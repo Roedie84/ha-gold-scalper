@@ -203,6 +203,41 @@ def _as_datetime(value, fallback: datetime) -> datetime:
     return fallback
 
 
+def _broker_sluitmoment(waarde, opende: datetime | None,
+                        now: datetime) -> datetime | None:
+    """Het sluitmoment zoals de broker het meldt (2.25.2, L-GS-011).
+
+    Neemt een ISO-tijd of de IG-vorm ``2026/10/12 02:21:52``. None als er geen
+    tijd in zit (een datum zonder tijd zou middernacht worden) of de waarde
+    onleesbaar is. Begrensd tussen opening en nu: een klok die iets voorloopt
+    of een verschoven venster mag geen negatieve looptijd of een sluiting in
+    de toekomst opleveren.
+    """
+    if isinstance(waarde, datetime):
+        moment = waarde
+    elif isinstance(waarde, str) and waarde.strip():
+        tekst = waarde.strip().replace("/", "-")
+        if "T" not in tekst and " " in tekst:
+            tekst = tekst.replace(" ", "T", 1)
+        if tekst.endswith("Z"):
+            tekst = tekst[:-1] + "+00:00"
+        try:
+            moment = datetime.fromisoformat(tekst)
+        except ValueError:
+            return None
+        if not (moment.hour or moment.minute or moment.second):
+            return None
+    else:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    if moment > now:
+        moment = now
+    if opende is not None and moment < opende:
+        moment = opende
+    return moment
+
+
 def _veilig_utc(waarde) -> datetime | None:
     """Een bewaarde tijd als UTC, of None als hij ontbreekt of onleesbaar is."""
     if not waarde:
@@ -6254,8 +6289,19 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                         werkelijk = activiteit
                         bron = activiteit.get("source") or "broker_activity"
 
+                sluitmoment: datetime | None = None
                 if werkelijk and werkelijk.get("exit_price"):
                     exit_price = float(werkelijk["exit_price"])
+                    # 2.25.2 (L-GS-011): ook het sluitmoment van de broker,
+                    # niet het moment waarop de lus het merkte. Dat liep
+                    # uiteen met de cyclus plus de vertraging van het
+                    # overzicht; looptijd en tijdsanalyses (per uur, per
+                    # sessie) werden daardoor te lang en verschoven.
+                    sluitmoment = _broker_sluitmoment(
+                        werkelijk.get("closed_at")
+                        or werkelijk.get("activity_date"),
+                        _as_datetime(trade.open_time, None), now,
+                    )
                     half = quote.spread / 2.0
                     settle = VenueQuote(
                         bid=exit_price if long else exit_price - 2 * half,
@@ -6319,7 +6365,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
 
                 await self._record_broker_close(
                     _TicketOnly(str(trade.broker_ticket)), settle, reason, now,
-                    bron=bron,
+                    bron=bron, sluitmoment=sluitmoment,
                 )
             except asyncio.CancelledError:
                 raise
@@ -7356,8 +7402,13 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
     async def _record_broker_close(
         self, position, quote: VenueQuote, reason: str, now: datetime,
         bron: str = "broker_transactions", risico: bool = True,
+        sluitmoment: datetime | None = None,
     ) -> None:
         """Werk de open trade bij tot een gesloten trade.
+
+        ``sluitmoment`` (2.25.2, L-GS-011): het moment waarop de broker sloot,
+        als dat bekend is; anders ``now``. Alleen voor sluittijd en looptijd;
+        de risicoadministratie (daglimiet, verliesreeks) blijft op ``now``.
 
         ``risico`` (2.4.7): False voor een verweesde trade uit een eerdere
         run; die telt niet voor de daglimiet of de verliesreeks van nu.
@@ -7382,14 +7433,15 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
         direction = 1.0 if long else -1.0
         units = trade.volume * CONTRACT_SIZE
 
-        trade.close_time = now.isoformat()
+        moment = sluitmoment or now
+        trade.close_time = moment.isoformat()
         trade.close_price = exit_price
         trade.close_mid = quote.mid
         trade.close_spread = quote.spread
         trade.close_reason = reason
-        trade.duration_seconds = int(
-            (now - _as_datetime(trade.open_time, now)).total_seconds()
-        )
+        trade.duration_seconds = max(0, int(
+            (moment - _as_datetime(trade.open_time, moment)).total_seconds()
+        ))
         # Bruto op de mids: dat is de beweging die de strategie ving.
         # Uitersten meenemen. Zonder deze twee kan de verliesanalyse niet
         # vaststellen of een verlies aan het ontwerp lag of aan de markt.
