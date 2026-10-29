@@ -1116,6 +1116,7 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             self.run_id = int(existing["id"])
             self.starting_balance = float(existing["starting_balance"])
             self.opening_equity = existing.get("opening_equity_account")
+            await self._pas_papieren_startbalans_toe()
             _LOGGER.info(
                 "Bewijsfase voortgezet: run %s, gestart %s",
                 self.run_id, existing["started_at"],
@@ -1445,6 +1446,44 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             self._geschatte_afwikkelingen = len(geschat)
         if post.patterns and post.patterns[0].actionable and post.fixable_share >= 0.25:
             _LOGGER.info("Verliesanalyse: %s", post.conclusion)
+
+    async def _pas_papieren_startbalans_toe(self) -> None:
+        """2.26.0: een gewijzigde startbalans geldt ook voor de lopende papieren run.
+
+        Gevraagd 29-10 (Bitvavo-mand): "start bedrag naar 1000000 zodat de vloer
+        nooit geraakt wordt maar er wel data wordt verzameld." De startbalans
+        zit bewust niet in de vingerafdruk (de bewijsfase loopt door), maar
+        daardoor won bij een voortgezette run altijd de opgeslagen waarde en
+        deed de instelling niets (mand: ingesteld 100.000, run 10.000).
+
+        Alleen op papier en alleen als de gebruiker de balans zelf instelde.
+        De trades blijven; de equity wordt startbalans plus resultaat, dus ook
+        de vermogensvloer en de positiegrootte (risico per trade) schuiven mee.
+        """
+        if self.mode.places_orders or self.run_id is None:
+            return
+        gekozen = self.entry.options.get(CONF_STARTING_BALANCE)
+        try:
+            gekozen = float(gekozen)
+        except (TypeError, ValueError):
+            return
+        if gekozen <= 0 or abs(gekozen - float(self.starting_balance)) < 0.005:
+            return
+        oud = float(self.starting_balance)
+        await self.hass.async_add_executor_job(
+            self.db.set_run_starting_balance, self.run_id, gekozen
+        )
+        await self.hass.async_add_executor_job(
+            self.db.annotate_run, self.run_id, f"startbalans_{gekozen:.0f}",
+            f"Startbalans op papier aangepast van {oud:.0f} naar {gekozen:.0f} "
+            f"(versie {INTEGRATION_VERSION}). Trades en resultaten blijven; equity, "
+            "vloer en positiegrootte rekenen vanaf hier met de nieuwe startbalans.",
+        )
+        self.starting_balance = gekozen
+        _LOGGER.info(
+            "Papieren run %s: startbalans %s -> %s (instelling)",
+            self.run_id, round(oud), round(gekozen),
+        )
 
     async def _adoptable_run(self, material: dict, fingerprint: str):
         """Zoek een lopende run die alleen verschilt in wat jij niet koos.

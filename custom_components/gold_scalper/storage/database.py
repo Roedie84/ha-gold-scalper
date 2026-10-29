@@ -1468,6 +1468,19 @@ class TradeDatabase:
         )
         self.conn.commit()
 
+    def set_run_starting_balance(self, run_id: int, starting_balance: float) -> None:
+        """2.26.0: de startbalans van een papieren run aanpassen (Ruud 29-10).
+
+        Alleen voor papier: daar is de startbalans een gekozen getal, geen
+        saldo bij een broker. De trades en hun resultaten blijven staan; de
+        equity is daarna startbalans plus resultaat.
+        """
+        self.conn.execute(
+            "UPDATE runs SET starting_balance=? WHERE id=?",
+            (float(starting_balance), run_id),
+        )
+        self.conn.commit()
+
     def annotate_run(self, run_id: int, kind: str, text: str,
                      boundary: str | None = None) -> bool:
         """Aantekening toevoegen; één per soort per run. Idempotent."""

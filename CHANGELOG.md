@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.26.0 - 29-10-2026
+
+### Startbalans op papier geldt ook voor de lopende run (gevraagd Ruud)
+- Gevraagd 29-10 (Bitvavo-mand, papier): "start bedrag naar 1000000 zodat de vloer nooit geraakt wordt maar er wel data wordt verzameld." De startbalans zit bewust niet in de vingerafdruk (de bewijsfase loopt door), maar daardoor won bij een voortgezette run altijd de opgeslagen startbalans en deed de instelling niets (mand: ingesteld 100.000, run 10.000; vloer 5.000 bij een mand van ~3.680, noodstop sinds 27-10).
+- Nu: `_pas_papieren_startbalans_toe` zet bij een voortgezette **papieren** run de zelf ingestelde startbalans in de run (`set_run_starting_balance`) met een aantekening (`startbalans_<bedrag>`). Trades en resultaten blijven; equity = startbalans + resultaat, dus vloer en positiegrootte (risico per trade) rekenen vanaf dan met de nieuwe balans.
+- Demo en live: ongewijzigd (daar is de balans het saldo bij de broker). Vingerafdruk, strategie, signalen en exits: ongewijzigd.
+- Test: `test_v2260_papieren_startbalans.py` (5).
+
 ## 2.25.3 - 29-10-2026
 
 ### Logregel uitgezette veldproefopzet noemt de reden (rapportage)
