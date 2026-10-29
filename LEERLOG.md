@@ -546,3 +546,14 @@ laatste ronde: 28-10 23:40, gemeten t/m 28-10 23:45
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting gelijk 4/5).
 
 laatste ronde: 29-10 03:40, gemeten t/m 29-10 03:45
+
+## 29-10 07:41 · tussenronde
+- **2.25.3 actief** (HA-herstart 06:40). Demo/papier; geen knoppen, geen instellingen. Geen release.
+- **2.25.3 werkt:** logregel 07:15 "vp:rsi_rev:15m uitgezet: n=312, netto −1.741,75 (kostenregel: bruto 1.661,14 dekt kosten 3.402,90 niet)" noemt nu de reden.
+- **Goud 03:45-07:45:** Pepperstone 6 trades, cluster 40 van −178,74 naar **−17,92** (14 trades) → run 334 tr / 40 cl, **−845,20**, t **−0,60** (gem −21,1, sd 222, 17/40 positief); ~440 clusters nodig voor |t| = 2. IG 5 trades, cluster 24 nu 21 trades −271,40 → run 216 / 24 cl, **−1.409,88**, t −1,67 (< 30 → geen toets; ~34 clusters voor een negatieve uitslag).
+- **H-GS-11:** vp:rsi_rev:15m bruto +1.661 tegen kosten 3.403 (n=312) → zelfde beeld: kosten ~2× bruto. **H-GS-14:** 29-10 tot nu PP −17,92 (cl. 40) / IG −271,40 → zelfde richting.
+- Mand: noodstop blijft (equity 3.674 < vloer 5.000, verwacht), 589 trades. DNS-storing ~07:35 (IG/cTrader/Bitvavo time-outs, afgevangen). Latency p99: PP 1,46 s, IG 1,60, mand 0,77.
+- Stilstand: **geen**.
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting).
+
+laatste ronde: 29-10 07:41, gemeten t/m 29-10 07:45
