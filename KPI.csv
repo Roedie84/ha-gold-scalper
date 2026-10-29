@@ -607,3 +607,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-29 15:45,TUSSEN,gs_ig_t_clusters,-1.689,24,"run 217 tr (+1), -1441.25 (-31.38); 1 positie open; < 30 clusters, geen toets"
 2026-10-29 15:45,TUSSEN,gs_latency_p99_ms_pp,1291,0,"IG 1489, mand 731"
 2026-10-29 15:45,TUSSEN,gs_mand_startbalans,10000,1,"2.26.0 geinstalleerd, instelling starting_balance 1000000, maar Equity-sensor startbalans 10000, equity 3692.49, vloer 5000 (noodstop blijft) -> L-GS-034"
+2026-10-29 19:40,TUSSEN,gs_pp_t_clusters,-0.555,42,"run 379 tr (+13), -784.36 (+167.44 sinds 15:45, cl 42 -264.17 -> -96.73); kosten 1124 tegen bruto +339 (3.3x); gem -18.7, sd 218 -> ~545 clusters voor |t|=2"
+2026-10-29 19:40,TUSSEN,gs_ig_t_clusters,-1.72,24,"run 222 tr (+5), -1502.97 (-61.72; cl 24 -364.49); 1 positie open; < 30 clusters, geen toets (bij dit gem/sd ~32 nodig)"
+2026-10-29 19:40,TUSSEN,gs_latency_p99_ms_pp,1500,2000,"IG 1759, mand 842"
+2026-10-29 19:40,TUSSEN,gs_mand_startbalans,1000000,1,"sinds herlaad 15:54: startbalans 1000000, vloer 500000, equity 993666; noodstop uit 18:23 na gold_scalper.resume (Ruud); 589 tr (0 nieuw), 6 open -> L-GS-034 vervallen"

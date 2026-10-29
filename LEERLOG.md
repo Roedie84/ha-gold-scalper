@@ -578,3 +578,14 @@ laatste ronde: 29-10 11:40, gemeten t/m 29-10 11:45
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting; vandaag beide negatief tot nu).
 
 laatste ronde: 29-10 15:45, gemeten t/m 29-10 15:45
+
+## 29-10 19:40 · tussenronde
+- **2.26.0 actief**; demo/papier; geen knoppen, geen instellingen. Geen release.
+- **Goud 15:45-19:45:** Pepperstone 13 trades (379), **+167,44** (cl 42 −264 → −97) → run 42 cl, **−784,36**, t **−0,56**; kosten 1.124 tegen bruto +339 (3,3×; was 7,6×). Gem −18,7, sd 218 → ~545 clusters voor |t| = 2 → geen conclusie. IG 5 trades (222 / 24 cl, **−1.502,97**, t −1,72; < 30 clusters, bij dit gem/sd ~32 nodig → geen toets). Beide 1 short open.
+- **H-GS-14:** 29-10 PP cl 41-42 −55 (cl 40 loopt sinds 28-10 23:30), IG cl 24 −364 → vandaag beide negatief, verschil in grootte; dagafsluiting telt af.
+- **L-GS-034 vervallen:** na herlaad 15:54 rekent de mand met startbalans 1.000.000, vloer 500.000, equity 993.666; Ruud hervatte 18:22 (`gold_scalper.resume` per markt, 4 markten "niet gevonden"). Noodstop uit sinds 18:23; nog 0 nieuwe mandtrades, 6 open. Kleine noot: de hervatlog meldt "−990.000 al verloren vandaag" (= de startbalansverhoging, geen verlies) - alleen tekst, geen effect op de daglimiet (dagijkpunt verzet naar 1.000.000).
+- Latency p99: PP 1,50 s, IG 1,76, mand 0,84.
+- Stilstand: **geen**. Mand *Afstemming* "nog_niet" (papier) → dagafsluiting: bewust of niet.
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting).
+
+laatste ronde: 29-10 19:40, gemeten t/m 29-10 19:45
