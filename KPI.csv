@@ -611,3 +611,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-29 19:40,TUSSEN,gs_ig_t_clusters,-1.72,24,"run 222 tr (+5), -1502.97 (-61.72; cl 24 -364.49); 1 positie open; < 30 clusters, geen toets (bij dit gem/sd ~32 nodig)"
 2026-10-29 19:40,TUSSEN,gs_latency_p99_ms_pp,1500,2000,"IG 1759, mand 842"
 2026-10-29 19:40,TUSSEN,gs_mand_startbalans,1000000,1,"sinds herlaad 15:54: startbalans 1000000, vloer 500000, equity 993666; noodstop uit 18:23 na gold_scalper.resume (Ruud); 589 tr (0 nieuw), 6 open -> L-GS-034 vervallen"
+2026-10-29 23:40,TUSSEN,gs_pp_t_clusters,-0.738,43,"run 382 tr (+3), -1054.88 (-270.52 sinds 19:45: cl 42 -96.73 -> -185.65, cl 43 -181.60 2 tr); kosten 1134 tegen bruto +79 (14x); gem -24.5, sd 218 -> ~316 clusters voor |t|=2"
+2026-10-29 23:40,TUSSEN,gs_ig_t_clusters,-1.749,25,"run 225 tr (+3), -1689.26 (-186.29; cl 24 -364.49 -> -562.50 afgesloten, cl 25 +11.72); < 30 clusters, geen toets (bij dit gem/sd ~33 nodig)"
+2026-10-29 23:40,TUSSEN,gs_latency_p99_ms_pp,1167,0,"IG 1170, mand 694"
+2026-10-29 23:40,TUSSEN,gs_mand_netto_sinds_hervatting,-315.36,3,"cl 12 18:22-21:43: 3 tr, bruto -276.25, kosten 39.11; equity 993351; 4 open; Bitvavo 'geen bieding en laat' 34x sinds 15:54 (1 van max 3, afgevangen)"

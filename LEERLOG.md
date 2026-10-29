@@ -589,3 +589,14 @@ laatste ronde: 29-10 15:45, gemeten t/m 29-10 15:45
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting).
 
 laatste ronde: 29-10 19:40, gemeten t/m 29-10 19:45
+
+## 29-10 23:40 · tussenronde
+- **2.26.0 actief** (HA-herstart 19:49: administratie weggeschreven, posities gedekt); demo/papier; geen knoppen, geen instellingen. Geen release.
+- **Goud 19:45-23:45:** Pepperstone 3 trades (382 / **43 cl**), **−270,52** (cl 42 −96,73 → −185,65; cl 43 −181,60 uit 2 trades) → run **−1.054,88**, t **−0,74**; kosten 1.134 tegen bruto +79 (H-GS-11: 14×). Gem −24,5, sd 218 → ~316 clusters voor |t| = 2 → geen conclusie. IG 3 trades (225 / **25 cl**, **−1.689,26**, t **−1,75**; cl 24 afgesloten op −562,50 = grootste verliescluster); < 30 clusters, ~33 nodig bij dit gem/sd → geen toets. Beide 1 positie open.
+- **H-GS-14:** 29-10 PP cl 41-43 −325, IG cl 24 (deels 28-10) −562 → vandaag beide negatief; dagafsluiting telt af.
+- **Mand na hervatting (18:22):** 3 trades, −315,36 (bruto −276, kosten 39); 592 tr / 12 cl, t −1,37; 4 open. Bitvavo-koersopvraging 34× "geen bieding en laat" sinds 15:54 (telkens 1 van max 3, data aangehouden, geen nieuwe posities in die tick) → afgevangen; dagafsluiting: frequentie per uur.
+- Latency p99: PP 1,17 s, IG 1,17, mand 0,69.
+- Stilstand: **geen**. Mand *Afstemming* "nog_niet" (papier) → dagafsluiting: bewust of niet.
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting).
+
+laatste ronde: 29-10 23:40, gemeten t/m 29-10 23:45
