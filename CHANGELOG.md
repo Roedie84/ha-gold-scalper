@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.25.3 - 29-10-2026
+
+### Logregel uitgezette veldproefopzet noemt de reden (rapportage)
+- Gemeten 28-10 (leerronde): "Veldproefopzet vp:donchian:15m uitgezet: n=40, netto -683.92, t=None". Bij de kostenregel (2.14.0) is `t` altijd None; dat de bruto beweging de kosten niet dekte, stond nergens.
+- Nu: `uitzet_reden()` - kostenregel met bruto en kosten, met de hand uitgezet tijdvak, groep, of `t=...`.
+- Alleen tekst in de log; welke opzetten uitgaan, handel, risico en instellingen: ongewijzigd.
+- Test: `test_v2253_uitzet_reden.py` (3).
+
 ## 2.25.2 - 28-10-2026
 
 ### Verdwenen positie: sluitmoment van de broker (L-GS-011, meetfout)

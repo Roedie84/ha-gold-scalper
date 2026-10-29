@@ -206,6 +206,21 @@ def kosten_uitgezet(per_opzet: dict[str, dict]) -> dict[str, dict]:
     return uit
 
 
+def uitzet_reden(info: dict) -> str:
+    """2.25.3: waarom een opzet uit staat, voor de logregel (alleen tekst).
+
+    Leerronde 28-10: "vp:donchian:15m uitgezet: n=40, netto -683.92, t=None"
+    - bij de kostenregel is t altijd None en stond de reden (bruto dekt de
+    kosten niet) nergens."""
+    if info.get("regel") == "kosten":
+        return f"kostenregel: bruto {info.get('bruto')} dekt kosten {info.get('kosten')} niet"
+    if info.get("handmatig"):
+        return f"tijdvak met de hand uit, t={info.get('t')}"
+    if info.get("groep"):
+        return f"groep {info.get('groep')} uit, t={info.get('t')}"
+    return f"t={info.get('t')}"
+
+
 def handmatig_uitgezet(per_opzet: dict[str, list[float]],
                        tijdvakken) -> dict[str, dict]:
     """2.10.0: alle opzetten van met de hand uitgezette tijdvakken."""

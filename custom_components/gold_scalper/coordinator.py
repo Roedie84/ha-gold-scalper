@@ -1989,9 +1989,9 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
                              len(nieuw), ", ".join(sorted(nieuw)))
         else:
             for naam in sorted(set(nieuw) - set(self._vp_uitgezet)):
-                _LOGGER.warning("Veldproefopzet %s uitgezet: n=%s, netto %s, t=%s",
+                _LOGGER.warning("Veldproefopzet %s uitgezet: n=%s, netto %s (%s)",
                                 naam, nieuw[naam]["n"], nieuw[naam]["netto"],
-                                nieuw[naam]["t"])
+                                veldproef_mod.uitzet_reden(nieuw[naam]))
         self._vp_uitgezet = nieuw
         # 2.6.1: scalp en turbo als groep.
         try:
