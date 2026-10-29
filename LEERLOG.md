@@ -534,3 +534,15 @@ laatste ronde: 28-10 19:43, gemeten t/m 28-10 19:45
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting; vandaag eerst tegengesteld, nu gelijk).
 
 laatste ronde: 28-10 23:40, gemeten t/m 28-10 23:45
+
+## 29-10 03:40 · dagafsluiting 28-10
+- 2.25.2 actief; **release 2.25.3** (04:16; logregel bij een uitgezette veldproefopzet noemt de reden - kostenregel met bruto/kosten i.p.v. `t=None`; alleen tekst; suite 2142 groen + 7 skip). Demo/papier; geen knoppen, geen instellingen.
+- **Goud 28-10 (UTC-dag):** Pepperstone 59 trades, netto **−220,81** (bruto +73,55, kosten 294,36); IG 38 trades, **−469,97** (bruto −198,99, kosten 270,98). Week 44 PP −971 / IG −1.494.
+- **Runs:** PP 328 tr / 40 cl, −1.006,02, PF 0,867, **t −0,71** (gem −25,2, sd 224, 17/40 positief) → niet van 0 te onderscheiden; bij dit gemiddelde ~316 clusters nodig voor |t| = 2. IG 211 tr / 24 cl, −1.312,24, PF 0,718, t −1,59 (< 30 clusters → geen toets; ~38 clusters voor een negatieve uitslag).
+- **H-GS-11:** PP bruto positief maar kosten 4× zo groot; IG ook bruto negatief → verlies = kosten + bruto. **H-GS-14:** dagrichting gelijk op 4 van 5 gezamenlijke dagen (28-10 beide negatief).
+- Nacht 23:45-03:45: PP 8 trades −220,21, IG 11 trades −153,36. Mand: noodstop blijft (equity 3.672 < vloer 5.000, verwacht), 589 trades, 3 open. Afstemming PP 1081/1082 (1 bedrag van de broker overgenomen), IG in orde.
+- Latency p99: PP 1,46 s, IG 1,30, mand 0,83 (DNS-storing 23:25-01:00; extern, afgevangen).
+- Stilstand: **geen** (mand *kosten gemeten* unknown = papier).
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting gelijk 4/5).
+
+laatste ronde: 29-10 03:40, gemeten t/m 29-10 03:45
