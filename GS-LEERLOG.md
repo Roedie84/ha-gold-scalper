@@ -383,3 +383,13 @@ laatste ronde: 28-10 07:55
 - Volgende ronde: Pep 3m ≥ 100 **posities** (niet regels) en bruto < 0 → `vp_tijdvakken_uit` + 3m.
 
 laatste ronde: 28-10 19:50
+
+## 29-10 ~07:50 · ronde 28 (geplande controle; 2.25.3 actief, update-entiteit off)
+- Sinds ronde 27 alleen 2.25.3 + dagafsluiting/tussenronde (andere sessies) → geen code, niets dubbel.
+- **Pepperstone** run 5: 269 posities (334 regels), netto −845 (bruto +168, kosten 1.013), PF 0,89, t −0,73. 3m **94 posities** netto −912, bruto −362 (bruto t −0,48); 15m 113 pos +65, 30m 45 pos +138, 5m 13 pos −153, daghandel 4 pos +17. Geen Bonferroni.
+- **IG** run 136: 201 posities, netto −1.410 (bruto −167, kosten 1.243), PF 0,70, t −1,77. vp:rsi_rev:15m (run 104 pos, bruto −559) om 07:15 door kostenregel uitgezet (alle runs n=312, bruto 1.661 < kosten 3.403).
+- Status: geen noodstop IG/Pep; mand-noodstop blijft (equity 3.652 < 5.000, verwacht). Logs: DNS-time-outs IG/cTrader/Bitvavo (afgevangen).
+- Instellingen: niets (Pep 3m 94 < vooraf vastgelegde 100 posities).
+- Volgende ronde: Pep 3m ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m.
+
+laatste ronde: 29-10 07:50
