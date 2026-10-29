@@ -567,3 +567,14 @@ laatste ronde: 29-10 07:41, gemeten t/m 29-10 07:45
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting gelijk 4/5).
 
 laatste ronde: 29-10 11:40, gemeten t/m 29-10 11:45
+
+## 29-10 15:45 · tussenronde
+- **2.26.0 actief** (andere sessie 15:09, op verzoek van Ruud: papieren startbalans ook voor de lopende run; HA-herstart ~15:10). Demo/papier; geen knoppen, geen instellingen. Geen release.
+- **Goud 11:45-15:45:** Pepperstone 17 trades (366 totaal), −134,86 (cl 40 +87, 41 +42, 42 −264) → run 42 cl, **−951,80**, t **−0,67**; kosten 1.096 tegen bruto +144 (H-GS-11: kosten nu 7,6× bruto). Gem −22,7, sd 221 → ~380 clusters voor |t| = 2 → geen conclusie. IG 1 trade (217 / 24 cl, **−1.441,25**, t −1,69; < 30 clusters → geen toets), 1 positie open.
+- **H-GS-14:** 29-10 tot nu PP ≈ −125 (cl 40-42), IG cl 24 −303 → nu dezelfde richting (negatief); dag loopt nog.
+- **Mand / 2.26.0:** instelling `starting_balance` 1.000.000, maar de Equity-sensor toont `startbalans` 10.000, equity 3.692, vloer 5.000 en de log van 15:10 meldt de noodstop met mand-equity 3.652. De nieuwe startbalans is dus (nog) niet in de lopende run gekomen → **L-GS-034** (bug; oorzaak nog niet vastgesteld; niet gebouwd in deze tussenronde: de chatsessie van 15:09 werkt hier vandaag aan). De noodstop blijft hoe dan ook tot `gold_scalper.resume` (Ruud).
+- Latency p99: PP 1,29 s, IG 1,49, mand 0,73.
+- Stilstand: **geen** (mand staat stil door de noodstop = bewust, wacht op Ruud).
+- Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting; vandaag beide negatief tot nu).
+
+laatste ronde: 29-10 15:45, gemeten t/m 29-10 15:45

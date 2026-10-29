@@ -201,3 +201,9 @@ Status: open / akkoord / afgewezen / gebouwd vX / geverifieerd / teruggedraaid. 
 - Bouw: bij de hoofdlus van de mand `periods` uit de gesloten trades van alle leden (zoals `mand_stats`), eenheid EUR; tijdens het opstarten onbekend (L-GS-030). Test: twee leden met trades op twee dagen → dagregels met de som.
 - Meten na installatie: *Resultaat per periode* van de mand gevuld; dagnetto = verschil in *Nettoresultaat* over die dag (± 0,01).
 
+
+## L-GS-034 · mand: papieren startbalans uit 2.26.0 komt niet in de lopende run (bug)
+- Status: **open — oorzaak zoeken en zelf bouwen bij dagafsluiting 30-10**, tenzij de chatsessie van 29-10 (2.26.0) het eerder oplost. Raakt geen strategie of handelslogica; wel de vloer van de mand (startbalans is door Ruud zelf ingesteld en 2.26.0 is zijn opdracht).
+- Onderbouwing (29-10 15:45): 2.26.0 geïnstalleerd (update-entiteit v2.26.0, herstart ~15:10); opties mand `starting_balance` 1000000; toch `sensor.gold_scalper_btc_eur_equity` startbalans 10000 / equity 3692,49, `..._vermogensvloer` opening_equity 10000, vloer 5000, ruimte −1307,51; log 15:10 "Noodstop uit een eerdere sessie blijft actief … equity van de mand 3652 onder 5000". De mand rekent met `hoofd.starting_balance` (`mand.py` grootboek); `_pas_papieren_startbalans_toe` wordt alleen aangeroepen als een bestaande run wordt voortgezet (`coordinator.py` ~1117). Te controleren: draait de hoofd-lus van de mand via dat pad, en wordt `starting_balance` daarna nog uit de opgeslagen staat/run teruggezet.
+- Verwacht effect: na herstart startbalans 1.000.000, equity ≈ 993.700, vloer 500.000. De noodstop blijft tot `gold_scalper.resume` (Ruud).
+- Meten: Equity-sensor `startbalans`, vermogensvloer en run-aantekening `startbalans_1000000`.
