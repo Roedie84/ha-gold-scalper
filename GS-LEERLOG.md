@@ -393,3 +393,13 @@ laatste ronde: 28-10 19:50
 - Volgende ronde: Pep 3m ≥ 100 posities en bruto < 0 → `vp_tijdvakken_uit` + 3m.
 
 laatste ronde: 29-10 07:50
+
+## 29-10 ~19:50 · ronde 29 (geplande controle; 2.26.0 actief, update-entiteit off)
+- Sinds ronde 28 alleen 2.26.0 (chatsessie, mand-startbalans) + tussenrondes → geen code, niets dubbel.
+- **Pepperstone** run 5: 305 posities (379 regels), netto −784 (bruto +339, kosten 1.124), PF 0,91, t −0,63. 3m **110 posities** netto −879, bruto −257 (bruto t −0,31; kosten 623); 15m 128 pos +194, 30m 49 pos +38, 5m 13 pos −153, daghandel 5 pos +17. Geen Bonferroni.
+- **IG** run 136: 206 posities, netto −1.503 (bruto −241, kosten 1.262), PF 0,69, t −1,87 (niet significant). vp:rsi_rev:15m blijft uit.
+- **Instelling (vooraf vastgelegde regel, laatste wijziging Pep 22-10 > 48 u):** Pep `vp_tijdvakken_uit` ["1m"] → ["1m","3m"]. Waarom: 3m ≥ 100 posities (110) en bruto < 0 (−257); kosten 623 = 2,4× |bruto|. Geen vingerafdruk, run 5 loopt door (entry herladen 19:49, positie open, toestand running). Meet: Pep kosten/positie en netto per dag zonder 3m; 3m-signalen blijven in de schaduw zichtbaar? (controleren).
+- Status: geen noodstop IG/Pep; mand hervat door Ruud 18:22. Logs: Pep stop broker 4008,23 vs db 4008,10 (klein), Bitvavo orderboek-waarschuwingen (afgevangen). Tekstnoot: "HA sluit af" verschijnt ook bij herladen van een entry (alleen tekst).
+- Volgende ronde: Pep 5m (13 pos) en 15m-opzetten volgen; geen nieuwe instellingen vóór 31-10 19:50.
+
+laatste ronde: 29-10 19:50
