@@ -412,3 +412,12 @@ laatste ronde: 29-10 19:50
 - Instellingen: niets (Pep wachttijd tot 31-10 19:50; IG geen vooraf vastgelegde regel geraakt).
 
 laatste ronde: 30-10 07:55
+
+## 30-10 ~19:55 · ronde 31 (geplande controle; 2.26.0 actief, update-entiteit off)
+- Sinds ronde 30 alleen tussenrondes 11:41/15:56/19:40 (LEERLOG.md), geen commits op main → geen code, niets dubbel. Geen noodstop IG/Pep/mand; log alleen bekende zaken (L-GS-035, Bitvavo-orderboek/time-outs afgevangen, 1× markt dicht binnen rooster). Beide brokers 1 positie open sinds ~15:30.
+- **Pepperstone** run 5: 329 posities (411 regels), netto −688 (bruto +508, kosten 1.196), PF 0,93, t −0,53. 15m 137 pos +419, 30m 57 +115, 5m 16 −364 (structuur_trend:5m door kostenregel uit), daghandel 9 +22. **Sinds 3m uit: 23 posities +185 (bruto +255), kosten/positie 3,0 (was 3,7)** → te weinig n, wel de verwachte richting.
+- **IG** run 136: 231 posities, netto −1.644 (bruto −290, kosten 1.354), PF 0,70, t −1,92; oordeel `failed`. 15m 156 pos t −2,00 (< 200, tijdvakregel niet geraakt); daghandel 10 pos +54 (n te klein, niet toetsen). Sessie Azië −640 / Europa −480 / NY −525 (NY bruto +132; niet significant).
+- Instellingen: niets (Pep wachttijd tot 31-10 19:50; IG geen vooraf vastgelegde regel geraakt). Geen release.
+- Volgende ronde: Pep effect 3m uit (≥ 50 posities), Pep 5m (16 pos), IG 15m richting n=200.
+
+laatste ronde: 30-10 19:55
