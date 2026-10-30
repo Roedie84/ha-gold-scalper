@@ -600,3 +600,16 @@ laatste ronde: 29-10 19:40, gemeten t/m 29-10 19:45
 - Hypotheses: H-GS-11 (kosten > bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-14 (dagrichting).
 
 laatste ronde: 29-10 23:40, gemeten t/m 29-10 23:45
+
+## 30-10 03:40 · dagafsluiting 29-10
+- **2.26.0 actief** (geen nieuwere release; geen commits sinds 29-10 15:09). Demo/papier; geen knoppen, geen instellingen. **Geen release** (geen bug die nu fout gedrag of foute data geeft).
+- **Goud 29-10 (UTC-dag):** Pepperstone 62 trades, netto **−232,23** (bruto −87,09, kosten 145,14); IG 24 trades, **−588,09** (bruto −481,15, kosten 106,94). 7 d (23..29-10): PP −1.834,70 (bruto −778, kosten 1.056), IG −1.698,21 (bruto −572, kosten 1.127). Week 44 PP −983,57 / IG −1.970,62.
+- **Runs:** PP 387 tr / 44 cl, −1.018,46, PF 0,887, **t −0,71**; bruto t **+0,09** (gem +3,2/cluster) → geen bruto-edge, ~344 clusters nodig voor |t| = 2 → geen conclusie. IG 229 tr / **27 cl**, −1.788,98, PF 0,663, **t −1,83** (bruto t −0,60); nog 3 clusters tot de toetsgrens van 30, ~32 nodig voor een negatieve uitslag bij dit gem/sd.
+- **H-GS-11 (kosten > bruto) aangescherpt:** over 7 d is ook bruto negatief op beide brokers; kosten/trade schommelen (PP 2,3-5,0, IG 4,5-7,1 per dag) → het verlies is niet alleen kosten. **H-GS-14 afgesloten:** dagrichting PP/IG gelijk op 5 van 6 dagen → beide runs zijn geen onafhankelijke waarnemingen; niet als dubbele n tellen.
+- **Mand:** dag 29-10 11 trades −229,27 EUR; na hervatting (18:22) 7 trades −520,86 (2 cl). Clusters **12 → 11**: cluster 11 loopt van 25-10 08:31 tot 30-10 01:16 (6.765 min) doordat `_clusters` per mand op het laatste sluitmoment ketent en er 19 posities op 1d/4h openstaan → **H-GS-15** (mand-oordeel komt met deze clusterdefinitie mogelijk nooit aan 30 clusters). Toets 02-11: groeit het aantal clusters? Zo niet → voorstel (raakt oordeel/poort → Ruud).
+- Bitvavo "geen bieding en laat" 35× (15:54-00:43, ~4/u, afgevangen). Paper-slippage 2× begrensd (01:00, 02:07; bekend vangnet). IG "stop bij broker ≠ database" 2× (19:01, 00:15; 0,13/0,45 USD, afstemming in_orde) → volgen.
+- Latency p99 29-10: PP mediaan ~1,41 s (max 1,60), mand ~0,83 s, IG 1,40 s (actueel).
+- Stilstand: **geen nieuwe** (mand-oordeel sinds 21-10 te weinig data; oorzaak t/m 29-10 de noodstop, nu H-GS-15).
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-15 (mand-clusterketen).
+
+laatste ronde: 30-10 03:40, gemeten t/m 30-10 03:10

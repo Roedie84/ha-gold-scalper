@@ -43,3 +43,6 @@
 | Latency p99 rustige nacht | IG 0,86 · PP 0,87 · mand 0,39 s | 27-10 nacht | 27-10 03:40 |
 | Run IG / Pepperstone (veldproef) | 165 tr / 18 cl, netto −719,60, PF 0,791, t −1,11 · 275 tr / 27 cl, −659,73, PF 0,892, t −0,48; clustergemiddelde −40 / −24 USD (sd 153 / 267) | t/m 28-10 03:30 | 28-10 03:40 |
 | Latency p99 per dag (27-10) | PP mediaan 0,97 s (max 1,76) · mand 0,56 s (max 0,75) · IG 0,81 s (alleen actueel) | 27-10 | 28-10 03:40 |
+| Run IG / Pepperstone (veldproef) | 229 tr / 27 cl, netto −1.788,98, PF 0,663, t −1,83 (bruto t −0,60) · 387 tr / 44 cl, −1.018,46, PF 0,887, t −0,71 (bruto t +0,09); clustergemiddelde −66 / −23 USD (sd 188 / 215) | t/m 30-10 02:55 | 30-10 03:40 |
+| Kosten per trade 7 d (23..29-10) | PP 3,08 · IG 5,78 USD; bruto 7 d negatief (PP −778, IG −572) | 343 / 195 trades | 30-10 03:40 |
+| Latency p99 per dag (29-10) | PP mediaan ~1,41 s (max 1,60) · mand ~0,83 s (max 0,97) · IG 1,40 s (alleen actueel) | 29-10 | 30-10 03:40 |
