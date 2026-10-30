@@ -655,3 +655,14 @@ laatste ronde: 30-10 15:56, gemeten t/m 30-10 15:58
 - Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-13 (L-GS-031, toets 22:00 → dagafsluiting), H-GS-15 (mand-clusterketen).
 
 laatste ronde: 30-10 19:40, gemeten t/m 30-10 19:45
+
+## 30-10 23:40 · tussenronde
+- **2.26.0 actief** (geen nieuwere). Demo/papier; geen knoppen, geen instellingen. Geen release. Log sinds 19:45: 1× Bitvavo "geen bieding en laat" TAO-EUR (20:38, afgevangen).
+- **L-GS-031 geverifieerd (vr-sluiting):** IG markt off en `markt_gesloten` om 22:00:02, 0 `rooster_wijkt_af`, geen instap na 21:00 (laatste IG-trade dicht 20:50). Pepperstone dicht 21:55 (broker, vrijdag 5 min eerder). Rest-toets ma 02-11 (pauze weer 23:00-24:00 na VS-wintertijd).
+- **Sinds 19:45:** IG +2 trades (20:29, 20:50; +84,78) → 258 tr, netto −1.559,64, bruto −201, kosten 1.358, **t −1,51** (failed). Pepperstone +1 (21:25; +64,22) → 412 tr, −623,64, bruto +573 tegen kosten 1.197, t −0,42 (failed). Mand +1 (+6,65) → 609 tr, −6.822,21, 15 open, 11 clusters (insufficient_data).
+- **H-GS-15 (mand-clusterketen):** dezelfde mand per tijdblok: 60 blokken, **t_netto −6,57** (lag1 +0,43), terwijl het oordeel op 11 clusters 'te weinig data' blijft. De tijdblok-maat ziet het verlies wel; lag1 +0,43 = blokken zijn niet onafhankelijk (open posities lopen door), dus |t| is overschat. Toets 02-11 blijft staan.
+- Latency p99: IG 1,05 s, PP 0,91 s, mand 0,63 s. Weekend: goud dicht tot zo 23:00 CET.
+- Stilstand: **geen nieuwe** (mand-oordeel → H-GS-15). L-GS-035 blijft open.
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-15 (mand-clusterketen), H-GS-13 afgerond met L-GS-031.
+
+laatste ronde: 30-10 23:40, gemeten t/m 30-10 23:45

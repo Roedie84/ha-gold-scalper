@@ -642,3 +642,8 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-30 19:40,TUSSEN,gs_mand_clusters,11,608,"+3 trades (+92.83); netto -6828.86, t -1.425, 16 open, oordeel insufficient_data"
 2026-10-30 19:40,TUSSEN,gs_latency_p99_ms,1203,3,"IG 1203, PP 1103, mand 765"
 2026-10-30 19:40,TUSSEN,gs_markt_gesloten_volgens_broker,1,1,"19:02:57 WARNING 'broker meldt markt gesloten binnen rooster' (afgevangen, eenmalig; Amerikaanse zomertijd tot 01-11)"
+2026-10-30 23:40,TUSSEN,gs_ig_t_clusters,-1.51,30,"258 tr (+2, +84.78), -1559.64, bruto -201, kosten 1358, oordeel failed; markt dicht 22:00:02"
+2026-10-30 23:40,TUSSEN,gs_pp_run_trades,412,0,"+1 sinds 19:45 (+64.22); netto -623.64, bruto +573, kosten 1197, t -0.42, oordeel failed; markt dicht 21:55"
+2026-10-30 23:40,TUSSEN,gs_mand_clusters,11,609,"+1 trade (+6.65); netto -6822.21, 15 open, insufficient_data; per tijdblok 60 blokken t_netto -6.57, lag1 +0.43"
+2026-10-30 23:40,TUSSEN,gs_latency_p99_ms,1049,3,"IG 1049, PP 910, mand 632"
+2026-10-30 23:40,TUSSEN,gs_rooster_wijkt_af_vr_sluiting,0,1,"vr 30-10 IG dicht 22:00:02 zonder afwijking -> L-GS-031 geverifieerd"
