@@ -633,3 +633,15 @@ laatste ronde: 30-10 07:41, gemeten t/m 30-10 07:45
 - Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-13 (L-GS-031, toets vandaag 22:00: IG/PP dicht om 22:00 tot ma), H-GS-15 (mand-clusterketen).
 
 laatste ronde: 30-10 11:41, gemeten t/m 30-10 11:45
+
+## 30-10 15:56 · tussenronde
+- **2.26.0 actief** (geen nieuwere; HA-herstart 13:03), alle toestanden `running`. Demo/papier; geen knoppen, geen instellingen. Geen release. Bij de herstart opnieuw 4× de oude vloer-noodstop (FARTCOIN/LTC/NEAR/PUMP) → L-GS-035 blijft open.
+- **IG haalde de toetsgrens: oordeel `failed`** (sinds 13:03): 255 trades (+18, +269,35), netto −1.648,36, PF 0,701, **t −1,62**, bruto −299 vóór kosten 1.350. Tijdstop 21 cl t −0,52; veldproef 21 cl t −1,85. Het verlies zit al in de bruto beweging (H-GS-11: ook IG). Geen edge aantoonbaar; geen strategievoorstel (Ruud beslist; research-oordeel van de integratie zelf).
+- **Pepperstone:** +16 trades (+390,34) → 410 tr, −713,35, PF 0,923, t −0,48; bruto +482 maar kosten 1.195 (oordeel failed).
+- **Integratie zette zelf 2 veldproefopzetten uit** (kostenregel, n=40): `vp:structuur_trend:5m` netto −444,68 (bruto −286,41) en `vp:donchian:30m` netto −979,49 (bruto −638,23). Ingebouwd gedrag, geen ingreep.
+- **Mand:** 0 trades sinds 11:45 (605, −6.921,69), 16 open; cluster 11 → H-GS-15 (toets 02-11).
+- Latency p99: IG 1,33 s, PP 1,00 s, mand 0,74 s.
+- Stilstand: **geen nieuwe**.
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto; IG nu bevestigd op 30 cl), H-GS-13 (L-GS-031, toets vandaag 22:00), H-GS-15 (mand-clusterketen).
+
+laatste ronde: 30-10 15:56, gemeten t/m 30-10 15:58

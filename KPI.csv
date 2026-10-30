@@ -633,3 +633,7 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-30 11:41,TUSSEN,gs_pp_run_trades,394,46,"+4 sinds 07:45 (-58.08); netto -1103.69, PF 0.881, t -0.772, oordeel failed"
 2026-10-30 11:41,TUSSEN,gs_ig_t_clusters,-1.958,29,"237 tr (+7, -27.77 in cl 29), -1917.71, PF 0.652; veldproef 18 cl t -2.38 / tijdstop 17 cl t -0.57; 1 cluster tot de toetsgrens"
 2026-10-30 11:41,TUSSEN,gs_mand_clusters,11,605,"+4 trades (+14.36); netto -6921.69, t -1.444, 16 open; cluster 11 loopt door tot 30-10 10:04 (44 tr, 7293 min) -> H-GS-15"
+2026-10-30 15:56,TUSSEN,gs_pp_run_trades,410,0,"+16 sinds 11:45 (+390.34); netto -713.35, PF 0.923, t -0.48, bruto +482 tegen kosten 1195, oordeel failed"
+2026-10-30 15:56,TUSSEN,gs_ig_t_clusters,-1.62,30,"≥ 30 clusters, toetsgrens bereikt: oordeel failed (13:03); 255 tr (+18, +269.35), -1648.36, PF 0.701, bruto -299, kosten 1350; tijdstop 21 cl t -0.52 / veldproef 21 cl t -1.85"
+2026-10-30 15:56,TUSSEN,gs_mand_clusters,11,605,"0 nieuwe trades sinds 11:45; netto -6921.69; afstemming nog_niet (papier)"
+2026-10-30 15:56,TUSSEN,gs_latency_p99_ms,1328,3,"IG 1328, PP 1003, mand 741"
