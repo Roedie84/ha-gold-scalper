@@ -645,3 +645,13 @@ laatste ronde: 30-10 11:41, gemeten t/m 30-10 11:45
 - Hypotheses: H-GS-11 (verlies = kosten + negatief bruto; IG nu bevestigd op 30 cl), H-GS-13 (L-GS-031, toets vandaag 22:00), H-GS-15 (mand-clusterketen).
 
 laatste ronde: 30-10 15:56, gemeten t/m 30-10 15:58
+
+## 30-10 19:40 · tussenronde
+- **2.26.0 actief** (geen nieuwere), alle toestanden `running`. Demo/papier; geen knoppen, geen instellingen. Geen release.
+- **Sinds 15:58:** Pepperstone +1 trade (+25,49) → 411 tr, −687,86, PF 0,926, t −0,47 (failed). IG +1 (+3,94) → 256 tr, −1.644,42, PF 0,702, **t −1,61** (failed, ≥ 30 cl). Mand +3 (+92,83) → 608 tr, −6.828,86, t −1,43, 16 open, 11 clusters (H-GS-15).
+- Log: 19:02:57 eenmalig "broker meldt de markt gesloten binnen het rooster" (afgevangen: niet gehandeld). Amerikaanse zomertijd loopt tot zo 01-11; telt mee bij de toets van L-GS-031 vanavond 22:00 (dagafsluiting).
+- Latency p99: IG 1,20 s, PP 1,10 s, mand 0,77 s.
+- Stilstand: **geen nieuwe** (mand-oordeel → H-GS-15, toets 02-11). L-GS-035 blijft open.
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-13 (L-GS-031, toets 22:00 → dagafsluiting), H-GS-15 (mand-clusterketen).
+
+laatste ronde: 30-10 19:40, gemeten t/m 30-10 19:45
