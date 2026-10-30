@@ -403,3 +403,12 @@ laatste ronde: 29-10 07:50
 - Volgende ronde: Pep 5m (13 pos) en 15m-opzetten volgen; geen nieuwe instellingen vóór 31-10 19:50.
 
 laatste ronde: 29-10 19:50
+
+## 30-10 ~07:55 · ronde 30 (geplande controle; 2.26.0 actief, geen nieuwere release)
+- Sinds ronde 29 alleen tussenrondes/dagafsluiting (andere sessies), geen commits op main → geen code, niets dubbel. Geen noodstop IG/Pep/mand; log alleen L-GS-035 (oude vloer-noodstops 4 mandmarkten buiten de mand, voorstel ligt bij Ruud).
+- **Pepperstone** run 5: 314 posities (390 regels), netto −1.046 (bruto +116, kosten 1.162), PF 0,89, t −0,82. 15m 135 pos +122 (vp:pullback:15m 50 pos +338, t 0,68), 30m 50 −51, 5m 14 −254, daghandel 5 +17. Sinds 3m uit (29-10 18:49 UTC): 8 posities, −172 → te weinig n.
+- **IG** run 136: 213 posities, netto −1.890 (bruto −596, kosten 1.294), PF 0,65; t per positie −2,26 (15m 153 pos t −2,14; < 200 voor de tijdvakregel). Geen Bonferroni.
+- **Uitstap (MFE in R, R ≈ verlies bij volle stop ~95):** Pep/IG slechts 1% van de posities haalt MFE ≥ 1R, 0% ≥ 2R → doel 2R is vrijwel onbereikbaar; winst komt uit trailing/omkeer (Pep 84, IG 40 stops in winst). Beschrijvend, geen toets → geen wijziging; kandidaat-hypothese voor Ruud: doel op ~1R vooraf vastleggen en in de schaduw toetsen.
+- Instellingen: niets (Pep wachttijd tot 31-10 19:50; IG geen vooraf vastgelegde regel geraakt).
+
+laatste ronde: 30-10 07:55
