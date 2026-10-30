@@ -623,3 +623,13 @@ laatste ronde: 30-10 03:40, gemeten t/m 30-10 03:10
 - Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-13 (L-GS-031, toets vr 30-10 22:00), H-GS-15 (mand-clusterketen).
 
 laatste ronde: 30-10 07:41, gemeten t/m 30-10 07:45
+
+## 30-10 11:41 · tussenronde
+- **2.26.0 actief** (geen nieuwere), alle toestanden `running`. Demo/papier; geen knoppen, geen instellingen. Geen release. Log: 1× paper-slippage begrensd (bekend vangnet), 2× Bitvavo "geen bieding en laat" (afgevangen).
+- **Sinds 07:45:** Pepperstone +4 trades (−58,08) → 394 tr / 46 cl, −1.103,69, PF 0,881, **t −0,77** (oordeel failed). IG +7 (cl 29: −27,77) → 237 tr / **29 clusters**, −1.917,71, PF 0,652, **t −1,96**; nog 1 cluster tot de toetsgrens 30. Uitsplitsing IG: veldproef 18 cl t −2,38 (netto −1.549) tegen tijdstop 17 cl t −0,57 — informatief, oordeel blijft op de hele run.
+- **Mand:** +4 trades (+14,36) → 605 tr, −6.921,69, t −1,44, 16 open. **Cluster 11 groeit door** (44 trades, 25-10 08:31 → 30-10 10:04, 7.293 min); aantal clusters blijft 11 → H-GS-15 2e waarneming (toets 02-11 blijft staan).
+- Latency p99: PP 0,86 s, IG 1,41 s, mand 0,63 s.
+- Stilstand: **geen nieuwe** (mand-oordeel → H-GS-15). Live-poortchecks (verstreken tijd/handelsdagen) zijn de live-drempels, geen stilstand.
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-13 (L-GS-031, toets vandaag 22:00: IG/PP dicht om 22:00 tot ma), H-GS-15 (mand-clusterketen).
+
+laatste ronde: 30-10 11:41, gemeten t/m 30-10 11:45

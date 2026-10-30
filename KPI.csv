@@ -630,3 +630,6 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-30 07:41,TUSSEN,gs_ig_t_clusters,-1.93,28,"230 tr, -1889.94, PF 0.651; +1 trade 03Z -100.97; bruto t -0.60; 2 clusters tot de toetsgrens 30"
 2026-10-30 07:41,TUSSEN,gs_mand_clusters,11,601,"+2 trades; netto -6936.05, t -1.45, 18 open; equity 993966, vloer 500000"
 2026-10-30 07:41,TUSSEN,gs_oude_vloer_noodstops,4,4,"herstart 07:41: FARTCOIN/LTC/NEAR/PUMP-EUR equity 3653 < oude vloer 5000; niet in de mand -> geen effect nu; L-GS-035"
+2026-10-30 11:41,TUSSEN,gs_pp_run_trades,394,46,"+4 sinds 07:45 (-58.08); netto -1103.69, PF 0.881, t -0.772, oordeel failed"
+2026-10-30 11:41,TUSSEN,gs_ig_t_clusters,-1.958,29,"237 tr (+7, -27.77 in cl 29), -1917.71, PF 0.652; veldproef 18 cl t -2.38 / tijdstop 17 cl t -0.57; 1 cluster tot de toetsgrens"
+2026-10-30 11:41,TUSSEN,gs_mand_clusters,11,605,"+4 trades (+14.36); netto -6921.69, t -1.444, 16 open; cluster 11 loopt door tot 30-10 10:04 (44 tr, 7293 min) -> H-GS-15"
