@@ -613,3 +613,13 @@ laatste ronde: 29-10 23:40, gemeten t/m 29-10 23:45
 - Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-13 (→ L-GS-031, toets vr 30-10 22:00), H-GS-15 (mand-clusterketen).
 
 laatste ronde: 30-10 03:40, gemeten t/m 30-10 03:10
+
+## 30-10 07:41 · tussenronde
+- **2.26.0 actief** (geen nieuwere), HA-herstart 07:40-07:41, alle toestanden `running`, noodstop-sensoren uit. Demo/papier; geen knoppen, geen instellingen. Geen release.
+- **Sinds 03:10:** Pepperstone +3 trades (−27,15) → 390 tr, −1.045,61, t −0,73, oordeel failed (sinds 28-10). IG +1 (03Z −100,97) → 230 tr / **28 clusters**, −1.889,94, PF 0,651, **t −1,93** (bruto t −0,60); nog 2 clusters tot de toetsgrens. Mand +2 → 601 tr / 11 clusters, −6.936, t −1,45; 18 open.
+- **Gevonden (L-GS-035, open):** bij de herstart 07:41 4× "Noodstop uit een eerdere sessie blijft actief" voor FARTCOIN/LTC/NEAR/PUMP-EUR: "equity van de mand 3653 onder de ondergrens van 5000" (vloer van vóór de papieren startbalans; nu vloer 500.000, equity 993.966). Geen effect zolang ze buiten de mand staan (`noodstop_markten` leeg); komen ze terug (PUMP/NEAR geweerd op spread-mediaan 0,051/0,044 %), dan staan ze stil op een reden die niet meer geldt. Vloer-noodstops blijven bewust staan (2.24.0) → voorstel, Ruud beslist.
+- Mand *boekhouding_klopt_met_broker* false / *Afstemming* nog_niet (papier; bekend sinds 29-10, dagafsluiting).
+- Stilstand: **geen nieuwe** (mand-oordeel → H-GS-15, toets 02-11).
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-13 (L-GS-031, toets vr 30-10 22:00), H-GS-15 (mand-clusterketen).
+
+laatste ronde: 30-10 07:41, gemeten t/m 30-10 07:45
