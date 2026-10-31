@@ -657,3 +657,5 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-31 03:40,DAG,gs_latency_p99_ms,663,3,"03:43: PP 663, IG 606, mand 525 (weekend, goud dicht)"
 2026-10-31 03:40,DAG,gs_stilstand_functies,0,3,"mand-oordeel insufficient_data -> H-GS-15 (toets 02-11); goud dicht tot zo 23:00"
 2026-10-31 07:40,TUSSEN,gs_beschikbaarheid,1,1,"weekend, markt gesloten; running, 0 open, afstemming in_orde; IG 258 tr t -1.515 failed (ongewijzigd); geen fouten sinds 03:45"
+2026-10-31 11:40,TUSSEN,gs_mand_trades,610,610,"+1 (09:25); netto -6931.08 incl. 15 open; insufficient_data; status wachtend sinds 04:39; p99 0.53 s"
+2026-10-31 11:40,TUSSEN,gs_beschikbaarheid,1,1,"weekend, goud dicht; IG 258 tr t -1.515, PP 412 tr t -0.418 (ongewijzigd); draait 2.26.0 (2.27.0 in HACS)"

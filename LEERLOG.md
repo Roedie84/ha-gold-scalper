@@ -686,3 +686,12 @@ laatste ronde: 31-10 03:40, gemeten t/m 31-10 03:45
 - Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-15 (mand-clusterketen, toets ma 02-11).
 
 laatste ronde: 31-10 07:42, gemeten t/m 31-10 07:45
+
+## 31-10 11:41 · tussenronde
+- **Draait nog 2.26.0** (HA-start 30-10 13:03); **2.27.0 (L-GS-035)** door een andere sessie gebouwd 08:10, in HACS klaar → toets na de herstart (0 oude vloer-noodstops). Demo/papier; geen knoppen, geen instellingen. Geen release.
+- Weekend: goud dicht tot zo 23:00 CET; IG 258 tr (t −1,515 failed), PP 412 tr (t −0,418 failed) ongewijzigd.
+- Mand: +1 trade (09:25) → 610 tr, netto −6.931,08 (incl. 15 open posities), oordeel insufficient_data; status "wachtend" sinds de Bitvavo-time-out 04:39; latency p99 0,53 s. *Afstemming* "nog_niet" (papier, bekend).
+- Stilstand: **geen nieuwe**.
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-15 (mand-clusterketen, toets ma 02-11).
+
+laatste ronde: 31-10 11:43, gemeten t/m 31-10 11:45
