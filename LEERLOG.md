@@ -678,3 +678,11 @@ laatste ronde: 30-10 23:40, gemeten t/m 30-10 23:45
 - Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-15 (mand-clusterketen), H-GS-14 afgesloten.
 
 laatste ronde: 31-10 03:40, gemeten t/m 31-10 03:45
+
+## 31-10 07:40 · tussenronde
+- **2.26.0 actief** (geen nieuwere; geen commits). Demo/papier; geen knoppen, geen instellingen. Geen release.
+- Weekend: goud dicht tot zo 23:00 CET; 0 open, afstemming in orde. Geen nieuwe trades sinds 03:45 (IG 258 tr, t −1,515 failed; PP 412 tr). Log: niets nieuws van gold_scalper na 03:45.
+- Stilstand: **geen nieuwe**. L-GS-035 blijft open.
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-15 (mand-clusterketen, toets ma 02-11).
+
+laatste ronde: 31-10 07:42, gemeten t/m 31-10 07:45

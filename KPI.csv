@@ -656,3 +656,4 @@ datumtijd,type,kpi,waarde,n,opmerking
 2026-10-31 03:40,DAG,gs_dagrichting_gelijk,6,7,"30-10 PP +435.87 en IG +129.34 zelfde teken (6/7 sinds 22-10)"
 2026-10-31 03:40,DAG,gs_latency_p99_ms,663,3,"03:43: PP 663, IG 606, mand 525 (weekend, goud dicht)"
 2026-10-31 03:40,DAG,gs_stilstand_functies,0,3,"mand-oordeel insufficient_data -> H-GS-15 (toets 02-11); goud dicht tot zo 23:00"
+2026-10-31 07:40,TUSSEN,gs_beschikbaarheid,1,1,"weekend, markt gesloten; running, 0 open, afstemming in_orde; IG 258 tr t -1.515 failed (ongewijzigd); geen fouten sinds 03:45"
