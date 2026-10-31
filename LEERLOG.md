@@ -666,3 +666,15 @@ laatste ronde: 30-10 19:40, gemeten t/m 30-10 19:45
 - Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-15 (mand-clusterketen), H-GS-13 afgerond met L-GS-031.
 
 laatste ronde: 30-10 23:40, gemeten t/m 30-10 23:45
+
+## 31-10 03:40 · dagafsluiting 30-10
+- **2.26.0 actief** (geen nieuwere; geen commits sinds 29-10 15:09). Demo/papier; geen knoppen, geen instellingen. **Geen release** (geen bug gevonden). Log: Bitvavo-koers 1× mislukt (afgevangen), noodstop-restanten van 4 vertrokken mandmarkten bij de herstart (L-GS-035, open).
+- **Goud 30-10:** Pepperstone 30 trades **+435,87** (bruto +497,99, kosten 62,12 = 2,07/trade); IG 33 trades **+129,34** (bruto +202,97, kosten 73,64). Beide positief: dagrichting gelijk 6/7 → nog steeds geen onafhankelijke waarnemingen (H-GS-14).
+- **Runs:** PP 412 tr, −623,64, PF 0,933, t −0,42 (failed); bruto +573 tegen kosten 1.197 → over de run dekt bruto de kosten niet. IG 258 tr / 30 cl, −1.559,91, PF 0,717, **t −1,51** (failed): bij ≥ 30 clusters géén aantoonbare edge; |t| < 2, dus ook geen significant verlies. Week 44 PP −588,75 / IG −1.741,56.
+- **H-GS-11:** één positieve brutodag verandert het beeld niet: run-bruto PP +573 / IG −201, kosten 1.197 / 1.358 → verlies = kosten (PP) en kosten + negatief bruto (IG). Blijft.
+- **Mand 30-10:** 16 trades −209,03 EUR (bruto −69, kosten 140); run 609 tr, −6.822,21, kosten 5.941 (87 % van het verlies), 11 clusters (H-GS-15, toets ma 02-11).
+- Latency p99 03:43: PP 0,66 s, IG 0,61 s, mand 0,52 s (weekend). Goud dicht tot zo 23:00 CET; VS-wintertijd zo 01-11 → rest-toets L-GS-031 ma 02-11.
+- Stilstand: **geen nieuwe**. L-GS-035 blijft open.
+- Hypotheses: H-GS-11 (verlies = kosten + negatief bruto), H-GS-15 (mand-clusterketen), H-GS-14 afgesloten.
+
+laatste ronde: 31-10 03:40, gemeten t/m 31-10 03:45

@@ -46,3 +46,5 @@
 | Run IG / Pepperstone (veldproef) | 229 tr / 27 cl, netto −1.788,98, PF 0,663, t −1,83 (bruto t −0,60) · 387 tr / 44 cl, −1.018,46, PF 0,887, t −0,71 (bruto t +0,09); clustergemiddelde −66 / −23 USD (sd 188 / 215) | t/m 30-10 02:55 | 30-10 03:40 |
 | Kosten per trade 7 d (23..29-10) | PP 3,08 · IG 5,78 USD; bruto 7 d negatief (PP −778, IG −572) | 343 / 195 trades | 30-10 03:40 |
 | Latency p99 per dag (29-10) | PP mediaan ~1,41 s (max 1,60) · mand ~0,83 s (max 0,97) · IG 1,40 s (alleen actueel) | 29-10 | 30-10 03:40 |
+| IG run-oordeel | t −1,51 bij 30 clusters (failed: geen edge) | run t/m 30-10, 258 tr | 31-10 03:40 |
+| PP run bruto tegen kosten | +573 / 1.197 USD (412 tr) | run t/m 30-10 | 31-10 03:40 |
