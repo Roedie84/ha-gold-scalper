@@ -421,3 +421,12 @@ laatste ronde: 30-10 07:55
 - Volgende ronde: Pep effect 3m uit (≥ 50 posities), Pep 5m (16 pos), IG 15m richting n=200.
 
 laatste ronde: 30-10 19:55
+
+## 31-10 ~07:50 · ronde 32 (geplande controle; 2.26.0 actief, geen nieuwere release)
+- Sinds ronde 31 alleen tussenrondes/dagafsluiting (LEERLOG.md), geen commits op main → geen code, niets dubbel. Weekend: goud dicht tot zo 23:00 CET, 0 open, afstemming in orde, geen noodstop IG/Pep/mand.
+- **Pepperstone** run 5: 329 posities (412 regels), netto −624 (bruto +573, kosten 1.197), PF 0,93, t −0,48. **Sinds 3m uit: 23 posities +250 (bruto +320), kosten/positie 3,07 (was 3,68)**; t 0,63 → nog te weinig n (doel ≥ 50).
+- **IG** run 136: 258 tr, netto −1.560 (bruto −201, kosten 1.358), PF 0,72, t −1,51 (failed). Mand 609 tr, −6.822 (H-GS-15, toets ma 02-11).
+- Instellingen: niets (Pep-wachttijd tot 31-10 19:50, geen vooraf vastgelegde regel geraakt). Geen release, dashboard ongewijzigd.
+- Volgende ronde: Pep effect 3m uit (≥ 50 posities), Pep 5m, IG 15m richting n=200.
+
+laatste ronde: 31-10 07:50
