@@ -72,7 +72,7 @@ def test_coordinator_restores_before_first_cycle():
     source = (Path(__file__).resolve().parent.parent / "custom_components"
               / "gold_scalper" / "coordinator.py").read_text()
     setup = source.split("async def async_setup")[1].split("\n    async def ")[0]
-    load_pos = setup.index("async_load()")
+    load_pos = setup.index("self._store.async_load(")  # 2.27.0: met mandlid=
     assert "warm_up" not in setup[:load_pos], "historie geladen vóór de toestand"
     # Teruggezet zonder het als nieuwe noodstop te melden.
     assert "self.risk.restore_halt" in setup, "noodstop wordt niet hersteld"

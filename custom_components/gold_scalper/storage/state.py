@@ -174,6 +174,13 @@ def is_dagverlies_noodstop(reden: str | None) -> bool:
     return str(reden or "").strip().lower().startswith("dagverlies")
 
 
+def is_mandvloer_noodstop(reden: str | None) -> bool:
+    """2.27.0 (L-GS-035): een noodstop op de vloer van de hele Bitvavo-mand
+    (zie ``RiskManager.toets_mandvloer``: "equity van de mand ... onder de
+    ondergrens ...")."""
+    return str(reden or "").strip().lower().startswith("equity van de mand")
+
+
 def noodstop_dag(state: RuntimeState) -> date | None:
     """2.24.0 (L-GS-029): de handelsdag waarop een bewaarde noodstop afging.
 
@@ -243,7 +250,7 @@ class StateStore:
     def _nu() -> datetime:
         return datetime.now(timezone.utc)
 
-    async def async_load(self) -> RuntimeState:
+    async def async_load(self, mandlid: bool = False) -> RuntimeState:
         self._all = await _lees_gedeeld(self._gedeeld)
         raw = self._all.get(self._entry_id) or {}
         fields = {f for f in RuntimeState.__dataclass_fields__}
@@ -263,6 +270,28 @@ class StateStore:
             _LOGGER.info(
                 "Dagverlies-noodstop van een eerdere handelsdag (%s) niet "
                 "teruggezet (%s): %s", dag.isoformat() if dag else "onbekend",
+                self._entry_id, state.halt_reason,
+            )
+            state.halted = False
+            state.halt_reason = None
+            state.halt_day = None
+            try:
+                await self.async_save(state)
+            except Exception:  # noqa: BLE001 - de coordinator bewaart later opnieuw
+                _LOGGER.debug("Gewiste noodstop niet meteen bewaard", exc_info=True)
+        elif mandlid and state.halted and is_mandvloer_noodstop(state.halt_reason):
+            # 2.27.0 (L-GS-035, akkoord 31-10): de vloer van de hele mand wordt
+            # elke cyclus opnieuw getoetst, door elk lid, tegen de huidige
+            # startbalans. Een bewaarde mandvloer-noodstop van een lid hoeft
+            # dus niet terug: ligt de mand nog onder de vloer, dan gaat hij in
+            # de eerste cyclus meteen weer aan. FARTCOIN, LTC, NEAR en PUMP
+            # bleven na elke herstart staan op "3.653 onder 5.000" terwijl de
+            # vloer sinds 29-10 500.000 is en de mand op 993.686 staat; buiten
+            # de mand waren ze ook niet met gold_scalper.resume te bereiken.
+            self.vervallen_noodstop = state.halt_reason
+            _LOGGER.info(
+                "Mandvloer-noodstop niet teruggezet (%s): %s. De vloer van de "
+                "mand wordt in de eerste cyclus opnieuw getoetst.",
                 self._entry_id, state.halt_reason,
             )
             state.halted = False

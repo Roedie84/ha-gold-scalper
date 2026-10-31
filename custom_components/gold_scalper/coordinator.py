@@ -959,7 +959,10 @@ class GoldScalperCoordinator(DataUpdateCoordinator[dict]):
             )
         # Eerst de bewaarde toestand: een noodstop uit een vorige sessie moet
         # gelden vóórdat er ook maar één cyclus draait.
-        self._state = await self._store.async_load()
+        # 2.27.0 (L-GS-035): een lid van de mand heeft een ``hoofd_entry_id``.
+        self._state = await self._store.async_load(
+            mandlid=getattr(self.entry, "hoofd_entry_id", None) is not None
+        )
         # De laatst bekende wisselkoers terugzetten. Zonder dit begon elke
         # herstart zonder koers, en tot de eerstvolgende gecorrigeerde trade werd
         # de positiegrootte niet omgerekend.

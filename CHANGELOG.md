@@ -1,5 +1,13 @@
 # Changelog — Gold Scalper
 
+## 2.27.0 - 31-10-2026
+
+### Oude mandvloer-noodstop van een lid komt niet terug (L-GS-035, akkoord Ruud)
+- FARTCOIN, LTC, NEAR en PUMP stonden na elke herstart in "Noodstop uit een eerdere sessie blijft actief: equity van de mand 3653 onder de ondergrens van 5000", terwijl de vloer sinds 2.26.0 op 500.000 ligt en de mand op 993.686 staat. Buiten de mand waren ze niet met `gold_scalper.resume` te bereiken (29-10: "Geen Gold Scalper-markt FARTCOIN-EUR gevonden").
+- Nu: `StateStore.async_load(mandlid=True)` zet een **mandvloer**-noodstop (`is_mandvloer_noodstop`) van een lid niet terug en wist hem in het bestand. Elke lus toetst de vloer van de hele mand elke cyclus opnieuw (`toets_mandvloer`, vóór de posities), tegen de huidige startbalans: ligt de mand nog onder de vloer, dan staat de noodstop in de eerste cyclus meteen weer.
+- Ongewijzigd: de hoofdlus houdt zijn mandvloer-noodstop (handmatig hervatten), en elke andere noodstop van een lid (eigen vloer, dode data, trade-limiet) blijft staan.
+- Test: `test_v2270_mandvloer_noodstop.py` (5).
+
 ## 2.26.0 - 29-10-2026
 
 ### Startbalans op papier geldt ook voor de lopende run (gevraagd Ruud)
